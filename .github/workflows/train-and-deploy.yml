@@ -28,13 +28,6 @@ permissions:
   packages: write
   actions: write  # needed for the docker/build-push-action GHA cache backend
 
-env:
-  # Docker registry names must be lowercase; github.repository preserves
-  # actual repo capitalization (this repo is "saisantoshtangirala/DANTS"),
-  # which broke the very first build-image run with "repository name must
-  # be lowercase". toLower() is a built-in GitHub Actions expression fn.
-  IMAGE_NAME: ghcr.io/${{ toLower(github.repository) }}-training
-
 jobs:
   build-image:
     runs-on: ubuntu-latest
@@ -52,7 +45,16 @@ jobs:
 
       - name: Set image tag
         id: meta
-        run: echo "image=${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        # GitHub Actions expressions have no built-in lowercase function
+        # (confirmed the hard way: toLower() doesn't exist - "Unrecognized
+        # function"), and Docker registry names must be lowercase, while
+        # github.repository preserves this repo's actual capitalization
+        # (saisantoshtangirala/DANTS). Bash's ${VAR,,} does the lowercasing.
+        run: |
+          REPO_LC="${GITHUB_REPOSITORY,,}"
+          IMAGE_NAME="ghcr.io/${REPO_LC}-training"
+          echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE_NAME:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -65,7 +67,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.image }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ steps.meta.outputs.image_name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
