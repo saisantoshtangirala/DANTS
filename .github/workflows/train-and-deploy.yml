@@ -1,9 +1,18 @@
 name: Train on RunPod and Deploy to Hetzner
 
-# Builds the training image, trains astra-trade-qml's HybridQMLModel on a
-# rented RunPod GPU, and deploys the resulting model to the Hetzner
-# paper-trading host. See astra-trade-qml/docker/README-style notes in
-# scripts/deploy_to_hetzner.sh for the one-time Hetzner setup this
+# Trains astra-trade-qml's HybridQMLModel on a rented RunPod GPU and
+# deploys the resulting model to the Hetzner paper-trading host.
+#
+# No custom Docker image or registry: the pod boots from RunPod's public
+# runpod/pytorch image and clones the repo + installs dependencies at
+# startup (scripts/ci/launch_training_pod.py) - the same pattern already
+# validated end-to-end on real GPU hardware for the one-off smoke test
+# (scripts/runpod_smoke_test.py). A CI-built image was tried first for a
+# faster pod boot but broke twice in ways not worth the added moving
+# parts; a few minutes of install time per run is a fine trade for one
+# less thing that can fail.
+#
+# See scripts/deploy_to_hetzner.sh for the one-time Hetzner setup this
 # depends on (a running docker-compose stack + a KITE_* .env file).
 #
 # NOTE: the schedule below runs this nightly on weekdays, which means
@@ -25,54 +34,9 @@ on:
 
 permissions:
   contents: write
-  packages: write
-  actions: write  # needed for the docker/build-push-action GHA cache backend
 
 jobs:
-  build-image:
-    runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.meta.outputs.image }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set image tag
-        id: meta
-        # GitHub Actions expressions have no built-in lowercase function
-        # (confirmed the hard way: toLower() doesn't exist - "Unrecognized
-        # function"), and Docker registry names must be lowercase, while
-        # github.repository preserves this repo's actual capitalization
-        # (saisantoshtangirala/DANTS). Bash's ${VAR,,} does the lowercasing.
-        run: |
-          REPO_LC="${GITHUB_REPOSITORY,,}"
-          IMAGE_NAME="ghcr.io/${REPO_LC}-training"
-          echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
-          echo "image=$IMAGE_NAME:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push training image
-        uses: docker/build-push-action@v5
-        with:
-          context: astra-trade-qml
-          file: astra-trade-qml/docker/Dockerfile.training
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.image }}
-            ${{ steps.meta.outputs.image_name }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   train:
-    needs: build-image
     runs-on: ubuntu-latest
     timeout-minutes: 200
     steps:
@@ -107,7 +71,6 @@ jobs:
           KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
         run: |
           python3 astra-trade-qml/scripts/ci/launch_training_pod.py \
-            --image "${{ needs.build-image.outputs.image }}" \
             --repo "${{ github.repository }}" \
             --branch "${{ github.ref_name }}" \
             --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}'

@@ -16,6 +16,19 @@ def test_build_start_command_includes_repo_branch_and_timeout():
     assert "RUNPOD_POD_ID" in cmd  # self-terminate step present
 
 
+def test_build_start_command_clones_and_installs_deps_no_custom_image():
+    """No CI-built Docker image involved - the pod itself clones and pip installs."""
+    cmd = ltp.build_start_command("owner/repo", "main", 10800)
+    assert "git clone --branch main --single-branch" in cmd
+    assert "pip install" in cmd
+    assert "requirements-runpod-image.txt" in cmd
+    assert "python3 -m src.main --mode train" in cmd
+
+
+def test_default_image_is_public_runpod_base():
+    assert ltp.DEFAULT_IMAGE == "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
+
+
 def test_create_pod_returns_pod_metadata():
     with patch("launch_training_pod.requests.post") as mock_post:
         mock_post.return_value = MagicMock(

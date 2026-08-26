@@ -1,19 +1,20 @@
 """
-Launch a RunPod training pod running the CI-built Docker image, wait for
-it to self-terminate (success or failure), and exit non-zero if it
-doesn't complete within the safety-net timeout (in which case the pod is
-force-stopped here so it can't keep billing).
+Launch a RunPod training pod, wait for it to self-terminate (success or
+failure), and exit non-zero if it doesn't complete within the
+safety-net timeout (in which case the pod is force-stopped here so it
+can't keep billing).
 
-The pod's own image (see docker/Dockerfile.training) has the code baked
-in at /app - that directory is NOT a git clone (the Dockerfile COPYs
-individual folders, not .git), so it can't `git push` from there. The
-start command trains in /app, then does a fresh shallow clone into
-/workspace purely to push models/latest/ and logs/ back to the
-`model-artifacts` branch, which the deploy job reads from.
+No custom Docker image or registry involved, deliberately: this is the
+exact pattern already validated end-to-end on real GPU hardware for the
+one-off smoke test (scripts/runpod_smoke_test.py) - a public RunPod
+base image, with the pod itself cloning the repo and installing
+dependencies at startup. A CI-built custom image was tried first for a
+faster/more reproducible pod boot, but broke twice in ways that took
+longer to chase than the few minutes a fresh clone + pip install costs
+per run, so this reverts to the proven approach.
 
 Usage:
     python3 launch_training_pod.py \\
-        --image ghcr.io/owner/repo-training:sha \\
         --repo owner/repo --branch main \\
         --gpu-ids-json '["RTX 3080 Ti","RTX 4090"]' \\
         --timeout-seconds 10800
@@ -31,26 +32,25 @@ import time
 import requests
 
 REST_BASE = "https://rest.runpod.io/v1"
+DEFAULT_IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
 
 
 def build_start_command(repo: str, branch: str, train_timeout_seconds: int) -> str:
     return f"""set -uxo pipefail
-cd /app
+mkdir -p /workspace
+cd /workspace
+git clone --branch {branch} --single-branch "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" repo
+cd repo/astra-trade-qml
+
+pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
+
 timeout {train_timeout_seconds} python3 -m src.main --mode train
 TRAIN_EXIT=$?
 
-mkdir -p /workspace
-cd /workspace
-git clone --depth 1 --branch {branch} "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" repo
-mkdir -p repo/astra-trade-qml/models repo/astra-trade-qml/logs
-cp -r /app/models/latest repo/astra-trade-qml/models/ 2>/dev/null || true
-cp -r /app/logs/. repo/astra-trade-qml/logs/ 2>/dev/null || true
-
-cd repo
 git config user.email "runpod-bot@astra-trade-qml.local"
 git config user.name "RunPod Training Bot"
 git checkout -B model-artifacts
-git add -f astra-trade-qml/models/latest astra-trade-qml/logs
+git add -f models/latest logs
 git commit -m "Automated training run $(date -u +%Y-%m-%dT%H:%M:%SZ) (exit=$TRAIN_EXIT)" || echo "nothing to commit"
 git push "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" HEAD:model-artifacts --force
 
@@ -114,7 +114,7 @@ def poll_until_terminated(api_key: str, pod_id: str, timeout_seconds: int, poll_
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image", required=True, help="Full GHCR image ref, e.g. ghcr.io/owner/repo-training:sha")
+    parser.add_argument("--image", default=DEFAULT_IMAGE, help="RunPod base image (default: the validated public runpod/pytorch image)")
     parser.add_argument("--repo", required=True, help="owner/repo, for the results-push clone")
     parser.add_argument("--branch", required=True, help="Branch the pod trains against")
     parser.add_argument("--gpu-ids-json", required=True, help='JSON array of GPU type IDs, e.g. select_gpu.py output')
