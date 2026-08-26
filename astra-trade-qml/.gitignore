@@ -3,9 +3,9 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
-data/
-models/
-logs/
-checkpoints/
+/data/
+/models/
+/logs/
+/checkpoints/
 *.db
 .env
