@@ -29,25 +29,72 @@ def run_train(config: dict, logger) -> None:
 
 
 def run_paper(config: dict, logger) -> None:
+    import os
+
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+
+    from src.data.feature_engineering import FeatureConfig, FeatureEngineer
+    from src.data.nse_ingestion import KiteDataProvider
     from src.models.quantum.hybrid_model import HybridQMLModel
     from src.signals.regime_detector import RegimeDetector
     from src.signals.signal_generator import SignalGenerator
     from src.trading.costs import CostCalculator
     from src.trading.executor import TradingEngine
+    from src.trading.live_feed import KiteLiveFeed
+    from src.trading.market_hours import is_market_open
     from src.trading.paper_broker import PaperBroker
     from src.trading.risk_manager import RiskManager
     from src.training.pipeline import build_hybrid_model_config
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
 
     db = DatabaseManager(config["logging"]["database"])
     regimes = load_regimes()
 
     model = HybridQMLModel(config=build_hybrid_model_config(config))
     model_dir = Path("models/latest")
-    if model_dir.exists():
-        model.load(str(model_dir))
-        logger.info("model_loaded", version=model.model_version)
-    else:
+    if not model_dir.exists():
         logger.warning("no_trained_model_found", note="Run --mode train first. Paper loop will idle.")
+        return
+    model.load(str(model_dir))
+    logger.info("model_loaded", version=model.model_version)
+
+    if not model.is_trained:
+        logger.warning("paper_trading_idle_no_model")
+        return
+
+    kite_provider = KiteDataProvider(api_key=os.environ.get("KITE_API_KEY", ""), access_token="")
+
+    def refresh_kite_session() -> bool:
+        try:
+            token = generate_access_token_from_env()
+            kite_provider.set_access_token(token)
+            logger.info("kite_session_refreshed")
+            return True
+        except KiteLoginError as e:
+            logger.error("kite_login_failed", error=str(e))
+            return False
+
+    if not refresh_kite_session():
+        logger.error("paper_trading_aborted", reason="no valid Kite session")
+        return
+
+    # Kite access tokens expire daily; re-login automatically each morning
+    # before the market opens rather than requiring a container restart.
+    scheduler = BackgroundScheduler(timezone=config["project"]["timezone"])
+    pre_market_hour, pre_market_minute = (
+        int(x) for x in config["trading"]["schedule"]["pre_market"].split(":")
+    )
+    scheduler.add_job(
+        refresh_kite_session,
+        CronTrigger(hour=pre_market_hour, minute=pre_market_minute, day_of_week="mon-fri"),
+    )
+    scheduler.start()
+
+    live_feed = KiteLiveFeed(kite_provider)
+    feature_engineer = FeatureEngineer(
+        FeatureConfig(lookback_periods=config["data"]["timeframes"]["features_lookback"])
+    )
 
     engine = TradingEngine(
         signal_generator=SignalGenerator(config["signals"]),
@@ -62,9 +109,8 @@ def run_paper(config: dict, logger) -> None:
     )
 
     symbols = config["data"]["symbols"]["focus_universe"]
-    poll_seconds = config.get("infrastructure", {}).get("model_sync", {}).get(
-        "sync_interval_minutes", 30
-    ) * 60
+    interval = config["data"]["timeframes"]["intraday"]
+    poll_seconds = 300  # matches the 5-min intraday timeframe
 
     logger.info(
         "paper_trading_started",
@@ -73,24 +119,50 @@ def run_paper(config: dict, logger) -> None:
         starting_capital=engine.risk_manager.state.starting_capital,
     )
 
-    if not model.is_trained:
-        logger.warning("paper_trading_idle_no_model")
-        return
-
-    # NOTE: this build does not wire up a live intraday market-data feed
-    # (Kite websocket ticks); engine.process_symbol() is ready to consume
-    # live bars + indicators once that feed is connected. Until then the
-    # service idles on the configured poll interval rather than fabricating
-    # data.
     try:
         while True:
-            logger.info(
-                "paper_trading_cycle_skipped",
-                reason="live market data feed not wired up in this build",
-            )
+            if is_market_open(config["trading"]["schedule"], timezone=config["project"]["timezone"]):
+                indicators = live_feed.get_regime_indicators()
+                for symbol in symbols:
+                    try:
+                        _process_symbol_cycle(
+                            symbol, live_feed, feature_engineer, model, engine, interval, indicators
+                        )
+                    except Exception as e:
+                        logger.error("symbol_processing_failed", symbol=symbol, error=str(e))
+            else:
+                logger.info("outside_market_hours")
+
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
         logger.info("paper_trading_stopped")
+    finally:
+        scheduler.shutdown(wait=False)
+
+
+def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, interval, indicators) -> None:
+    """One signal-generation cycle for a single symbol, given the current regime indicators."""
+    ohlcv = live_feed.get_recent_ohlcv(symbol, interval=interval)
+    if ohlcv.empty:
+        return
+
+    featured = feature_engineer.generate_all_features(ohlcv)
+    if featured.empty:
+        return
+
+    feature_cols = feature_engineer.get_feature_columns(featured)
+    X = featured[feature_cols].to_numpy()[-1:]
+    class_probabilities = model.predict_proba(X)[0]
+    price = float(ohlcv["close"].iloc[-1])
+
+    engine.process_symbol(
+        symbol=symbol,
+        class_probabilities=class_probabilities,
+        price=price,
+        indicators=indicators,
+        model_version=model.model_version,
+        quantum_depth=model.get_quantum_metrics().get("vqc_depth", 0),
+    )
 
 
 def run_dashboard(config: dict, logger) -> None:

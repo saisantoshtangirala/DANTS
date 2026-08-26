@@ -247,6 +247,12 @@ class KiteDataProvider:
             print("kiteconnect not installed. Install with: pip install kiteconnect")
             self.kite = None
 
+    def set_access_token(self, access_token: str) -> None:
+        """Update the access token in place (Kite tokens expire daily)."""
+        self.access_token = access_token
+        if self.kite is not None:
+            self.kite.set_access_token(access_token)
+
     def get_historical_data(
         self,
         instrument_token: int,

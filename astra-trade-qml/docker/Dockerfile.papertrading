@@ -7,8 +7,7 @@ ENV PYTHONUNBUFFERED=1
 # System dependencies
 RUN apt-get update && apt-get install -y \
     gcc g++ libgomp1 \
-    libpq-dev \
-    curl cron \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set workdir
@@ -26,11 +25,15 @@ COPY scripts/ ./scripts/
 # Create necessary directories
 RUN mkdir -p logs models data
 
-# Environment variables for Hetzner + Zerodha
+# Environment variables for Hetzner + Zerodha. Real values are supplied
+# at `docker compose up` time via the host's .env file (see
+# docker/docker-compose.yml) - never baked into the image.
 ENV KITE_API_KEY=""
-ENV KITE_ACCESS_TOKEN=""
+ENV KITE_API_SECRET=""
+ENV KITE_USER_ID=""
+ENV KITE_PASSWORD=""
+ENV KITE_TOTP_SECRET=""
 ENV DATABASE_URL="sqlite:///logs/astra_trade.db"
-ENV MODEL_SYNC_S3_BUCKET="astra-trade-models"
 
 # Expose dashboard port
 EXPOSE 8501

@@ -246,13 +246,11 @@ class FeatureEngineer:
 
         # Intraday VWAP reset (for 5-min data, reset daily)
         if "date" in df.columns and pd.infer_freq(df["date"]) in ["5min", "15min"]:
-            df["date_only"] = df["date"].dt.date
-            df["intraday_vwap"] = df.groupby("date_only").apply(
-                lambda x: (typical_price.loc[x.index] * df.loc[x.index, "volume"]).cumsum() /
-                         df.loc[x.index, "volume"].cumsum()
-            ).reset_index(level=0, drop=True)
+            date_only = df["date"].dt.date
+            cum_tp_vol = (typical_price * df["volume"]).groupby(date_only).cumsum()
+            cum_vol = df["volume"].groupby(date_only).cumsum()
+            df["intraday_vwap"] = cum_tp_vol / cum_vol
             df["intraday_vwap_dev"] = (df["close"] - df["intraday_vwap"]) / df["intraday_vwap"]
-            df = df.drop("date_only", axis=1)
 
         return df
 

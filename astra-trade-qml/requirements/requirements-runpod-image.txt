@@ -1,0 +1,39 @@
+# Packages installed into the CI-built training Docker image, on top of
+# the runpod/pytorch base image (which already provides Python 3.11,
+# CUDA 12.4, and a matching torch/torchvision/torchaudio - reinstalling
+# those here would be redundant and risks a version mismatch with the
+# base image's CUDA setup). This is the training/inference stack only;
+# dev tooling (pytest, jupyter) is in requirements-training.txt for local
+# use and deliberately left out of the production image.
+#
+# This exact package set (minus torch, which the base image supplies)
+# was verified end-to-end on a real RunPod GPU run.
+
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+pyyaml>=6.0
+python-dotenv>=1.0
+python-dateutil>=2.8
+pytz>=2023.3
+requests>=2.31
+
+scikit-learn>=1.5
+xgboost>=2.0
+
+qiskit>=1.0
+qiskit-machine-learning>=0.7
+qiskit-aer>=0.14
+qiskit-algorithms>=0.3
+
+SQLAlchemy>=2.0
+structlog>=23.1
+
+kiteconnect>=4.2
+websocket-client>=1.6
+pyotp>=2.9
+
+APScheduler>=3.10
+
+tqdm>=4.66
+joblib>=1.3

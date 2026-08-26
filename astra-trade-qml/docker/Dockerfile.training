@@ -1,24 +1,21 @@
 # Astra-Trade QML - Training Docker (RunPod GPU)
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+#
+# Built FROM RunPod's own pytorch image rather than assembling
+# CUDA+Python by hand: this exact base (Python 3.11, CUDA 12.4, matching
+# torch/torchvision/torchaudio) is what the project's real GPU smoke test
+# was validated against, so building from it avoids re-deriving a
+# combination that's already proven to work.
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-ENV CUDA_VISIBLE_DEVICES=0
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-    python3.10 python3-pip python3-dev \
-    git wget curl vim \
-    libgomp1 libssl-dev \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set workdir
 WORKDIR /app
 
-# Install Python dependencies
-COPY requirements/requirements-training.txt .
-RUN pip3 install --no-cache-dir -r requirements-training.txt
+# Install Python dependencies (torch/torchvision/torchaudio already
+# provided by the base image - see requirements-runpod-image.txt).
+COPY requirements/requirements-runpod-image.txt .
+RUN pip install --no-cache-dir -r requirements-runpod-image.txt
 
 # Copy source code
 COPY src/ ./src/
@@ -27,12 +24,6 @@ COPY scripts/ ./scripts/
 
 # Create necessary directories
 RUN mkdir -p logs models data checkpoints
-
-# Environment variables for RunPod
-ENV RUNPOD_POD_ID=""
-ENV AWS_ACCESS_KEY_ID=""
-ENV AWS_SECRET_ACCESS_KEY=""
-ENV S3_MODEL_BUCKET="astra-trade-models"
 
 # Training entrypoint
 CMD ["python3", "-m", "src.main", "--mode", "train"]
