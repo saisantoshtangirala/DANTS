@@ -14,6 +14,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# Initialize CUDA before any other imports (Qiskit-Aer can interfere with
+# PyTorch's CUDA context if it initializes first).
+try:
+    import torch
+    if hasattr(torch.cuda, "init"):
+        torch.cuda.init()
+    _cuda_ok = torch.cuda.is_available()
+    if _cuda_ok:
+        print(f"CUDA initialized: {torch.cuda.get_device_name(0)}, "
+              f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+    else:
+        print("WARNING: CUDA not available - training will run on CPU")
+except Exception as e:
+    print(f"WARNING: CUDA initialization failed: {e}")
+
 from src.utils.config import load_config, load_regimes
 from src.utils.database import DatabaseManager
 from src.utils.logger import setup_logging

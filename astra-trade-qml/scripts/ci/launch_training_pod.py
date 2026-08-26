@@ -68,10 +68,32 @@ def build_start_command(repo: str, branch: str, train_timeout_seconds: int) -> s
     return f"""set -uxo pipefail
 mkdir -p /workspace
 cd /workspace
+
+# CUDA diagnostics and initialization - RunPod containers sometimes need
+# explicit driver init before PyTorch can see the GPU
+echo "=== GPU diagnostics ==="
+nvidia-smi || echo "WARNING: nvidia-smi failed"
+ldconfig 2>/dev/null || true
+python3 -c "import torch; torch.cuda.init(); print(f'CUDA available: {{torch.cuda.is_available()}}, device: {{torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}}')" || echo "WARNING: CUDA init check failed"
+
 git clone --branch {branch} --single-branch "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" repo
 cd repo/astra-trade-qml
 
 pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
+
+# Verify CUDA after pip install (packages can affect torch's CUDA detection)
+python3 -c "
+import torch
+print(f'PyTorch {{torch.__version__}}, CUDA available: {{torch.cuda.is_available()}}')
+if torch.cuda.is_available():
+    print(f'GPU: {{torch.cuda.get_device_name(0)}}, VRAM: {{torch.cuda.get_device_properties(0).total_mem / 1e9:.1f}} GB')
+else:
+    print('WARNING: CUDA not available - all training will run on CPU')
+try:
+    import xgboost as xgb
+    print(f'XGBoost {{xgb.__version__}}')
+except: pass
+"
 
 timeout {train_timeout_seconds} python3 -m src.main --mode train
 TRAIN_EXIT=$?

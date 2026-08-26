@@ -72,11 +72,18 @@ class XGBoostMarketModel:
             "eval_metric": eval_metric,
             "random_state": random_state,
             "n_jobs": -1,
-            "tree_method": "hist",  # Fast histogram-based algorithm
+            "tree_method": "hist",
             "verbosity": 0,
-            # early_stopping_rounds moved from fit() to the constructor in xgboost >= 2.0
             "early_stopping_rounds": early_stopping_rounds,
         }
+
+        try:
+            import torch
+            if torch.cuda.is_available():
+                self.params["device"] = "cuda"
+                print(f"XGBoost: using GPU (CUDA)")
+        except ImportError:
+            pass
 
         self.early_stopping_rounds = early_stopping_rounds
         self.model = None

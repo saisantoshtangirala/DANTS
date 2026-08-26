@@ -39,6 +39,15 @@ def test_build_start_command_always_writes_last_run_status():
     assert "exit=$TRAIN_EXIT" in cmd
 
 
+def test_build_start_command_runs_cuda_diagnostics_before_training():
+    cmd = ltp.build_start_command("owner/repo", "main", 10800)
+    assert "nvidia-smi" in cmd
+    assert "ldconfig" in cmd
+    train_pos = cmd.index("python3 -m src.main --mode train")
+    nvidia_pos = cmd.index("nvidia-smi")
+    assert nvidia_pos < train_pos
+
+
 def test_default_image_is_public_runpod_base():
     assert ltp.DEFAULT_IMAGE == "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
 

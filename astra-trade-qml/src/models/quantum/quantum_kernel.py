@@ -136,20 +136,44 @@ class QuantumKernelClassifier:
             # Take first n_qubits features
             X_processed = X_scaled[:, :self.n_qubits]
 
-        # Try quantum approach
-        if QISKIT_AVAILABLE and not self.fallback_to_classical:
+        # Try quantum approach; fall back to classical only on failure
+        if QISKIT_AVAILABLE:
             try:
                 self._fit_quantum(X_processed, y_train_mapped, X_val, y_val)
                 self.is_quantum = True
             except Exception as e:
-                print(f"Quantum training failed: {e}. Falling back to classical SVM.")
-                self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
-                self.is_quantum = False
+                if self.fallback_to_classical:
+                    print(f"Quantum training failed: {e}. Falling back to classical SVM.")
+                    self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
+                    self.is_quantum = False
+                else:
+                    raise
         else:
             self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
             self.is_quantum = False
 
         return self.training_metrics
+
+    @staticmethod
+    def _make_aer_sampler():
+        """Create a GPU-backed Aer sampler if possible, CPU otherwise."""
+        try:
+            from qiskit_aer.primitives import SamplerV2 as AerSampler
+            gpu_backend = AerSimulator(method="statevector", device="GPU")
+            sampler = AerSampler(backend=gpu_backend)
+            print("Quantum Kernel: using GPU-accelerated Aer simulator")
+            return sampler
+        except Exception:
+            pass
+        try:
+            from qiskit_aer.primitives import SamplerV2 as AerSampler
+            cpu_backend = AerSimulator(method="statevector")
+            sampler = AerSampler(backend=cpu_backend)
+            print("Quantum Kernel: using CPU Aer simulator")
+            return sampler
+        except Exception:
+            print("Quantum Kernel: using reference StatevectorSampler (CPU)")
+            return Sampler()
 
     def _fit_quantum(
         self,
@@ -159,13 +183,14 @@ class QuantumKernelClassifier:
         y_val: Optional[np.ndarray] = None,
     ) -> None:
         """Train using quantum kernel SVM."""
-        # Build feature map
         self.feature_map = self._build_feature_map()
 
-        # Create quantum kernel
-        backend = AerSimulator(method="statevector")
+        sampler = self._make_aer_sampler()
+        from qiskit_algorithms.state_fidelities import ComputeUncompute
+        fidelity = ComputeUncompute(sampler=sampler)
         self.quantum_kernel = FidelityQuantumKernel(
             feature_map=self.feature_map,
+            fidelity=fidelity,
             enforce_psd=True,
         )
 

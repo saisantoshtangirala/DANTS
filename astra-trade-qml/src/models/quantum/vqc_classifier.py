@@ -177,20 +177,46 @@ class VQCMarketClassifier:
         # Normalize to [0, 1] for feature map encoding
         X_normalized = MinMaxScaler().fit_transform(X_processed)
 
-        # Try quantum approach
-        if QISKIT_AVAILABLE and not self.fallback_to_classical:
+        # Try quantum approach; fall back to classical only on failure
+        if QISKIT_AVAILABLE:
             try:
                 self._fit_quantum(X_normalized, y_train_mapped, X_val, y_val)
                 self.is_quantum = True
             except Exception as e:
-                print(f"VQC training failed: {e}. Falling back to classical MLP.")
-                self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
-                self.is_quantum = False
+                if self.fallback_to_classical:
+                    print(f"VQC training failed: {e}. Falling back to classical MLP.")
+                    self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
+                    self.is_quantum = False
+                else:
+                    raise
         else:
             self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
             self.is_quantum = False
 
         return self.training_metrics
+
+    @staticmethod
+    def _make_aer_sampler(shots: int):
+        """Create a GPU-backed Aer sampler if possible, CPU otherwise."""
+        try:
+            from qiskit_aer import AerSimulator
+            from qiskit_aer.primitives import SamplerV2 as AerSampler
+            gpu_backend = AerSimulator(method="statevector", device="GPU")
+            sampler = AerSampler(backend=gpu_backend, options={"default_shots": shots})
+            print("VQC: using GPU-accelerated Aer simulator")
+            return sampler
+        except Exception:
+            pass
+        try:
+            from qiskit_aer import AerSimulator
+            from qiskit_aer.primitives import SamplerV2 as AerSampler
+            cpu_backend = AerSimulator(method="statevector")
+            sampler = AerSampler(backend=cpu_backend, options={"default_shots": shots})
+            print("VQC: using CPU Aer simulator")
+            return sampler
+        except Exception:
+            print("VQC: using reference StatevectorSampler (CPU)")
+            return Sampler(default_shots=shots)
 
     def _fit_quantum(
         self,
@@ -200,24 +226,16 @@ class VQCMarketClassifier:
         y_val: Optional[np.ndarray] = None,
     ) -> None:
         """Train using Variational Quantum Circuit."""
-        # Build circuits
         self.feature_map = self._build_feature_map()
         self.ansatz = self._build_ansatz()
 
-        # Combine into full circuit
         circuit = QuantumCircuit(self.n_qubits)
         circuit.compose(self.feature_map, inplace=True)
         circuit.compose(self.ansatz, inplace=True)
 
         self.circuit_depth = len(circuit.data)
 
-        # SamplerQNN (not EstimatorQNN) is required for multi-class output:
-        # EstimatorQNN produces a single scalar expectation value, which
-        # NeuralNetworkClassifier only accepts for binary classification.
-        # SamplerQNN samples the circuit's computational basis states and an
-        # `interpret` function maps each outcome to one of NUM_CLASSES
-        # classes, giving a genuine multi-class probability distribution.
-        sampler = Sampler(default_shots=self.shots)
+        sampler = self._make_aer_sampler(self.shots)
         qnn = SamplerQNN(
             circuit=circuit,
             input_params=self.feature_map.parameters,
