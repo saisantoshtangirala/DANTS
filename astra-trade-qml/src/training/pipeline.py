@@ -93,6 +93,7 @@ class TrainingPipeline:
 
         self.raw_data: Dict[str, pd.DataFrame] = {}
         self.featured_data: Dict[str, pd.DataFrame] = {}
+        self.used_synthetic_data = False
 
     def data_ingestion(self, lookback_days: int = 365) -> Dict[str, pd.DataFrame]:
         """Task: download historical OHLCV for the focus universe (Kite first, NSE archive fallback)."""
@@ -115,7 +116,41 @@ class TrainingPipeline:
             if not df.empty:
                 self.raw_data[symbol] = df
 
+        if not self.raw_data and symbols:
+            # Neither Kite nor the NSE archive produced anything for any
+            # symbol - rather than crash the whole pipeline downstream (at
+            # _pooled_training_matrix), fall back to synthetic OHLCV so a
+            # data-source outage doesn't take down training entirely. This
+            # validates the ML code path only, NOT a usable trading model -
+            # flagged loudly here and surfaced in run_full_pipeline's summary.
+            print(
+                "WARNING: no real data available from Kite or the NSE archive "
+                "for any symbol in the focus universe. Falling back to "
+                "synthetic OHLCV so the pipeline can still run end-to-end. "
+                "The resulting model is NOT usable for trading - fix the data "
+                "source before deploying it."
+            )
+            self.used_synthetic_data = True
+            for symbol in symbols:
+                self.raw_data[symbol] = self._synthetic_ohlcv(symbol, min(lookback_days, 250))
+
         return self.raw_data
+
+    @staticmethod
+    def _synthetic_ohlcv(symbol: str, days: int) -> pd.DataFrame:
+        """Last-resort synthetic OHLCV, used only when no real data source is reachable."""
+        rng = np.random.default_rng(abs(hash(symbol)) % (2**32))
+        dates = pd.date_range(end=datetime.now(), periods=days, freq="D")
+        close = 100 + np.cumsum(rng.normal(0, 1, days))
+        close = np.maximum(close, 1.0)
+        open_ = close + rng.normal(0, 0.5, days)
+        high = np.maximum(open_, close) + np.abs(rng.normal(0, 0.5, days))
+        low = np.minimum(open_, close) - np.abs(rng.normal(0, 0.5, days))
+        volume = rng.integers(1_000, 100_000, days).astype(float)
+
+        return pd.DataFrame(
+            {"date": dates, "open": open_, "high": high, "low": low, "close": close, "volume": volume}
+        )
 
     def feature_engineering(self) -> Dict[str, pd.DataFrame]:
         """Task: generate technical/microstructure features and labels per symbol."""
@@ -222,6 +257,7 @@ class TrainingPipeline:
         """Run every daily_schedule task in order and return a task->result summary."""
         summary: Dict[str, Any] = {}
         summary["data_ingestion"] = f"{len(self.data_ingestion())} symbols ingested"
+        summary["used_synthetic_data"] = self.used_synthetic_data
         summary["feature_engineering"] = f"{len(self.feature_engineering())} symbols featured"
 
         training_metrics = self.classical_and_quantum_training()
@@ -230,5 +266,13 @@ class TrainingPipeline:
         summary["ensemble_optimization"] = training_metrics
 
         summary["backtest_validation"] = self.backtest_validation()
-        summary["model_deployment"] = self.model_deployment()
+
+        # Never let a data-source outage silently overwrite a real deployed
+        # model with one trained on synthetic noise - skip model_deployment
+        # entirely rather than pushing garbage to the paper-trading host.
+        if self.used_synthetic_data:
+            summary["model_deployment"] = "SKIPPED: trained on synthetic data (no real data source available)"
+        else:
+            summary["model_deployment"] = self.model_deployment()
+
         return summary

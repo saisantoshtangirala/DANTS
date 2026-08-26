@@ -195,12 +195,32 @@ class NSEDataIngestion:
         """
         all_data = []
         current_date = start_date
+        consecutive_failures = 0
+        # NSE's archive endpoint is behind Akamai bot protection that a plain
+        # requests session can't pass - it returns an HTML challenge page
+        # (503/404 depending on request shape) for every date once blocked,
+        # not just missing ones. Retrying all ~250 weekdays in a range against
+        # a systemically blocked endpoint wastes minutes per symbol for
+        # nothing, so bail out after a few consecutive failures instead of
+        # exhausting the full range.
+        max_consecutive_failures = 3
 
         while current_date <= end_date:
             if current_date.weekday() < 5:  # Weekdays only
                 df = self.download_bhavcopy(current_date)
-                if not df.empty and symbol in df["symbol"].values:
-                    all_data.append(df[df["symbol"] == symbol])
+                if df.empty:
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_consecutive_failures:
+                        print(
+                            f"Aborting historical range download for {symbol}: "
+                            f"{consecutive_failures} consecutive failures "
+                            f"(NSE archive likely blocked/unreachable)"
+                        )
+                        break
+                else:
+                    consecutive_failures = 0
+                    if symbol in df["symbol"].values:
+                        all_data.append(df[df["symbol"] == symbol])
                 time.sleep(0.5)  # Rate limiting
             current_date += timedelta(days=1)
 
