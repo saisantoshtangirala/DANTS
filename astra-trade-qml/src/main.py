@@ -20,10 +20,23 @@ from src.utils.logger import setup_logging
 
 
 def run_train(config: dict, logger) -> None:
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
     from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_training")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
 
     logger.info("starting_training_pipeline")
-    pipeline = TrainingPipeline(config)
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
     summary = pipeline.run_full_pipeline()
     logger.info("training_pipeline_complete", summary={k: str(v)[:200] for k, v in summary.items()})
 

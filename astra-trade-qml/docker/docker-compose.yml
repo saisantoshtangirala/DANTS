@@ -1,7 +1,19 @@
+# Always run this with --project-directory pointed at the astra-trade-qml
+# root (not the docker/ directory this file lives in), from the repo root:
+#   docker compose -f docker/docker-compose.yml --project-directory . up -d
+# Without --project-directory, Compose resolves build.context and the
+# ./models /./data /./logs volumes relative to *this file's* directory
+# (docker/), not the project root, which silently puts everything one
+# level in the wrong place. scripts/deploy_to_hetzner.sh already invokes
+# it correctly.
 version: '3.8'
 
 services:
-  # Training Service (RunPod - GPU)
+  # Local training (optional - for a home/on-prem GPU box). The real
+  # CI/CD pipeline trains on a rented RunPod GPU instead (see
+  # .github/workflows/train-and-deploy.yml + scripts/ci/); this service
+  # is only useful if you want to run training locally against your own
+  # GPU rather than RunPod.
   astra-training:
     build:
       context: .
@@ -12,13 +24,16 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - CUDA_VISIBLE_DEVICES=0
-      - MODE=training
+      - KITE_API_KEY=${KITE_API_KEY:-}
+      - KITE_API_SECRET=${KITE_API_SECRET:-}
+      - KITE_USER_ID=${KITE_USER_ID:-}
+      - KITE_PASSWORD=${KITE_PASSWORD:-}
+      - KITE_TOTP_SECRET=${KITE_TOTP_SECRET:-}
     volumes:
       - ./data:/app/data
       - ./models:/app/models
       - ./logs:/app/logs
       - ./checkpoints:/app/checkpoints
-      - ~/.aws:/root/.aws:ro
     command: python3 -m src.main --mode train
     deploy:
       resources:
@@ -28,7 +43,10 @@ services:
               count: 1
               capabilities: [gpu]
 
-  # Paper Trading Service (Hetzner - CPU)
+  # Paper Trading Service (Hetzner - CPU). Deployed by
+  # scripts/deploy_to_hetzner.sh, which syncs a freshly trained model
+  # into ./models/latest and restarts this service - it does not depend
+  # on astra-training running locally.
   astra-paper:
     build:
       context: .
@@ -36,30 +54,26 @@ services:
     image: astra-trade-qml:paper
     container_name: astra-paper
     environment:
-      - MODE=paper
-      - KITE_API_KEY=${KITE_API_KEY}
-      - KITE_ACCESS_TOKEN=${KITE_ACCESS_TOKEN}
+      - KITE_API_KEY=${KITE_API_KEY:-}
+      - KITE_API_SECRET=${KITE_API_SECRET:-}
+      - KITE_USER_ID=${KITE_USER_ID:-}
+      - KITE_PASSWORD=${KITE_PASSWORD:-}
+      - KITE_TOTP_SECRET=${KITE_TOTP_SECRET:-}
     volumes:
       - ./data:/app/data
       - ./models:/app/models
       - ./logs:/app/logs
-      - ~/.aws:/root/.aws:ro
-    ports:
-      - "8501:8501"
     command: python3 -m src.main --mode paper
-    depends_on:
-      - astra-training
     restart: unless-stopped
 
-  # Dashboard Only
+  # Dashboard (the only service that actually serves HTTP - astra-paper
+  # runs headless, so they don't compete for port 8501).
   astra-dashboard:
     build:
       context: .
       dockerfile: docker/Dockerfile.papertrading
     image: astra-trade-qml:paper
     container_name: astra-dashboard
-    environment:
-      - MODE=dashboard
     volumes:
       - ./logs:/app/logs
       - ./models:/app/models

@@ -14,8 +14,9 @@ import numpy as np
 import pandas as pd
 
 from src.data.feature_engineering import FeatureConfig, FeatureEngineer
-from src.data.nse_ingestion import NSEDataIngestion
+from src.data.nse_ingestion import KiteDataProvider, NSEDataIngestion
 from src.models.quantum.hybrid_model import HybridQMLModel
+from src.trading.live_feed import KiteLiveFeed
 from src.utils.database import DatabaseManager
 from src.utils.metrics import generate_performance_report
 
@@ -63,7 +64,12 @@ def build_hybrid_model_config(config: Dict[str, Any]) -> Dict[str, Any]:
 class TrainingPipeline:
     """Runs the daily model retraining pipeline across the focus universe."""
 
-    def __init__(self, config: Dict[str, Any], db: Optional[DatabaseManager] = None):
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        db: Optional[DatabaseManager] = None,
+        kite_provider: Optional[KiteDataProvider] = None,
+    ):
         self.config = config
         self.data_cfg = config.get("data", {})
         self.training_cfg = config.get("training", {})
@@ -72,6 +78,12 @@ class TrainingPipeline:
         )
 
         self.ingestion = NSEDataIngestion(data_dir="data/nse")
+        # Optional: when a live Kite session is available, prefer it for
+        # historical data (more reliable than NSE's archive URLs, which
+        # can 404 for dates outside their retention window) and fall back
+        # to NSE per-symbol if a Kite fetch comes back empty.
+        self.kite_feed = KiteLiveFeed(kite_provider) if kite_provider is not None else None
+
         self.feature_engineer = FeatureEngineer(
             FeatureConfig(
                 lookback_periods=self.data_cfg.get("timeframes", {}).get("features_lookback", 60)
@@ -83,13 +95,23 @@ class TrainingPipeline:
         self.featured_data: Dict[str, pd.DataFrame] = {}
 
     def data_ingestion(self, lookback_days: int = 365) -> Dict[str, pd.DataFrame]:
-        """Task: download historical OHLCV for the focus universe."""
+        """Task: download historical OHLCV for the focus universe (Kite first, NSE archive fallback)."""
         symbols = self.data_cfg.get("symbols", {}).get("focus_universe", [])
         end_date = datetime.now()
         start_date = end_date - timedelta(days=lookback_days)
 
         for symbol in symbols:
-            df = self.ingestion.download_historical_range(symbol, start_date, end_date)
+            df = pd.DataFrame()
+
+            if self.kite_feed is not None:
+                try:
+                    df = self.kite_feed.get_recent_ohlcv(symbol, interval="day", days=lookback_days)
+                except Exception:
+                    df = pd.DataFrame()
+
+            if df.empty:
+                df = self.ingestion.download_historical_range(symbol, start_date, end_date)
+
             if not df.empty:
                 self.raw_data[symbol] = df
 
