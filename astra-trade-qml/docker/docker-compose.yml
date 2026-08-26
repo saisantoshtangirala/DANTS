@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Training Service (RunPod - GPU)
+  astra-training:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.training
+    image: astra-trade-qml:training
+    container_name: astra-training
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - MODE=training
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./checkpoints:/app/checkpoints
+      - ~/.aws:/root/.aws:ro
+    command: python3 -m src.main --mode train
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Paper Trading Service (Hetzner - CPU)
+  astra-paper:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.papertrading
+    image: astra-trade-qml:paper
+    container_name: astra-paper
+    environment:
+      - MODE=paper
+      - KITE_API_KEY=${KITE_API_KEY}
+      - KITE_ACCESS_TOKEN=${KITE_ACCESS_TOKEN}
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ~/.aws:/root/.aws:ro
+    ports:
+      - "8501:8501"
+    command: python3 -m src.main --mode paper
+    depends_on:
+      - astra-training
+    restart: unless-stopped
+
+  # Dashboard Only
+  astra-dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.papertrading
+    image: astra-trade-qml:paper
+    container_name: astra-dashboard
+    environment:
+      - MODE=dashboard
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
+    ports:
+      - "8501:8501"
+    command: streamlit run src/dashboard/streamlit_app.py --server.port=8501 --server.address=0.0.0.0
+    restart: unless-stopped

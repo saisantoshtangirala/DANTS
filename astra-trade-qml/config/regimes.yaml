@@ -1,0 +1,102 @@
+# Market Regime Definitions for NSE India
+# Used for regime detection and routing to regime-specific sub-models
+
+regimes:
+  bull_trend:
+    name: "Bull Trend"
+    description: "Nifty above 20 & 50 DMA, low volatility"
+    conditions:
+      - indicator: "nifty_vs_20dma"
+        operator: ">"
+        value: 1.02
+      - indicator: "nifty_vs_50dma"
+        operator: ">"
+        value: 1.05
+      - indicator: "india_vix"
+        operator: "<"
+        value: 15
+    allowed_strategies:
+      - momentum_breakout
+      - trend_following
+      - ipo_aggressive
+    forbidden_strategies:
+      - mean_reversion
+      - short_selling
+    position_size_multiplier: 1.0
+
+  bear_trend:
+    name: "Bear Trend"
+    description: "Nifty below 50 DMA, rising volatility"
+    conditions:
+      - indicator: "nifty_vs_50dma"
+        operator: "<"
+        value: 0.98
+      - indicator: "india_vix"
+        operator: ">"
+        value: 18
+    allowed_strategies:
+      - short_momentum
+      - defensive_rotation
+      - cash_hedge
+    forbidden_strategies:
+      - long_momentum
+      - ipo_aggressive
+    position_size_multiplier: 0.5
+
+  sideways:
+    name: "Sideways/Range-bound"
+    description: "Nifty between 20 & 50 DMA, moderate volatility"
+    conditions:
+      - indicator: "nifty_vs_20dma"
+        operator: ">"
+        value: 0.99
+      - indicator: "nifty_vs_50dma"
+        operator: "<"
+        value: 1.01
+      - indicator: "india_vix"
+        operator: "<"
+        value: 20
+    allowed_strategies:
+      - mean_reversion
+      - range_bound
+      - options_theta
+    forbidden_strategies:
+      - trend_following
+    position_size_multiplier: 0.7
+
+  high_volatility:
+    name: "High Volatility"
+    description: "VIX spiking, large daily moves"
+    conditions:
+      - indicator: "india_vix"
+        operator: ">"
+        value: 22
+      - indicator: "atr_14_pct"
+        operator: ">"
+        value: 0.02
+    allowed_strategies:
+      - volatility_breakout
+      - straddle_strangle
+      - cash_defensive
+    forbidden_strategies:
+      - mean_reversion
+      - trend_following
+    position_size_multiplier: 0.4
+
+  pre_event:
+    name: "Pre-Event"
+    description: "Major event upcoming (RBI policy, Budget, Elections)"
+    conditions:
+      - indicator: "days_to_major_event"
+        operator: "<="
+        value: 3
+    allowed_strategies:
+      - event_volatility
+      - cash_hedge
+    forbidden_strategies:
+      - directional_bias
+    position_size_multiplier: 0.3
+
+transitions:
+  cooldown_period_bars: 5           # Wait 5 bars before switching regimes
+  hysteresis: 0.02                  # 2% buffer to avoid regime flickering

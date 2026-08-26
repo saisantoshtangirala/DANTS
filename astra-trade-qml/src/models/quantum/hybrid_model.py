@@ -1,0 +1,508 @@
+"""
+Hybrid Quantum-Classical Ensemble Model.
+Combines LSTM, XGBoost, Quantum Kernel SVM, and VQC into a meta-learner.
+"""
+
+import numpy as np
+import pandas as pd
+from typing import List, Dict, Optional, Tuple, Any
+from pathlib import Path
+import json
+from datetime import datetime
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import StackingClassifier, VotingClassifier
+from sklearn.metrics import accuracy_score, f1_score, log_loss
+
+from src.models.classical.lstm_model import LSTMModel
+from src.models.classical.xgboost_model import XGBoostMarketModel
+from src.models.quantum.quantum_kernel import QuantumKernelClassifier
+from src.models.quantum.vqc_classifier import VQCMarketClassifier
+
+
+class HybridQMLModel:
+    """
+    Hybrid Quantum-Classical ensemble for Indian market prediction.
+
+    Architecture:
+        - Classical LSTM: Sequence modeling of temporal features
+        - Classical XGBoost: Tabular feature importance and fast inference
+        - Quantum Kernel SVM: Non-linear classification in quantum Hilbert space
+        - VQC: Variational quantum circuit for pattern recognition
+        - Meta-Learner: Logistic regression stacking ensemble
+    """
+
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize hybrid model ensemble.
+
+        Args:
+            config: Model configuration dictionary
+        """
+        self.config = config or {}
+
+        # Sub-model configurations
+        self.lstm_config = self.config.get("lstm", {})
+        self.xgb_config = self.config.get("xgboost", {})
+        self.qkernel_config = self.config.get("quantum_kernel", {})
+        self.vqc_config = self.config.get("vqc", {})
+
+        # Ensemble weights (learned or fixed)
+        self.ensemble_method = self.config.get("ensemble_method", "weighted_average")
+        self.classical_weight = self.config.get("classical_weight", 0.7)
+        self.quantum_weight = self.config.get("quantum_weight", 0.3)
+
+        # Model instances
+        self.lstm_model: Optional[LSTMModel] = None
+        self.xgb_model: Optional[XGBoostMarketModel] = None
+        self.qkernel_model: Optional[QuantumKernelClassifier] = None
+        self.vqc_model: Optional[VQCMarketClassifier] = None
+        self.meta_learner: Optional[LogisticRegression] = None
+
+        # State tracking
+        self.is_trained = False
+        self.model_version = self._generate_version()
+        self.training_timestamp = None
+        self.sub_model_weights = {}
+        self.performance_history = []
+
+    def _generate_version(self) -> str:
+        """Generate unique model version hash."""
+        import hashlib
+        timestamp = datetime.now().isoformat()
+        return hashlib.sha256(timestamp.encode()).hexdigest()[:12]
+
+    def build_models(self, input_size: int, sequence_length: int = 60) -> None:
+        """
+        Build all sub-models.
+
+        Args:
+            input_size: Number of input features
+            sequence_length: Sequence length for LSTM
+        """
+        # LSTM
+        self.lstm_model = LSTMModel(
+            input_size=input_size,
+            sequence_length=sequence_length,
+            **self.lstm_config,
+        )
+
+        # XGBoost
+        self.xgb_model = XGBoostMarketModel(**self.xgb_config)
+
+        # Quantum Kernel
+        self.qkernel_model = QuantumKernelClassifier(**self.qkernel_config)
+
+        # VQC
+        self.vqc_model = VQCMarketClassifier(**self.vqc_config)
+
+        # Meta-learner
+        self.meta_learner = LogisticRegression(
+            multi_class="multinomial",
+            solver="lbfgs",
+            max_iter=1000,
+            C=1.0,
+        )
+
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+        feature_names: Optional[List[str]] = None,
+        sequence_length: int = 60,
+    ) -> Dict[str, Any]:
+        """
+        Train all sub-models and ensemble.
+
+        Args:
+            X_train: Training features
+            y_train: Training labels
+            X_val: Validation features
+            y_val: Validation labels
+            feature_names: Feature names for XGBoost
+            sequence_length: LSTM sequence length
+
+        Returns:
+            Training metrics for all models
+        """
+        print("=" * 60)
+        print("HYBRID QML TRAINING PIPELINE")
+        print("=" * 60)
+
+        if self.lstm_model is None:
+            self.build_models(X_train.shape[1], sequence_length)
+
+        metrics = {}
+
+        # 1. Train LSTM
+        print("
+[1/4] Training LSTM Sequence Model...")
+        try:
+            lstm_history = self.lstm_model.fit(X_train, y_train, X_val, y_val)
+            metrics["lstm"] = {
+                "status": "trained",
+                "history": lstm_history,
+            }
+            print(f"  ✓ LSTM trained. Best val acc: {max(lstm_history.get('val_acc', [0])):.4f}")
+        except Exception as e:
+            metrics["lstm"] = {"status": "failed", "error": str(e)}
+            print(f"  ✗ LSTM failed: {e}")
+
+        # 2. Train XGBoost
+        print("
+[2/4] Training XGBoost Classifier...")
+        try:
+            xgb_metrics = self.xgb_model.fit(X_train, y_train, X_val, y_val, feature_names)
+            metrics["xgboost"] = {
+                "status": "trained",
+                "metrics": xgb_metrics,
+            }
+            print(f"  ✓ XGBoost trained. Val F1: {xgb_metrics.get('val_f1', 0):.4f}")
+        except Exception as e:
+            metrics["xgboost"] = {"status": "failed", "error": str(e)}
+            print(f"  ✗ XGBoost failed: {e}")
+
+        # 3. Train Quantum Kernel
+        print("
+[3/4] Training Quantum Kernel SVM...")
+        try:
+            qkernel_metrics = self.qkernel_model.fit(X_train, y_train, X_val, y_val)
+            metrics["quantum_kernel"] = {
+                "status": "trained",
+                "metrics": qkernel_metrics,
+                "is_quantum": qkernel_metrics.get("is_quantum", False),
+            }
+            print(f"  ✓ Quantum Kernel trained. Acc: {qkernel_metrics.get('train_accuracy', 0):.4f}")
+            if not qkernel_metrics.get("is_quantum", False):
+                print(f"  ⚠ Quantum Kernel using classical fallback")
+        except Exception as e:
+            metrics["quantum_kernel"] = {"status": "failed", "error": str(e)}
+            print(f"  ✗ Quantum Kernel failed: {e}")
+
+        # 4. Train VQC
+        print("
+[4/4] Training Variational Quantum Circuit...")
+        try:
+            vqc_metrics = self.vqc_model.fit(X_train, y_train, X_val, y_val)
+            metrics["vqc"] = {
+                "status": "trained",
+                "metrics": vqc_metrics,
+                "is_quantum": vqc_metrics.get("is_quantum", False),
+                "circuit_depth": vqc_metrics.get("circuit_depth", 0),
+            }
+            print(f"  ✓ VQC trained. Acc: {vqc_metrics.get('train_accuracy', 0):.4f}")
+            if not vqc_metrics.get("is_quantum", False):
+                print(f"  ⚠ VQC using classical fallback")
+        except Exception as e:
+            metrics["vqc"] = {"status": "failed", "error": str(e)}
+            print(f"  ✗ VQC failed: {e}")
+
+        # 5. Train Meta-Learner (Stacking)
+        print("
+[5/5] Training Meta-Learner Ensemble...")
+        self._train_meta_learner(X_val if X_val is not None else X_train,
+                                 y_val if y_val is not None else y_train)
+
+        self.is_trained = True
+        self.training_timestamp = datetime.now().isoformat()
+        self.performance_history.append({
+            "version": self.model_version,
+            "timestamp": self.training_timestamp,
+            "metrics": metrics,
+        })
+
+        print("
+" + "=" * 60)
+        print("TRAINING COMPLETE")
+        print("=" * 60)
+
+        return metrics
+
+    def _train_meta_learner(self, X: np.ndarray, y: np.ndarray) -> None:
+        """
+        Train meta-learner using sub-model predictions.
+
+        Args:
+            X: Features
+            y: Labels
+        """
+        # Collect predictions from all trained models
+        predictions = []
+        model_names = []
+
+        if self.lstm_model is not None:
+            try:
+                pred = self.lstm_model.predict_proba(X)
+                predictions.append(pred)
+                model_names.append("lstm")
+            except Exception:
+                pass
+
+        if self.xgb_model is not None:
+            try:
+                pred = self.xgb_model.predict_proba(X)
+                predictions.append(pred)
+                model_names.append("xgboost")
+            except Exception:
+                pass
+
+        if self.qkernel_model is not None:
+            try:
+                pred = self.qkernel_model.predict_proba(X)
+                predictions.append(pred)
+                model_names.append("qkernel")
+            except Exception:
+                pass
+
+        if self.vqc_model is not None:
+            try:
+                pred = self.vqc_model.predict_proba(X)
+                predictions.append(pred)
+                model_names.append("vqc")
+            except Exception:
+                pass
+
+        if not predictions:
+            print("  ✗ No models available for meta-learner")
+            return
+
+        # Stack predictions horizontally
+        X_meta = np.hstack(predictions)
+
+        # Map labels
+        label_map = {-1: 0, 0: 1, 1: 2}
+        y_mapped = np.array([label_map.get(int(yi), 1) for yi in y])
+
+        # Train meta-learner
+        self.meta_learner.fit(X_meta, y_mapped)
+
+        # Calculate ensemble weights based on validation performance
+        self.sub_model_weights = {}
+        for name, pred in zip(model_names, predictions):
+            pred_labels = np.argmax(pred, axis=1)
+            acc = accuracy_score(y_mapped, pred_labels)
+            self.sub_model_weights[name] = max(0.1, acc)
+
+        # Normalize weights
+        total_weight = sum(self.sub_model_weights.values())
+        self.sub_model_weights = {k: v / total_weight for k, v in self.sub_model_weights.items()}
+
+        print(f"  ✓ Meta-learner trained with weights: {self.sub_model_weights}")
+
+    def predict_proba(
+        self,
+        X: np.ndarray,
+        method: str = "meta_learner",
+    ) -> np.ndarray:
+        """
+        Predict class probabilities using ensemble.
+
+        Args:
+            X: Feature array
+            method: "meta_learner", "weighted_average", or "voting"
+
+        Returns:
+            Probabilities for [loss, hold, profit]
+        """
+        if not self.is_trained:
+            return np.ones((len(X), 3)) / 3.0
+
+        predictions = {}
+
+        # LSTM predictions
+        if self.lstm_model is not None:
+            try:
+                predictions["lstm"] = self.lstm_model.predict_proba(X)
+            except Exception:
+                predictions["lstm"] = np.ones((len(X), 3)) / 3.0
+
+        # XGBoost predictions
+        if self.xgb_model is not None:
+            try:
+                predictions["xgboost"] = self.xgb_model.predict_proba(X)
+            except Exception:
+                predictions["xgboost"] = np.ones((len(X), 3)) / 3.0
+
+        # Quantum Kernel predictions
+        if self.qkernel_model is not None:
+            try:
+                predictions["qkernel"] = self.qkernel_model.predict_proba(X)
+            except Exception:
+                predictions["qkernel"] = np.ones((len(X), 3)) / 3.0
+
+        # VQC predictions
+        if self.vqc_model is not None:
+            try:
+                predictions["vqc"] = self.vqc_model.predict_proba(X)
+            except Exception:
+                predictions["vqc"] = np.ones((len(X), 3)) / 3.0
+
+        if method == "meta_learner" and self.meta_learner is not None:
+            # Stack all predictions for meta-learner
+            X_meta = np.hstack([predictions[name] for name in predictions])
+            return self.meta_learner.predict_proba(X_meta)
+
+        elif method == "weighted_average":
+            # Weighted average of all predictions
+            weights = self.sub_model_weights or {name: 1.0 / len(predictions) for name in predictions}
+
+            ensemble_proba = np.zeros((len(X), 3))
+            for name, pred in predictions.items():
+                weight = weights.get(name, 1.0 / len(predictions))
+                ensemble_proba += weight * pred
+
+            return ensemble_proba
+
+        elif method == "voting":
+            # Hard voting
+            votes = np.zeros((len(X), 3))
+            for pred in predictions.values():
+                class_idx = np.argmax(pred, axis=1)
+                for i, idx in enumerate(class_idx):
+                    votes[i, idx] += 1
+
+            return votes / len(predictions)
+
+        else:
+            # Default to simple average
+            return np.mean(list(predictions.values()), axis=0)
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels.
+
+        Args:
+            X: Feature array
+
+        Returns:
+            Labels (-1=loss, 0=hold, 1=profit)
+        """
+        proba = self.predict_proba(X)
+        class_indices = np.argmax(proba, axis=1)
+
+        label_map = {0: -1, 1: 0, 2: 1}
+        return np.array([label_map[i] for i in class_indices])
+
+    def get_signal_confidence(self, X: np.ndarray) -> np.ndarray:
+        """
+        Get confidence scores for predictions.
+        Confidence = max class probability.
+
+        Args:
+            X: Feature array
+
+        Returns:
+            Confidence scores (0-1)
+        """
+        proba = self.predict_proba(X)
+        return np.max(proba, axis=1)
+
+    def get_quantum_metrics(self) -> Dict[str, Any]:
+        """Get quantum layer metrics."""
+        metrics = {
+            "qkernel_is_quantum": False,
+            "vqc_is_quantum": False,
+            "qkernel_depth": 0,
+            "vqc_depth": 0,
+        }
+
+        if self.qkernel_model is not None:
+            metrics["qkernel_is_quantum"] = self.qkernel_model.is_quantum
+            metrics["qkernel_depth"] = self.qkernel_model.training_metrics.get("circuit_depth", 0)
+
+        if self.vqc_model is not None:
+            metrics["vqc_is_quantum"] = self.vqc_model.is_quantum
+            metrics["vqc_depth"] = self.vqc_model.circuit_depth
+            metrics["vqc_parameters"] = self.vqc_model.training_metrics.get("num_parameters", 0)
+
+        return metrics
+
+    def save(self, path: str) -> None:
+        """
+        Save entire ensemble to disk.
+
+        Args:
+            path: Save directory
+        """
+        save_path = Path(path)
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        # Save metadata
+        metadata = {
+            "model_version": self.model_version,
+            "training_timestamp": self.training_timestamp,
+            "ensemble_method": self.ensemble_method,
+            "sub_model_weights": self.sub_model_weights,
+            "classical_weight": self.classical_weight,
+            "quantum_weight": self.quantum_weight,
+            "performance_history": self.performance_history,
+        }
+
+        with open(save_path / "hybrid_metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        # Save meta-learner
+        import joblib
+        if self.meta_learner is not None:
+            joblib.dump(self.meta_learner, save_path / "meta_learner.pkl")
+
+        # Save sub-models
+        if self.lstm_model is not None:
+            self.lstm_model.save(save_path / "lstm")
+
+        if self.xgb_model is not None:
+            self.xgb_model.save(save_path / "xgboost")
+
+        if self.qkernel_model is not None:
+            self.qkernel_model.save(save_path / "qkernel")
+
+        if self.vqc_model is not None:
+            self.vqc_model.save(save_path / "vqc")
+
+    def load(self, path: str) -> None:
+        """
+        Load entire ensemble from disk.
+
+        Args:
+            path: Load directory
+        """
+        load_path = Path(path)
+
+        # Load metadata
+        with open(load_path / "hybrid_metadata.json", "r") as f:
+            metadata = json.load(f)
+
+        self.model_version = metadata["model_version"]
+        self.training_timestamp = metadata["training_timestamp"]
+        self.ensemble_method = metadata["ensemble_method"]
+        self.sub_model_weights = metadata["sub_model_weights"]
+        self.classical_weight = metadata["classical_weight"]
+        self.quantum_weight = metadata["quantum_weight"]
+        self.performance_history = metadata.get("performance_history", [])
+
+        # Load meta-learner
+        import joblib
+        if (load_path / "meta_learner.pkl").exists():
+            self.meta_learner = joblib.load(load_path / "meta_learner.pkl")
+
+        # Load sub-models (lazy - build then load)
+        self.build_models(input_size=50)  # Will be overridden on load
+
+        if (load_path / "lstm").exists():
+            self.lstm_model.load(load_path / "lstm")
+
+        if (load_path / "xgboost").exists():
+            self.xgb_model.load(load_path / "xgboost")
+
+        if (load_path / "qkernel").exists():
+            self.qkernel_model.load(load_path / "qkernel")
+
+        if (load_path / "vqc").exists():
+            self.vqc_model.load(load_path / "vqc")
+
+        self.is_trained = True

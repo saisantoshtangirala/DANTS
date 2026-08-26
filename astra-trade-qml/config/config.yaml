@@ -1,0 +1,213 @@
+# Astra-Trade QML - Main Configuration
+# Infrastructure: RunPod (Training) + Hetzner (Paper Trading) + Zerodha Kite (Execution)
+
+project:
+  name: "Astra-Trade-QML"
+  version: "1.0.0"
+  timezone: "Asia/Kolkata"
+  market: "NSE_INDIA"
+
+infrastructure:
+  training_host: "runpod"           # GPU cloud for daily model training
+  trading_host: "hetzner"           # VPS for paper trading & live shadow
+  broker_api: "zerodha_kite"        # Execution API
+  model_sync:
+    method: "s3"                    # s3 | scp | rsync
+    bucket: "astra-trade-models"
+    region: "ap-south-1"
+    sync_interval_minutes: 30
+
+data:
+  symbols:
+    focus_universe:
+      - "NIFTY 50"
+      - "NIFTY BANK"
+      - "RELIANCE"
+      - "TCS"
+      - "INFY"
+      - "HDFCBANK"
+      - "ICICIBANK"
+      - "SBIN"
+      - "BHARTIARTL"
+      - "ITC"
+    fno_universe: []                # Auto-populated from NSE F&O list
+    midcap_watchlist: []
+
+  timeframes:
+    intraday: "5min"                # Primary intraday timeframe
+    swing: "1d"                     # Daily timeframe
+    features_lookback: 60           # Bars for feature calculation
+
+  sources:
+    nse_bhavcopy_url: "https://archives.nseindia.com/content/historical/EQUITIES"
+    kite_historical: true           # Use Kite API for historical data
+    alternative_data:
+      ipo_gmp: "https://www.ipowatch.in"
+      fii_dii: "https://www.nseindia.com/reports/fii-dii"
+
+models:
+  classical:
+    lstm:
+      hidden_size: 128
+      num_layers: 2
+      dropout: 0.3
+      learning_rate: 0.001
+      batch_size: 64
+      epochs: 50
+      early_stopping_patience: 10
+
+    xgboost:
+      max_depth: 6
+      learning_rate: 0.05
+      n_estimators: 200
+      subsample: 0.8
+      colsample_bytree: 0.8
+      objective: "binary:logistic"
+
+  quantum:
+    backend: "qiskit"               # qiskit | pennylane
+    simulator: "aer_simulator"      # aer_simulator | statevector_simulator
+    shots: 1024
+    max_qubits: 8                   # Limited by classical simulation
+    feature_map: "ZZFeatureMap"     # ZZFeatureMap | PauliFeatureMap
+    ansatz: "EfficientSU2"          # EfficientSU2 | RealAmplitudes
+    reps: 2                         # Repetitions of ansatz layers
+    optimizer: "SPSA"               # SPSA | L-BFGS-B | COBYLA
+    max_iter: 100
+    quantum_batch_size: 32
+
+    # Hybrid integration weights
+    classical_weight: 0.7
+    quantum_weight: 0.3
+
+    # Fallback: if quantum simulation fails
+    fallback_to_classical: true
+    fallback_threshold_accuracy: 0.55
+
+  ensemble:
+    method: "weighted_average"      # weighted_average | stacking | voting
+    meta_learner: "logistic_regression"
+    cv_folds: 5
+
+signals:
+  confidence:
+    min_threshold: 0.70             # Minimum confidence to execute
+    tiers:
+      high: { min: 0.75, action: "execute_full" }
+      medium: { min: 0.60, action: "execute_half" }
+      low: { min: 0.50, action: "queue_review" }
+
+    weights:
+      model_probability: 0.30
+      ensemble_agreement: 0.25
+      regime_alignment: 0.20
+      historical_expectancy: 0.15
+      liquidity_score: 0.10
+
+  targets:
+    intraday:
+      profit_target_pct: 0.015      # 1.5%
+      stop_loss_pct: 0.008          # 0.8%
+      trailing_stop_pct: 0.005      # 0.5%
+
+    swing:
+      profit_target_pct: 0.05       # 5%
+      stop_loss_pct: 0.03           # 3%
+      trailing_stop_pct: 0.02       # 2%
+
+trading:
+  mode: "paper"                     # paper | live_shadow | live
+  capital:
+    initial: 1000000                # INR 10 Lakhs
+    currency: "INR"
+
+  position_sizing:
+    method: "kelly_fraction"
+    max_risk_per_trade_pct: 0.02    # 2% max risk
+    kelly_fraction: 0.25            # Quarter Kelly for safety
+    max_position_size_pct: 0.10     # 10% of capital max per position
+
+  costs:
+    brokerage_per_order: 20         # Zerodha flat ₹20 per order
+    stt_pct: 0.001                  # 0.1% on sell side (intraday)
+    stt_delivery_pct: 0.001         # 0.1% both sides (delivery)
+    gst_pct: 0.18                   # 18% on brokerage + transaction charges
+    transaction_charges_pct: 0.00345 # NSE transaction charges
+    sebi_charges_pct: 0.0001        # ₹10 per crore
+    stamp_duty_pct: 0.00015         # 0.015% on buy side (Maharashtra)
+    slippage_pct: 0.0005            # 0.05% estimated slippage
+
+  risk_management:
+    daily_loss_limit_pct: 0.03      # 3% daily loss limit → halt
+    consecutive_loss_limit: 3       # 3 consecutive losses → reduce size 50%
+    vix_spike_threshold: 25         # India VIX > 25 → exit directional
+    max_drawdown_pct: 0.12          # 12% max drawdown → halt all
+    max_open_positions: 5           # Max 5 concurrent positions
+    circuit_breaker_action: "cancel_all_pending"
+
+  schedule:
+    pre_market: "09:00"
+    market_open: "09:15"
+    market_close: "15:30"
+    post_market: "15:30"
+    training_window: "16:30-23:30"  # Non-trading hours
+
+training:
+  daily_schedule:
+    - { time: "16:30", task: "data_ingestion" }
+    - { time: "17:00", task: "feature_engineering" }
+    - { time: "18:00", task: "classical_training" }
+    - { time: "20:00", task: "quantum_optimization" }
+    - { time: "22:00", task: "ensemble_optimization" }
+    - { time: "23:00", task: "backtest_validation" }
+    - { time: "23:30", task: "model_deployment" }
+
+  evolution:
+    enabled: true
+    nas_frequency_days: 30          # Neural Architecture Search monthly
+    feature_evolution: true         # Genetic programming for features
+    regime_submodels: true          # Train separate models per regime
+    quantum_depth_adaptation: true  # Auto-adjust circuit depth
+
+  validation:
+    walk_forward_windows: 6         # 6-month rolling window
+    out_of_sample_pct: 0.20         # 20% OOS
+    paper_trading_months: 6         # 6-month incubation
+
+ipo:
+  enabled: true
+  mode: "paper_only"                # Never automate IPOs live (regulatory risk)
+  data_sources:
+    - "ipo_watch"
+    - "chittorgarh"
+    - "nse_ipo_calendar"
+  features:
+    - gmp_trend
+    - subscription_ratio_retail
+    - subscription_ratio_qib
+    - subscription_ratio_hni
+    - issue_size
+    - sector_momentum_5d
+    - market_sentiment_vix
+  prediction_target: "listing_day_return_pct"
+  min_confidence: 0.65
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+  file: "logs/astra_trade.log"
+  max_bytes: 10485760               # 10MB
+  backup_count: 10
+  database: "sqlite:///logs/astra_trade.db"
+
+dashboard:
+  enabled: true
+  port: 8501
+  refresh_interval_seconds: 30
+  metrics:
+    - pnl_chart
+    - confidence_distribution
+    - regime_timeline
+    - quantum_circuit_metrics
+    - trade_journal
+    - model_performance
