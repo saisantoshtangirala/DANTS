@@ -84,7 +84,9 @@ class FeatureEngineer:
         # Momentum and trend features
         df = self._add_momentum_features(df)
 
-        # Drop NaN rows from lookback
+        # Replace inf values (from division by zero in indicators) with NaN,
+        # then drop all NaN rows from lookback periods and sanitization.
+        df = df.replace([np.inf, -np.inf], np.nan)
         df = df.dropna().reset_index(drop=True)
 
         return df

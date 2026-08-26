@@ -270,6 +270,9 @@ class HybridQMLModel:
         # Stack predictions horizontally
         X_meta = np.hstack(predictions)
 
+        # Replace any inf/NaN from failed sub-models with uniform priors
+        X_meta = np.where(np.isfinite(X_meta), X_meta, 1.0 / 3.0)
+
         # Map labels
         label_map = {-1: 0, 0: 1, 1: 2}
         y_mapped = np.array([label_map.get(int(yi), 1) for yi in y])

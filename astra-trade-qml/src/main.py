@@ -23,7 +23,7 @@ try:
     _cuda_ok = torch.cuda.is_available()
     if _cuda_ok:
         print(f"CUDA initialized: {torch.cuda.get_device_name(0)}, "
-              f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+              f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
     else:
         print("WARNING: CUDA not available - training will run on CPU")
 except Exception as e:

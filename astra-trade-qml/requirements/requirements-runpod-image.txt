@@ -24,7 +24,7 @@ xgboost>=2.0
 
 qiskit>=1.0
 qiskit-machine-learning>=0.7
-qiskit-aer-gpu>=0.14
+qiskit-aer>=0.14
 qiskit-algorithms>=0.3
 
 SQLAlchemy>=2.0
