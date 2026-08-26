@@ -29,7 +29,11 @@ permissions:
   actions: write  # needed for the docker/build-push-action GHA cache backend
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}-training
+  # Docker registry names must be lowercase; github.repository preserves
+  # actual repo capitalization (this repo is "saisantoshtangirala/DANTS"),
+  # which broke the very first build-image run with "repository name must
+  # be lowercase". toLower() is a built-in GitHub Actions expression fn.
+  IMAGE_NAME: ghcr.io/${{ toLower(github.repository) }}-training
 
 jobs:
   build-image:
