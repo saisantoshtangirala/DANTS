@@ -38,7 +38,12 @@ permissions:
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 200
+    # launch_training_pod.py's own timeouts: up to 3 launch attempts x 5min
+    # boot check (worst case, all fail to boot) + the 190min poll-timeout
+    # once a pod does boot = up to 205min. Padded above that so the script's
+    # own clean failure/retry logic always gets to finish before GitHub's
+    # job timeout would hard-kill it mid-retry.
+    timeout-minutes: 215
     steps:
       - uses: actions/checkout@v4
 
@@ -70,10 +75,26 @@ jobs:
           KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
           KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
         run: |
+          set -o pipefail
           python3 astra-trade-qml/scripts/ci/launch_training_pod.py \
             --repo "${{ github.repository }}" \
             --branch "${{ github.ref_name }}" \
-            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}'
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            2>&1 | tee /tmp/launch_training_pod.log
+
+      - name: Summarize training run
+        if: always()
+        run: |
+          {
+            echo "### Training run"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
+            echo
+            echo '```'
+            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+              /tmp/launch_training_pod.log || echo "(no matching status lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: train
