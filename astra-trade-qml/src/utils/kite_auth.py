@@ -10,16 +10,25 @@ directly calling Zerodha's own login endpoints (the same ones the login
 page's JavaScript calls), which is the standard pattern used across the
 retail algo-trading community for exactly this purpose.
 
-This is inherently more fragile than the rest of this codebase: it
-depends on undocumented endpoints that Zerodha could change without
-notice, and it has NOT been exercised against a real account (no live
-Kite credentials were available while writing it). Before relying on
-this in an unattended pipeline, run `generate_access_token()` manually
-once against your real account and confirm it returns a working token.
+The login flow (4 steps):
+  1. POST /api/login          user_id + password        -> request_id
+  2. POST /api/twofa          request_id + TOTP         -> session cookies
+  3. GET  /connect/login      api_key (follow redirects) -> request_token
+  4. POST /session/token      checksum(key+token+secret) -> access_token
+
+Step 3 is the fragile one: the redirect chain passes through
+/connect/finish (intermediate, no token), may stop at /connect/authorize
+(one-time consent screen), and eventually redirects to the app's
+registered redirect URL with request_token in the query string. The
+registered URL is typically http://127.0.0.1/ where nothing listens, so
+we must capture the token from the Location header before following
+that final hop.
 """
 
 import re
-from typing import Optional
+import time
+import urllib.parse
+from typing import List, Optional
 
 import pyotp
 import requests
@@ -37,28 +46,93 @@ class KiteLoginError(RuntimeError):
     """Raised when the automated Kite login flow fails at any step."""
 
 
-def _extract_request_token(session: requests.Session, api_key: str) -> str:
+def _totp_with_headroom(secret: str, min_seconds: float = 5.0) -> str:
+    """Generate a TOTP code, waiting if the current one is about to expire.
+
+    A code generated with 1-2 seconds of validity left often expires
+    before Zerodha's server validates it, causing a 2FA rejection that
+    looks like a wrong seed. This waits for the next code when the
+    current one has less than `min_seconds` of life remaining.
     """
-    Follow the connect/login redirect chain (without letting `requests`
-    try to actually load the app's registered redirect URL, which may
-    not be reachable from this environment) and pull `request_token`
-    out of whichever Location header carries it.
+    totp = pyotp.TOTP(secret)
+    remaining = totp.interval - (time.time() % totp.interval)
+    if remaining < min_seconds:
+        wait = remaining + 0.5
+        logger.info("totp_waiting_for_fresh_code", wait_seconds=round(wait, 1))
+        time.sleep(wait)
+    return totp.now()
+
+
+def _extract_request_token(session: requests.Session, api_key: str) -> str:
+    """Follow the /connect/login redirect chain and extract request_token.
+
+    Three failure modes this handles:
+
+    1. The final redirect target (the app's registered URL, usually
+       127.0.0.1) is unreachable — we stop before following it.
+    2. /connect/authorize appears — the app hasn't been authorised for
+       this account yet (one-time manual approval needed).
+    3. The token is embedded in a JS redirect in the page body rather
+       than a Location header.
     """
     url = f"{_CONNECT_URL}?api_key={api_key}&v=3"
-    for _ in range(5):
-        response = session.get(url, allow_redirects=False, timeout=15)
-        location = response.headers.get("Location")
-        if not location:
+    seen_urls: List[str] = []
+    body = ""
+
+    for _ in range(10):
+        try:
+            response = session.get(url, allow_redirects=False, timeout=15)
+        except requests.RequestException:
             break
-        match = re.search(r"request_token=([^&]+)", location)
+
+        location = response.headers.get("Location", "")
+
+        if location:
+            seen_urls.append(location)
+            match = re.search(r"request_token=([A-Za-z0-9]+)", location)
+            if match:
+                return match.group(1)
+            url = location
+            continue
+
+        # No Location header — we've landed on a page. Check its body.
+        body = response.text[:200_000]
+
+        # Check for token in JS redirect or meta refresh
+        match = re.search(r"request_token=([A-Za-z0-9]+)", body)
         if match:
             return match.group(1)
-        url = location
+
+        break
+
+    # Detect the consent screen by path, not page content (it's a JS
+    # shell whose HTML doesn't contain "authorize" as visible text).
+    landed = url
+    all_urls = seen_urls + [landed]
+    if any("/connect/authorize" in u for u in all_urls):
+        raise KiteLoginError(
+            "The Kite app has not been authorised for this account yet. "
+            "Kite stopped at its consent screen (/connect/authorize), which "
+            "needs ONE manual approval and then never appears again. "
+            "Open https://kite.zerodha.com/connect/login?v=3&api_key="
+            f"{api_key} in a browser, sign in, press Authorise, and re-run. "
+            "The page failing to load AFTER you press Authorise is expected "
+            "and means it worked."
+        )
+
+    # Strip query strings for safe logging (they can carry tokens)
+    safe_hops = []
+    for u in seen_urls:
+        parsed = urllib.parse.urlparse(u)
+        safe_hops.append(urllib.parse.urlunparse(
+            parsed._replace(query="", fragment="")))
 
     raise KiteLoginError(
         "Could not find request_token in the connect/login redirect chain. "
-        "Zerodha may have changed their login flow, or the account/app "
-        "configuration is invalid."
+        f"Redirect hops: {' -> '.join(safe_hops) or '(no redirects)'}. "
+        "Possible causes: (1) the app's redirect URL on the Kite developer "
+        "console doesn't match, (2) the TOTP seed is for a different account, "
+        "(3) the password changed, or (4) Zerodha changed their login flow."
     )
 
 
@@ -89,6 +163,8 @@ def generate_access_token(
     session = requests.Session()
     session.headers.update({"User-Agent": "Mozilla/5.0"})
 
+    # Step 1: password login
+    logger.info("kite_login_step1", user_id=user_id)
     login_resp = session.post(
         _LOGIN_URL, data={"user_id": user_id, "password": password}, timeout=15
     )
@@ -97,7 +173,9 @@ def generate_access_token(
         raise KiteLoginError(f"Kite login step failed: {login_data}")
     request_id = login_data["data"]["request_id"]
 
-    totp_code = pyotp.TOTP(totp_secret).now()
+    # Step 2: TOTP with headroom to avoid near-expiry race
+    totp_code = _totp_with_headroom(totp_secret)
+    logger.info("kite_login_step2_twofa")
     twofa_resp = session.post(
         _TWOFA_URL,
         data={
@@ -109,11 +187,20 @@ def generate_access_token(
         timeout=15,
     )
     twofa_data = twofa_resp.json()
+    if str(twofa_data.get("status", "success")).lower() == "error":
+        raise KiteLoginError(
+            f"Kite 2FA rejected: {twofa_data.get('message', twofa_data)}. "
+            "The TOTP seed is most likely for a different account, or the "
+            "server clock has drifted more than 30s."
+        )
     if twofa_data.get("status") != "success":
         raise KiteLoginError(f"Kite 2FA step failed: {twofa_data}")
 
+    # Step 3: collect request_token from redirect chain
+    logger.info("kite_login_step3_request_token")
     request_token = _extract_request_token(session, api_key)
 
+    # Step 4: exchange for access_token
     kite = KiteConnect(api_key=api_key)
     session_data = kite.generate_session(request_token, api_secret=api_secret)
     access_token = session_data["access_token"]
@@ -146,9 +233,6 @@ def generate_access_token_from_env(env: Optional[dict] = None) -> str:
 
 
 if __name__ == "__main__":
-    # Manual smoke test: `python3 -m src.utils.kite_auth` with the KITE_*
-    # env vars set. Prints only whether it succeeded - never the token
-    # itself, since this may run in a logged CI context.
     try:
         token = generate_access_token_from_env()
         print(f"Login succeeded. Access token length: {len(token)}")
