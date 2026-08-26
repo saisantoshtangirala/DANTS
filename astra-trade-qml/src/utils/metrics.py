@@ -5,7 +5,7 @@ Implements Sharpe ratio, max drawdown, profit factor, and other trading metrics.
 
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 
 
 def calculate_sharpe_ratio(

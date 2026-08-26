@@ -140,8 +140,7 @@ class HybridQMLModel:
         metrics = {}
 
         # 1. Train LSTM
-        print("
-[1/4] Training LSTM Sequence Model...")
+        print("\n[1/4] Training LSTM Sequence Model...")
         try:
             lstm_history = self.lstm_model.fit(X_train, y_train, X_val, y_val)
             metrics["lstm"] = {
@@ -154,8 +153,7 @@ class HybridQMLModel:
             print(f"  ✗ LSTM failed: {e}")
 
         # 2. Train XGBoost
-        print("
-[2/4] Training XGBoost Classifier...")
+        print("\n[2/4] Training XGBoost Classifier...")
         try:
             xgb_metrics = self.xgb_model.fit(X_train, y_train, X_val, y_val, feature_names)
             metrics["xgboost"] = {
@@ -168,8 +166,7 @@ class HybridQMLModel:
             print(f"  ✗ XGBoost failed: {e}")
 
         # 3. Train Quantum Kernel
-        print("
-[3/4] Training Quantum Kernel SVM...")
+        print("\n[3/4] Training Quantum Kernel SVM...")
         try:
             qkernel_metrics = self.qkernel_model.fit(X_train, y_train, X_val, y_val)
             metrics["quantum_kernel"] = {
@@ -185,8 +182,7 @@ class HybridQMLModel:
             print(f"  ✗ Quantum Kernel failed: {e}")
 
         # 4. Train VQC
-        print("
-[4/4] Training Variational Quantum Circuit...")
+        print("\n[4/4] Training Variational Quantum Circuit...")
         try:
             vqc_metrics = self.vqc_model.fit(X_train, y_train, X_val, y_val)
             metrics["vqc"] = {
@@ -203,8 +199,7 @@ class HybridQMLModel:
             print(f"  ✗ VQC failed: {e}")
 
         # 5. Train Meta-Learner (Stacking)
-        print("
-[5/5] Training Meta-Learner Ensemble...")
+        print("\n[5/5] Training Meta-Learner Ensemble...")
         self._train_meta_learner(X_val if X_val is not None else X_train,
                                  y_val if y_val is not None else y_train)
 
@@ -216,8 +211,7 @@ class HybridQMLModel:
             "metrics": metrics,
         })
 
-        print("
-" + "=" * 60)
+        print("\n" + "=" * 60)
         print("TRAINING COMPLETE")
         print("=" * 60)
 
