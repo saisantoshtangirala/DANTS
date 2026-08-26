@@ -19,7 +19,7 @@ try:
     from qiskit_machine_learning.connectors import TorchConnector
     from qiskit_algorithms.optimizers import SPSA, COBYLA, L_BFGS_B
     from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
-    from qiskit.primitives import Estimator
+    from qiskit.primitives import StatevectorEstimator as Estimator
     QISKIT_AVAILABLE = True
 except ImportError:
     QISKIT_AVAILABLE = False

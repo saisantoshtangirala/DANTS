@@ -208,8 +208,10 @@ class LSTMModel:
         # Loss and optimizer
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        # verbose was removed from ReduceLROnPlateau in newer torch releases;
+        # the training loop already prints loss/accuracy every 10 epochs below.
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=5, verbose=True
+            optimizer, mode="min", factor=0.5, patience=5
         )
 
         history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}

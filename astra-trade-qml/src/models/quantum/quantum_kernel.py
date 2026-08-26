@@ -18,7 +18,7 @@ try:
     from qiskit_machine_learning.algorithms import QSVC
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
     from qiskit_aer import AerSimulator
-    from qiskit.primitives import Sampler
+    from qiskit.primitives import StatevectorSampler as Sampler
     QISKIT_AVAILABLE = True
 except ImportError:
     QISKIT_AVAILABLE = False

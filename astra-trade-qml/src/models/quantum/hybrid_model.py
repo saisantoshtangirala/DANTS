@@ -99,9 +99,11 @@ class HybridQMLModel:
         # VQC
         self.vqc_model = VQCMarketClassifier(**self.vqc_config)
 
-        # Meta-learner
+        # Meta-learner. LogisticRegression with solver="lbfgs" fits a
+        # multinomial model automatically for multi-class targets (the
+        # explicit multi_class="multinomial" kwarg was deprecated and
+        # removed in scikit-learn >= 1.7).
         self.meta_learner = LogisticRegression(
-            multi_class="multinomial",
             solver="lbfgs",
             max_iter=1000,
             C=1.0,

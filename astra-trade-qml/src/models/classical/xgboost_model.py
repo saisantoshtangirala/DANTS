@@ -74,6 +74,8 @@ class XGBoostMarketModel:
             "n_jobs": -1,
             "tree_method": "hist",  # Fast histogram-based algorithm
             "verbosity": 0,
+            # early_stopping_rounds moved from fit() to the constructor in xgboost >= 2.0
+            "early_stopping_rounds": early_stopping_rounds,
         }
 
         self.early_stopping_rounds = early_stopping_rounds
@@ -121,7 +123,6 @@ class XGBoostMarketModel:
             X_train,
             y_train_mapped,
             eval_set=eval_set,
-            early_stopping_rounds=self.early_stopping_rounds,
             verbose=False,
         )
 

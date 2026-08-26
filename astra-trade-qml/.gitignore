@@ -9,3 +9,4 @@ logs/
 checkpoints/
 *.db
 .env
+runpod_results/
