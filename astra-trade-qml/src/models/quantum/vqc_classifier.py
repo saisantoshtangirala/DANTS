@@ -15,11 +15,11 @@ try:
     from qiskit import QuantumCircuit
     from qiskit.circuit import ParameterVector
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap, EfficientSU2, RealAmplitudes
-    from qiskit_machine_learning.neural_networks import EstimatorQNN
+    from qiskit_machine_learning.neural_networks import SamplerQNN
     from qiskit_machine_learning.connectors import TorchConnector
     from qiskit_algorithms.optimizers import SPSA, COBYLA, L_BFGS_B
     from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
-    from qiskit.primitives import StatevectorEstimator as Estimator
+    from qiskit.primitives import StatevectorSampler as Sampler
     QISKIT_AVAILABLE = True
 except ImportError:
     QISKIT_AVAILABLE = False
@@ -35,6 +35,8 @@ class VQCMarketClassifier:
     Variational Quantum Circuit classifier.
     Uses a feature map + ansatz architecture optimized via classical gradient descent.
     """
+
+    NUM_CLASSES = 3  # loss, hold, profit
 
     def __init__(
         self,
@@ -84,6 +86,7 @@ class VQCMarketClassifier:
         self.is_quantum = False
         self.training_metrics = {}
         self.circuit_depth = 0
+        self.class_names = ["loss", "hold", "profit"]
 
         if not QISKIT_AVAILABLE:
             self.is_quantum = False
@@ -208,13 +211,20 @@ class VQCMarketClassifier:
 
         self.circuit_depth = len(circuit.data)
 
-        # Create QNN
-        estimator = Estimator()
-        qnn = EstimatorQNN(
+        # SamplerQNN (not EstimatorQNN) is required for multi-class output:
+        # EstimatorQNN produces a single scalar expectation value, which
+        # NeuralNetworkClassifier only accepts for binary classification.
+        # SamplerQNN samples the circuit's computational basis states and an
+        # `interpret` function maps each outcome to one of NUM_CLASSES
+        # classes, giving a genuine multi-class probability distribution.
+        sampler = Sampler(default_shots=self.shots)
+        qnn = SamplerQNN(
             circuit=circuit,
             input_params=self.feature_map.parameters,
             weight_params=self.ansatz.parameters,
-            estimator=estimator,
+            interpret=lambda x: x % self.NUM_CLASSES,
+            output_shape=self.NUM_CLASSES,
+            sampler=sampler,
         )
 
         # Create classifier
@@ -311,20 +321,11 @@ class VQCMarketClassifier:
 
         if self.is_quantum and self.vqc is not None:
             try:
-                # NeuralNetworkClassifier predict returns class labels
-                # We approximate probabilities using decision function or repeated sampling
-                proba = np.ones((len(X), 3)) / 3.0  # Default uniform
-
-                # Try to get scores if available
-                if hasattr(self.vqc, "predict"):
-                    pred = self.vqc.predict(X_normalized)
-                    # One-hot encode predictions as pseudo-probabilities
-                    for i, p in enumerate(pred):
-                        if 0 <= p < 3:
-                            proba[i, p] = 0.7
-                            proba[i, (p+1)%3] = 0.15
-                            proba[i, (p+2)%3] = 0.15
-                return proba
+                # SamplerQNN's output is a genuine per-class probability
+                # distribution (see _fit_quantum), so NeuralNetworkClassifier
+                # exposes real probabilities directly - no need to fake them
+                # from hard predictions.
+                return self.vqc.predict_proba(X_normalized)
             except Exception:
                 pass
 
