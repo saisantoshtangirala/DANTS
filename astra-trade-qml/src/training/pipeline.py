@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from src.data.feature_engineering import FeatureConfig, FeatureEngineer
-from src.data.nse_ingestion import KiteDataProvider, NSEDataIngestion
+from src.data.nse_ingestion import KiteDataProvider, NSEDataIngestion, YFinanceDataProvider
 from src.models.quantum.hybrid_model import HybridQMLModel
 from src.trading.live_feed import KiteLiveFeed
 from src.utils.database import DatabaseManager
@@ -78,6 +78,7 @@ class TrainingPipeline:
         )
 
         self.ingestion = NSEDataIngestion(data_dir="data/nse")
+        self.yfinance_ingestion = YFinanceDataProvider()
         # Optional: when a live Kite session is available, prefer it for
         # historical data (more reliable than NSE's archive URLs, which
         # can 404 for dates outside their retention window) and fall back
@@ -112,6 +113,14 @@ class TrainingPipeline:
 
             if df.empty:
                 df = self.ingestion.download_historical_range(symbol, start_date, end_date)
+
+            if df.empty:
+                # NSE archive is behind Akamai bot protection that blocks
+                # datacenter/CI IPs outright (see download_historical_range's
+                # fail-fast) - Yahoo Finance doesn't have that problem, so
+                # it's a meaningfully more reliable free fallback here, not
+                # just a redundant retry.
+                df = self.yfinance_ingestion.download_historical_range(symbol, start_date, end_date)
 
             if not df.empty:
                 self.raw_data[symbol] = df

@@ -32,17 +32,19 @@ def test_build_hybrid_model_config_maps_quantum_section(config):
 
 def test_data_ingestion_falls_back_to_synthetic_when_no_real_source_available(config):
     """
-    Regression test: when neither Kite nor the NSE archive produce data for
-    any symbol (e.g. NSE blocked by Akamai bot protection, no Kite session),
-    data_ingestion() should degrade to synthetic OHLCV rather than leave
-    raw_data empty, which would otherwise crash the pipeline downstream at
-    _pooled_training_matrix with an unhandled ValueError.
+    Regression test: when neither Kite, the NSE archive, nor Yahoo Finance
+    produce data for any symbol (e.g. NSE blocked by Akamai bot protection,
+    no Kite session, Yahoo also unreachable), data_ingestion() should
+    degrade to synthetic OHLCV rather than leave raw_data empty, which
+    would otherwise crash the pipeline downstream at _pooled_training_matrix
+    with an unhandled ValueError.
     """
     test_config = {**config, "data": {**config["data"], "symbols": {"focus_universe": ["RELIANCE", "TCS"]}}}
     db = DatabaseManager("sqlite:///:memory:")
     pipeline = TrainingPipeline(test_config, db=db)
 
-    with patch.object(pipeline.ingestion, "download_historical_range", return_value=pd.DataFrame()):
+    with patch.object(pipeline.ingestion, "download_historical_range", return_value=pd.DataFrame()), \
+         patch.object(pipeline.yfinance_ingestion, "download_historical_range", return_value=pd.DataFrame()):
         raw = pipeline.data_ingestion(lookback_days=250)
 
     assert pipeline.used_synthetic_data is True
@@ -67,6 +69,32 @@ def test_data_ingestion_does_not_use_synthetic_when_real_data_available(config):
 
     assert pipeline.used_synthetic_data is False
     assert raw["RELIANCE"] is real_df
+
+
+def test_data_ingestion_falls_back_to_yfinance_when_nse_archive_empty(config):
+    """
+    Yahoo Finance should be tried per-symbol when both Kite (not configured)
+    and the NSE archive come back empty, before ever touching synthetic data.
+    """
+    test_config = {**config, "data": {**config["data"], "symbols": {"focus_universe": ["RELIANCE"]}}}
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(test_config, db=db)
+
+    yfinance_df = pd.DataFrame({
+        "symbol": ["RELIANCE"] * 5,
+        "date": pd.date_range("2024-01-01", periods=5),
+        "open": [1, 2, 3, 4, 5], "high": [1, 2, 3, 4, 5],
+        "low": [1, 2, 3, 4, 5], "close": [1, 2, 3, 4, 5], "volume": [100] * 5,
+        "turnover": [100.0] * 5,
+    })
+
+    with patch.object(pipeline.ingestion, "download_historical_range", return_value=pd.DataFrame()), \
+         patch.object(pipeline.yfinance_ingestion, "download_historical_range", return_value=yfinance_df) as mock_yf:
+        raw = pipeline.data_ingestion(lookback_days=250)
+
+    mock_yf.assert_called_once()
+    assert pipeline.used_synthetic_data is False
+    assert raw["RELIANCE"] is yfinance_df
 
 
 def test_run_full_pipeline_skips_deployment_when_synthetic_data_used(config):

@@ -243,6 +243,82 @@ class NSEDataIngestion:
         return today
 
 
+class YFinanceDataProvider:
+    """
+    Yahoo Finance fallback for historical OHLCV data.
+
+    Free, no API key, no account. Used as a last-resort real-data source
+    when both Kite (not configured / login failed) and the NSE archive
+    (Akamai bot-blocked on datacenter/CI IPs - see download_historical_range
+    in NSEDataIngestion) come back empty for a symbol. Yahoo's infrastructure
+    doesn't fingerprint/block cloud IPs the way NSE's archive does, so this
+    is meaningfully more reliable to run from GitHub Actions / RunPod.
+    """
+
+    _INDEX_TICKERS = {
+        "NIFTY 50": "^NSEI",
+        "NIFTY BANK": "^NSEBANK",
+        "INDIA VIX": "^INDIAVIX",
+    }
+
+    @classmethod
+    def _to_yahoo_symbol(cls, symbol: str) -> str:
+        if symbol in cls._INDEX_TICKERS:
+            return cls._INDEX_TICKERS[symbol]
+        return f"{symbol}.NS"
+
+    def download_historical_range(
+        self,
+        symbol: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> pd.DataFrame:
+        """
+        Download daily OHLCV for a symbol from Yahoo Finance.
+
+        Args:
+            symbol: NSE symbol (e.g. "RELIANCE") or index name (e.g. "NIFTY 50")
+            start_date: Start date
+            end_date: End date
+
+        Returns:
+            DataFrame with the same schema as NSEDataIngestion.download_historical_range
+        """
+        try:
+            import yfinance as yf
+        except ImportError:
+            print("yfinance not installed. Install with: pip install yfinance")
+            return pd.DataFrame()
+
+        yahoo_symbol = self._to_yahoo_symbol(symbol)
+
+        try:
+            history = yf.Ticker(yahoo_symbol).history(
+                start=start_date, end=end_date, interval="1d", auto_adjust=True
+            )
+        except Exception as e:
+            print(f"Error downloading {symbol} ({yahoo_symbol}) from Yahoo Finance: {e}")
+            return pd.DataFrame()
+
+        if history.empty:
+            return pd.DataFrame()
+
+        history = history.reset_index()
+        history = history.rename(columns={
+            "Date": "date",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume",
+        })
+        history["date"] = pd.to_datetime(history["date"]).dt.tz_localize(None)
+        history["symbol"] = symbol
+        history["turnover"] = history["close"] * history["volume"]
+
+        return history[["symbol", "date", "open", "high", "low", "close", "volume", "turnover"]]
+
+
 class KiteDataProvider:
     """
     Zerodha Kite API data provider for real-time and historical data.

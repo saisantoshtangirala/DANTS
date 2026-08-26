@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from src.data.nse_ingestion import NSEDataIngestion
+from src.data.nse_ingestion import NSEDataIngestion, YFinanceDataProvider
 
 
 def make_ingestion(tmp_path) -> NSEDataIngestion:
@@ -58,3 +58,73 @@ def test_download_historical_range_recovers_after_transient_failures(tmp_path):
         )
 
     assert not result.empty
+
+
+def _fake_yfinance_history() -> pd.DataFrame:
+    index = pd.date_range("2024-01-01", periods=3, freq="D", tz="Asia/Kolkata", name="Date")
+    return pd.DataFrame(
+        {
+            "Open": [100.0, 101.0, 102.0],
+            "High": [101.0, 102.0, 103.0],
+            "Low": [99.0, 100.0, 101.0],
+            "Close": [100.5, 101.5, 102.5],
+            "Volume": [1000, 1100, 1200],
+            "Dividends": [0.0, 0.0, 0.0],
+            "Stock Splits": [0.0, 0.0, 0.0],
+        },
+        index=index,
+    )
+
+
+def test_yfinance_provider_maps_equity_symbol_to_ns_ticker():
+    provider = YFinanceDataProvider()
+    mock_ticker = MagicMock()
+    mock_ticker.history.return_value = _fake_yfinance_history()
+
+    with patch("yfinance.Ticker", return_value=mock_ticker) as mock_ticker_cls:
+        result = provider.download_historical_range(
+            "RELIANCE", datetime(2024, 1, 1), datetime(2024, 1, 3)
+        )
+
+    mock_ticker_cls.assert_called_once_with("RELIANCE.NS")
+    assert not result.empty
+    assert (result["symbol"] == "RELIANCE").all()
+    assert list(result.columns) == ["symbol", "date", "open", "high", "low", "close", "volume", "turnover"]
+    assert result["date"].dt.tz is None
+
+
+def test_yfinance_provider_maps_known_index_names():
+    provider = YFinanceDataProvider()
+    mock_ticker = MagicMock()
+    mock_ticker.history.return_value = _fake_yfinance_history()
+
+    with patch("yfinance.Ticker", return_value=mock_ticker) as mock_ticker_cls:
+        provider.download_historical_range("NIFTY 50", datetime(2024, 1, 1), datetime(2024, 1, 3))
+
+    mock_ticker_cls.assert_called_once_with("^NSEI")
+
+
+def test_yfinance_provider_returns_empty_on_empty_history():
+    provider = YFinanceDataProvider()
+    mock_ticker = MagicMock()
+    mock_ticker.history.return_value = pd.DataFrame()
+
+    with patch("yfinance.Ticker", return_value=mock_ticker):
+        result = provider.download_historical_range(
+            "RELIANCE", datetime(2024, 1, 1), datetime(2024, 1, 3)
+        )
+
+    assert result.empty
+
+
+def test_yfinance_provider_returns_empty_on_exception():
+    provider = YFinanceDataProvider()
+    mock_ticker = MagicMock()
+    mock_ticker.history.side_effect = RuntimeError("network error")
+
+    with patch("yfinance.Ticker", return_value=mock_ticker):
+        result = provider.download_historical_range(
+            "RELIANCE", datetime(2024, 1, 1), datetime(2024, 1, 3)
+        )
+
+    assert result.empty
