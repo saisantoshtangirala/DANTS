@@ -138,23 +138,35 @@ git config user.name "RunPod Training Bot"
 REPO_URL="https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git"
 LOG_FILE=/workspace/training.log
 
-# Background process: push live logs to model-artifacts every 90 seconds
+# Background process: push live logs to model-artifacts every 90 seconds.
+# Uses the GitHub Contents API instead of git checkout to avoid switching
+# branches in the working directory where training is running.
 (
+  LOG_SHA=""
   while true; do
     sleep 90
     if [ -f "$LOG_FILE" ]; then
-      (
-        cd /workspace/repo/astra-trade-qml
-        git checkout -B model-artifacts 2>/dev/null
-        mkdir -p logs
-        cp "$LOG_FILE" logs/live_training.log
-        git add -f logs/live_training.log
-        git diff --cached --quiet || {{
-          git commit -q -m "Live training log $(date -u +%H:%M:%S)"
-          git push "$REPO_URL" HEAD:model-artifacts --force 2>/dev/null
-        }}
-        git checkout - 2>/dev/null
-      ) 2>/dev/null
+      LOG_B64=$(base64 -w0 "$LOG_FILE")
+      if [ -z "$LOG_SHA" ]; then
+        # Check if file already exists to get its SHA for updates
+        LOG_SHA=$(curl -sS -H "Authorization: Bearer ${{GH_TOKEN}}" \
+          "https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/live_training.log?ref=model-artifacts" \
+          2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
+      fi
+      SHA_FIELD=""
+      if [ -n "$LOG_SHA" ]; then
+        SHA_FIELD=", \"sha\": \"$LOG_SHA\""
+      fi
+      RESP=$(curl -sS -X PUT \
+        -H "Authorization: Bearer ${{GH_TOKEN}}" \
+        -H "Content-Type: application/json" \
+        "https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/live_training.log" \
+        -d "{{\"message\": \"Live training log $(date -u +%H:%M:%S)\", \"content\": \"$LOG_B64\", \"branch\": \"model-artifacts\" $SHA_FIELD}}" \
+        2>/dev/null || echo "{{}}")
+      NEW_SHA=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('content',{{}}).get('sha',''))" 2>/dev/null || echo "")
+      if [ -n "$NEW_SHA" ]; then
+        LOG_SHA="$NEW_SHA"
+      fi
     fi
   done
 ) &
