@@ -132,21 +132,50 @@ try:
 except: pass
 "
 
-PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train
-TRAIN_EXIT=$?
+git config user.email "runpod-bot@astra-trade-qml.local"
+git config user.name "RunPod Training Bot"
+
+REPO_URL="https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git"
+LOG_FILE=/workspace/training.log
+
+# Background process: push live logs to model-artifacts every 90 seconds
+(
+  while true; do
+    sleep 90
+    if [ -f "$LOG_FILE" ]; then
+      (
+        cd /workspace/repo/astra-trade-qml
+        git checkout -B model-artifacts 2>/dev/null
+        mkdir -p logs
+        cp "$LOG_FILE" logs/live_training.log
+        git add -f logs/live_training.log
+        git diff --cached --quiet || {{
+          git commit -q -m "Live training log $(date -u +%H:%M:%S)"
+          git push "$REPO_URL" HEAD:model-artifacts --force 2>/dev/null
+        }}
+        git checkout - 2>/dev/null
+      ) 2>/dev/null
+    fi
+  done
+) &
+LOG_PUSH_PID=$!
+
+PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train 2>&1 | tee "$LOG_FILE"
+TRAIN_EXIT=${{PIPESTATUS[0]}}
+
+kill $LOG_PUSH_PID 2>/dev/null || true
 
 mkdir -p models/latest logs
 {{
   echo "exit=$TRAIN_EXIT"
   echo "finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }} > logs/last_run_status.txt
+cp "$LOG_FILE" logs/training_full.log 2>/dev/null || true
 
-git config user.email "runpod-bot@astra-trade-qml.local"
-git config user.name "RunPod Training Bot"
 git checkout -B model-artifacts
 git add -f models/latest logs
 git commit -m "Automated training run $(date -u +%Y-%m-%dT%H:%M:%SZ) (exit=$TRAIN_EXIT)"
-git push "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" HEAD:model-artifacts --force
+git push "$REPO_URL" HEAD:model-artifacts --force
 
 POD_ID="${{RUNPOD_POD_ID:-$(hostname)}}"
 curl -sS -X DELETE -H "Authorization: Bearer ${{RUNPOD_API_KEY}}" "https://rest.runpod.io/v1/pods/${{POD_ID}}"
@@ -272,9 +301,34 @@ def wait_for_pod_boot(api_key: str, pod_id: str, boot_timeout_seconds: int, poll
         time.sleep(poll_interval)
 
 
-def poll_until_terminated(api_key: str, pod_id: str, timeout_seconds: int, poll_interval: int = 30) -> bool:
+def _fetch_live_log(repo: str, gh_token: str, lines_seen: int) -> tuple[str, int]:
+    """Fetch the live training log from model-artifacts and return new lines."""
+    url = f"https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/live_training.log"
+    try:
+        resp = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github.raw+json"},
+            params={"ref": "model-artifacts"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return "", lines_seen
+        all_lines = resp.text.splitlines()
+        new_lines = all_lines[lines_seen:]
+        if new_lines:
+            return "\n".join(new_lines), len(all_lines)
+        return "", lines_seen
+    except Exception:
+        return "", lines_seen
+
+
+def poll_until_terminated(
+    api_key: str, pod_id: str, timeout_seconds: int, poll_interval: int = 30,
+    repo: str = "", gh_token: str = "",
+) -> bool:
     """Returns True if the pod self-terminated normally, False if force-stopped on timeout."""
     start = time.time()
+    log_lines_seen = 0
     while True:
         elapsed = time.time() - start
         status = get_pod_status(api_key, pod_id)
@@ -292,6 +346,14 @@ def poll_until_terminated(api_key: str, pod_id: str, timeout_seconds: int, poll_
             f"Pod {pod_id} still running: elapsed={elapsed:.0f}s desiredStatus={status.get('desiredStatus')} "
             f"lastStatusChange={status.get('lastStatusChange')!r}"
         )
+
+        if repo and gh_token:
+            new_output, log_lines_seen = _fetch_live_log(repo, gh_token, log_lines_seen)
+            if new_output:
+                print(f"--- pod log (lines {log_lines_seen - new_output.count(chr(10))+1}-{log_lines_seen}) ---")
+                print(new_output, flush=True)
+                print("--- end pod log ---")
+
         time.sleep(poll_interval)
 
 
@@ -306,6 +368,8 @@ def launch_and_wait(
     train_poll_timeout_seconds: int,
     max_launch_attempts: int = 3,
     cloud_type: str = "SECURE",
+    repo: str = "",
+    gh_token: str = "",
 ) -> bool:
     """
     Create a pod and wait for it to boot; if it never boots (a
@@ -340,7 +404,7 @@ def launch_and_wait(
         )
 
         if wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds):
-            result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds)
+            result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds, repo=repo, gh_token=gh_token)
             _active_pod = None
             return result
 
@@ -430,6 +494,8 @@ def main() -> None:
         train_poll_timeout_seconds=args.poll_timeout_seconds,
         max_launch_attempts=args.max_launch_attempts,
         cloud_type=args.cloud_type,
+        repo=args.repo,
+        gh_token=gh_token,
     )
     if not completed:
         print("::error::Training pod never completed - either it repeatedly failed to boot or timed out mid-training", file=sys.stderr)
