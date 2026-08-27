@@ -132,7 +132,7 @@ try:
 except: pass
 "
 
-timeout {train_timeout_seconds} python3 -m src.main --mode train
+PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train
 TRAIN_EXIT=$?
 
 mkdir -p models/latest logs

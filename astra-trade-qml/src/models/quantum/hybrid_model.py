@@ -8,6 +8,7 @@ import pandas as pd
 from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
 import json
+import time as _time
 from datetime import datetime
 
 from sklearn.linear_model import LogisticRegression
@@ -132,9 +133,11 @@ class HybridQMLModel:
         Returns:
             Training metrics for all models
         """
-        print("=" * 60)
-        print("HYBRID QML TRAINING PIPELINE")
-        print("=" * 60)
+        print("=" * 60, flush=True)
+        print("HYBRID QML TRAINING PIPELINE", flush=True)
+        print(f"  Training samples: {len(X_train)}, Validation samples: {len(X_val) if X_val is not None else 0}", flush=True)
+        print(f"  Features: {X_train.shape[1]}, Sequence length: {sequence_length}", flush=True)
+        print("=" * 60, flush=True)
 
         if self.lstm_model is None:
             self.build_models(X_train.shape[1], sequence_length)
@@ -142,33 +145,36 @@ class HybridQMLModel:
         metrics = {}
 
         # 1. Train LSTM
-        print("\n[1/4] Training LSTM Sequence Model...")
+        t0 = _time.monotonic()
+        print("\n[1/4] Training LSTM Sequence Model...", flush=True)
         try:
             lstm_history = self.lstm_model.fit(X_train, y_train, X_val, y_val)
             metrics["lstm"] = {
                 "status": "trained",
                 "history": lstm_history,
             }
-            print(f"  ✓ LSTM trained. Best val acc: {max(lstm_history.get('val_acc', [0])):.4f}")
+            print(f"  LSTM trained in {_time.monotonic() - t0:.1f}s. Best val acc: {max(lstm_history.get('val_acc', [0])):.4f}", flush=True)
         except Exception as e:
             metrics["lstm"] = {"status": "failed", "error": str(e)}
-            print(f"  ✗ LSTM failed: {e}")
+            print(f"  LSTM failed after {_time.monotonic() - t0:.1f}s: {e}", flush=True)
 
         # 2. Train XGBoost
-        print("\n[2/4] Training XGBoost Classifier...")
+        t0 = _time.monotonic()
+        print("\n[2/4] Training XGBoost Classifier...", flush=True)
         try:
             xgb_metrics = self.xgb_model.fit(X_train, y_train, X_val, y_val, feature_names)
             metrics["xgboost"] = {
                 "status": "trained",
                 "metrics": xgb_metrics,
             }
-            print(f"  ✓ XGBoost trained. Val F1: {xgb_metrics.get('val_f1', 0):.4f}")
+            print(f"  XGBoost trained in {_time.monotonic() - t0:.1f}s. Val F1: {xgb_metrics.get('val_f1', 0):.4f}", flush=True)
         except Exception as e:
             metrics["xgboost"] = {"status": "failed", "error": str(e)}
-            print(f"  ✗ XGBoost failed: {e}")
+            print(f"  XGBoost failed after {_time.monotonic() - t0:.1f}s: {e}", flush=True)
 
         # 3. Train Quantum Kernel
-        print("\n[3/4] Training Quantum Kernel SVM...")
+        t0 = _time.monotonic()
+        print("\n[3/4] Training Quantum Kernel SVM...", flush=True)
         try:
             qkernel_metrics = self.qkernel_model.fit(X_train, y_train, X_val, y_val)
             metrics["quantum_kernel"] = {
@@ -176,15 +182,17 @@ class HybridQMLModel:
                 "metrics": qkernel_metrics,
                 "is_quantum": qkernel_metrics.get("is_quantum", False),
             }
-            print(f"  ✓ Quantum Kernel trained. Acc: {qkernel_metrics.get('train_accuracy', 0):.4f}")
+            elapsed = _time.monotonic() - t0
+            print(f"  Quantum Kernel trained in {elapsed:.1f}s. Acc: {qkernel_metrics.get('train_accuracy', 0):.4f}", flush=True)
             if not qkernel_metrics.get("is_quantum", False):
-                print(f"  ⚠ Quantum Kernel using classical fallback")
+                print("  Quantum Kernel using classical fallback", flush=True)
         except Exception as e:
             metrics["quantum_kernel"] = {"status": "failed", "error": str(e)}
-            print(f"  ✗ Quantum Kernel failed: {e}")
+            print(f"  Quantum Kernel failed after {_time.monotonic() - t0:.1f}s: {e}", flush=True)
 
         # 4. Train VQC
-        print("\n[4/4] Training Variational Quantum Circuit...")
+        t0 = _time.monotonic()
+        print("\n[4/4] Training Variational Quantum Circuit...", flush=True)
         try:
             vqc_metrics = self.vqc_model.fit(X_train, y_train, X_val, y_val)
             metrics["vqc"] = {
@@ -193,17 +201,20 @@ class HybridQMLModel:
                 "is_quantum": vqc_metrics.get("is_quantum", False),
                 "circuit_depth": vqc_metrics.get("circuit_depth", 0),
             }
-            print(f"  ✓ VQC trained. Acc: {vqc_metrics.get('train_accuracy', 0):.4f}")
+            elapsed = _time.monotonic() - t0
+            print(f"  VQC trained in {elapsed:.1f}s. Acc: {vqc_metrics.get('train_accuracy', 0):.4f}", flush=True)
             if not vqc_metrics.get("is_quantum", False):
-                print(f"  ⚠ VQC using classical fallback")
+                print("  VQC using classical fallback", flush=True)
         except Exception as e:
             metrics["vqc"] = {"status": "failed", "error": str(e)}
-            print(f"  ✗ VQC failed: {e}")
+            print(f"  VQC failed after {_time.monotonic() - t0:.1f}s: {e}", flush=True)
 
         # 5. Train Meta-Learner (Stacking)
-        print("\n[5/5] Training Meta-Learner Ensemble...")
+        t0 = _time.monotonic()
+        print("\n[5/5] Training Meta-Learner Ensemble...", flush=True)
         self._train_meta_learner(X_val if X_val is not None else X_train,
                                  y_val if y_val is not None else y_train)
+        print(f"  Meta-learner trained in {_time.monotonic() - t0:.1f}s", flush=True)
 
         self.is_trained = True
         self.training_timestamp = datetime.now().isoformat()
@@ -213,9 +224,9 @@ class HybridQMLModel:
             "metrics": metrics,
         })
 
-        print("\n" + "=" * 60)
-        print("TRAINING COMPLETE")
-        print("=" * 60)
+        print("\n" + "=" * 60, flush=True)
+        print("TRAINING COMPLETE", flush=True)
+        print("=" * 60, flush=True)
 
         return metrics
 
@@ -264,7 +275,7 @@ class HybridQMLModel:
                 pass
 
         if not predictions:
-            print("  ✗ No models available for meta-learner")
+            print("  No models available for meta-learner", flush=True)
             return
 
         # Stack predictions horizontally
@@ -291,7 +302,7 @@ class HybridQMLModel:
         total_weight = sum(self.sub_model_weights.values())
         self.sub_model_weights = {k: v / total_weight for k, v in self.sub_model_weights.items()}
 
-        print(f"  ✓ Meta-learner trained with weights: {self.sub_model_weights}")
+        print(f"  Meta-learner trained with weights: {self.sub_model_weights}", flush=True)
 
     def predict_proba(
         self,

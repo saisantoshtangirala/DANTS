@@ -184,7 +184,7 @@ class VQCMarketClassifier:
                 self.is_quantum = True
             except Exception as e:
                 if self.fallback_to_classical:
-                    print(f"VQC training failed: {e}. Falling back to classical MLP.")
+                    print(f"VQC training failed: {e}. Falling back to classical MLP.", flush=True)
                     self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
                     self.is_quantum = False
                 else:
@@ -203,7 +203,7 @@ class VQCMarketClassifier:
             from qiskit_aer.primitives import SamplerV2 as AerSampler
             gpu_backend = AerSimulator(method="statevector", device="GPU")
             sampler = AerSampler(backend=gpu_backend, options={"default_shots": shots})
-            print("VQC: using GPU-accelerated Aer simulator")
+            print("VQC: using GPU-accelerated Aer simulator", flush=True)
             return sampler
         except Exception:
             pass
@@ -212,10 +212,10 @@ class VQCMarketClassifier:
             from qiskit_aer.primitives import SamplerV2 as AerSampler
             cpu_backend = AerSimulator(method="statevector")
             sampler = AerSampler(backend=cpu_backend, options={"default_shots": shots})
-            print("VQC: using CPU Aer simulator")
+            print("VQC: using CPU Aer simulator", flush=True)
             return sampler
         except Exception:
-            print("VQC: using reference StatevectorSampler (CPU)")
+            print("VQC: using reference StatevectorSampler (CPU)", flush=True)
             return Sampler(default_shots=shots)
 
     def _fit_quantum(
@@ -264,7 +264,11 @@ class VQCMarketClassifier:
             warm_start=True,
         )
 
+        import time as _time
+        print(f"  VQC: fitting on {len(X_sub)} samples, {len(self.ansatz.parameters)} parameters, optimizer={self.optimizer_name}...", flush=True)
+        t0 = _time.monotonic()
         self.vqc.fit(X_sub, y_sub)
+        print(f"  VQC: fit completed in {_time.monotonic() - t0:.1f}s", flush=True)
 
         # Metrics
         train_pred = self.vqc.predict(X_sub)

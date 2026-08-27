@@ -143,7 +143,7 @@ class QuantumKernelClassifier:
                 self.is_quantum = True
             except Exception as e:
                 if self.fallback_to_classical:
-                    print(f"Quantum training failed: {e}. Falling back to classical SVM.")
+                    print(f"Quantum training failed: {e}. Falling back to classical SVM.", flush=True)
                     self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
                     self.is_quantum = False
                 else:
@@ -161,7 +161,7 @@ class QuantumKernelClassifier:
             from qiskit_aer.primitives import SamplerV2 as AerSampler
             gpu_backend = AerSimulator(method="statevector", device="GPU")
             sampler = AerSampler(backend=gpu_backend)
-            print("Quantum Kernel: using GPU-accelerated Aer simulator")
+            print("Quantum Kernel: using GPU-accelerated Aer simulator", flush=True)
             return sampler
         except Exception:
             pass
@@ -169,10 +169,10 @@ class QuantumKernelClassifier:
             from qiskit_aer.primitives import SamplerV2 as AerSampler
             cpu_backend = AerSimulator(method="statevector")
             sampler = AerSampler(backend=cpu_backend)
-            print("Quantum Kernel: using CPU Aer simulator")
+            print("Quantum Kernel: using CPU Aer simulator", flush=True)
             return sampler
         except Exception:
-            print("Quantum Kernel: using reference StatevectorSampler (CPU)")
+            print("Quantum Kernel: using reference StatevectorSampler (CPU)", flush=True)
             return Sampler()
 
     def _fit_quantum(
@@ -197,8 +197,9 @@ class QuantumKernelClassifier:
         # Train QSVC
         self.qsvc = QSVC(quantum_kernel=self.quantum_kernel)
 
-        # Subsample for quantum kernel (computationally expensive)
-        max_samples = min(len(X), 500)  # Limit for simulation speed
+        # Subsample for quantum kernel (computationally expensive -
+        # kernel matrix is O(n^2) quantum circuit evaluations)
+        max_samples = min(len(X), 300)
         if len(X) > max_samples:
             indices = np.random.choice(len(X), max_samples, replace=False)
             X_sub = X[indices]
@@ -207,7 +208,11 @@ class QuantumKernelClassifier:
             X_sub = X
             y_sub = y
 
+        import time as _time
+        print(f"  Quantum Kernel: fitting QSVC on {len(X_sub)} samples ({len(X_sub)}x{len(X_sub)} kernel matrix)...", flush=True)
+        t0 = _time.monotonic()
         self.qsvc.fit(X_sub, y_sub)
+        print(f"  Quantum Kernel: QSVC fit completed in {_time.monotonic() - t0:.1f}s", flush=True)
 
         # Metrics
         train_pred = self.qsvc.predict(X_sub)

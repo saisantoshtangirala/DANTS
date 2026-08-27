@@ -288,7 +288,7 @@ class LSTMModel:
                     patience_counter += 1
 
                 if patience_counter >= self.early_stopping_patience:
-                    print(f"Early stopping at epoch {epoch + 1}")
+                    print(f"Early stopping at epoch {epoch + 1}", flush=True)
                     if hasattr(self, "best_state"):
                         self.model.load_state_dict(self.best_state)
                     break
@@ -297,12 +297,12 @@ class LSTMModel:
                     print(f"Epoch {epoch+1}/{self.epochs} | "
                           f"Train Loss: {avg_train_loss:.4f} | "
                           f"Val Loss: {avg_val_loss:.4f} | "
-                          f"Val Acc: {val_acc:.4f}")
+                          f"Val Acc: {val_acc:.4f}", flush=True)
             else:
                 if (epoch + 1) % 10 == 0:
                     print(f"Epoch {epoch+1}/{self.epochs} | "
                           f"Train Loss: {avg_train_loss:.4f} | "
-                          f"Train Acc: {train_acc:.4f}")
+                          f"Train Acc: {train_acc:.4f}", flush=True)
 
         self.training_history = history
         return history

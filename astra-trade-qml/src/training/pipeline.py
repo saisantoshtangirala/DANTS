@@ -140,7 +140,8 @@ class TrainingPipeline:
                 "for any symbol in the focus universe. Falling back to "
                 "synthetic OHLCV so the pipeline can still run end-to-end. "
                 "The resulting model is NOT usable for trading - fix the data "
-                "source before deploying it."
+                "source before deploying it.",
+                flush=True,
             )
             self.used_synthetic_data = True
             for symbol in symbols:
