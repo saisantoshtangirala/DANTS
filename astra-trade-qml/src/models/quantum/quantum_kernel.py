@@ -14,7 +14,7 @@ import warnings
 try:
     from qiskit import QuantumCircuit
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
-    from qiskit.primitives import Sampler
+    from qiskit.primitives import StatevectorSampler
     QISKIT_AVAILABLE = True
 except ImportError as e:
     QISKIT_AVAILABLE = False
@@ -152,14 +152,14 @@ class QuantumKernelClassifier:
 
     @staticmethod
     def _make_sampler():
-        """Create a V1 Sampler for quantum kernel fidelity computation.
+        """Create a V2 StatevectorSampler for quantum kernel fidelity computation.
 
-        ComputeUncompute (qiskit-algorithms 0.3.x) expects a V1 BaseSampler.
-        The V1 reference Sampler provides exact statevector simulation and
-        is compatible with both ComputeUncompute and FidelityQuantumKernel.
+        ComputeUncompute (qiskit-algorithms 0.3.x) requires BaseSamplerV2.
+        StatevectorSampler is the V2 primitive that provides exact statevector
+        simulation and satisfies the BaseSamplerV2 interface.
         """
-        print("Quantum Kernel: using V1 Sampler (statevector, exact simulation)", flush=True)
-        return Sampler()
+        print("Quantum Kernel: using StatevectorSampler (V2, exact simulation)", flush=True)
+        return StatevectorSampler()
 
     def _fit_quantum(
         self,

@@ -10,15 +10,14 @@ from pathlib import Path
 import json
 import warnings
 
-# Qiskit imports
+# Qiskit imports — only basic qiskit at top level.
+# qiskit_machine_learning and qiskit_algorithms are imported lazily inside
+# methods to avoid triggering qiskit_machine_learning.__init__.py which
+# loads all subpackages including kernels → evolved_operator_ansatz (qiskit ≥1.3 only).
 try:
     from qiskit import QuantumCircuit
     from qiskit.circuit import ParameterVector
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap, EfficientSU2, RealAmplitudes
-    from qiskit_machine_learning.neural_networks import SamplerQNN
-    from qiskit_machine_learning.connectors import TorchConnector
-    from qiskit_algorithms.optimizers import SPSA, COBYLA, L_BFGS_B
-    from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
     from qiskit.primitives import Sampler
     QISKIT_AVAILABLE = True
 except ImportError as e:
@@ -129,6 +128,8 @@ class VQCMarketClassifier:
 
     def _get_optimizer(self) -> Callable:
         """Get classical optimizer instance."""
+        from qiskit_algorithms.optimizers import SPSA, COBYLA, L_BFGS_B
+
         if self.optimizer_name == "SPSA":
             return SPSA(maxiter=self.max_iter)
         elif self.optimizer_name == "COBYLA":
@@ -218,6 +219,9 @@ class VQCMarketClassifier:
         y_val: Optional[np.ndarray] = None,
     ) -> None:
         """Train using Variational Quantum Circuit."""
+        from qiskit_machine_learning.neural_networks.sampler_qnn import SamplerQNN
+        from qiskit_machine_learning.algorithms.classifiers.neural_network_classifier import NeuralNetworkClassifier
+
         self.feature_map = self._build_feature_map()
         self.ansatz = self._build_ansatz()
 
