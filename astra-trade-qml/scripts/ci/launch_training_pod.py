@@ -349,13 +349,19 @@ def poll_until_terminated(
             print(f"Pod {pod_id} terminated after {elapsed:.0f}s")
             return True
 
+        desired = status.get("desiredStatus")
+        if desired == "EXITED":
+            print(f"Pod {pod_id} exited after {elapsed:.0f}s — cleaning up")
+            terminate_pod(api_key, pod_id)
+            return True
+
         if elapsed > timeout_seconds:
             print(f"Timeout after {elapsed:.0f}s - force-stopping pod {pod_id}")
             terminate_pod(api_key, pod_id)
             return False
 
         print(
-            f"Pod {pod_id} still running: elapsed={elapsed:.0f}s desiredStatus={status.get('desiredStatus')} "
+            f"Pod {pod_id} still running: elapsed={elapsed:.0f}s desiredStatus={desired} "
             f"lastStatusChange={status.get('lastStatusChange')!r}"
         )
 

@@ -24,7 +24,7 @@ def test_build_start_command_clones_and_installs_deps_no_custom_image():
     assert "git clone --branch main --single-branch" in cmd
     assert "pip install" in cmd
     assert "requirements-runpod-image.txt" in cmd
-    assert "python3 -m src.main --mode train" in cmd
+    assert "python3 -u -m src.main --mode train" in cmd
 
 
 def test_build_start_command_always_writes_last_run_status():
@@ -43,7 +43,7 @@ def test_build_start_command_runs_cuda_diagnostics_before_training():
     cmd = ltp.build_start_command("owner/repo", "main", 10800)
     assert "nvidia-smi" in cmd
     assert "ldconfig" in cmd
-    train_pos = cmd.index("python3 -m src.main --mode train")
+    train_pos = cmd.index("python3 -u -m src.main --mode train")
     nvidia_pos = cmd.index("nvidia-smi")
     assert nvidia_pos < train_pos
 
@@ -198,7 +198,7 @@ def test_launch_and_wait_retries_after_boot_failure_then_succeeds():
     assert result is True
     assert mock_create.call_count == 2
     mock_terminate.assert_called_once_with("key", "pod1")
-    mock_poll.assert_called_once_with("key", "pod2", timeout_seconds=1000)
+    mock_poll.assert_called_once_with("key", "pod2", timeout_seconds=1000, repo="", gh_token="")
 
 
 def test_launch_and_wait_gives_up_after_max_attempts():

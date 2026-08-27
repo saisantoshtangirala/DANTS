@@ -17,7 +17,6 @@ try:
     from qiskit_machine_learning.kernels import FidelityQuantumKernel
     from qiskit_machine_learning.algorithms import QSVC
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
-    from qiskit_aer import AerSimulator
     from qiskit.primitives import StatevectorSampler as Sampler
     QISKIT_AVAILABLE = True
 except ImportError:
@@ -155,27 +154,10 @@ class QuantumKernelClassifier:
         return self.training_metrics
 
     @staticmethod
-    def _make_aer_sampler():
-        """Create a GPU-backed Aer sampler if possible, CPU otherwise."""
-        try:
-            from qiskit_aer import AerSimulator as _Aer
-            from qiskit.primitives import BackendSamplerV2
-            gpu_backend = _Aer(method="statevector", device="GPU")
-            sampler = BackendSamplerV2(backend=gpu_backend)
-            print("Quantum Kernel: using GPU-accelerated Aer simulator", flush=True)
-            return sampler
-        except Exception as e:
-            print(f"Quantum Kernel: GPU Aer failed ({e}), trying CPU Aer...", flush=True)
-        try:
-            from qiskit_aer import AerSimulator as _Aer
-            from qiskit.primitives import BackendSamplerV2
-            cpu_backend = _Aer(method="statevector")
-            sampler = BackendSamplerV2(backend=cpu_backend)
-            print("Quantum Kernel: using CPU Aer simulator", flush=True)
-            return sampler
-        except Exception as e:
-            print(f"Quantum Kernel: CPU Aer failed ({e}), using reference StatevectorSampler", flush=True)
-            return Sampler()
+    def _make_sampler():
+        """Create a StatevectorSampler for quantum kernel fidelity computation."""
+        print("Quantum Kernel: using StatevectorSampler (exact simulation)", flush=True)
+        return Sampler()
 
     def _fit_quantum(
         self,
@@ -187,7 +169,7 @@ class QuantumKernelClassifier:
         """Train using quantum kernel SVM."""
         self.feature_map = self._build_feature_map()
 
-        sampler = self._make_aer_sampler()
+        sampler = self._make_sampler()
         from qiskit_algorithms.state_fidelities import ComputeUncompute
         fidelity = ComputeUncompute(sampler=sampler)
         self.quantum_kernel = FidelityQuantumKernel(

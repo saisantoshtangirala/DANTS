@@ -196,27 +196,16 @@ class VQCMarketClassifier:
         return self.training_metrics
 
     @staticmethod
-    def _make_aer_sampler(shots: int):
-        """Create a GPU-backed Aer sampler if possible, CPU otherwise."""
-        try:
-            from qiskit_aer import AerSimulator
-            from qiskit.primitives import BackendSamplerV2
-            gpu_backend = AerSimulator(method="statevector", device="GPU")
-            sampler = BackendSamplerV2(backend=gpu_backend, options={"default_shots": shots})
-            print("VQC: using GPU-accelerated Aer simulator", flush=True)
-            return sampler
-        except Exception as e:
-            print(f"VQC: GPU Aer failed ({e}), trying CPU Aer...", flush=True)
-        try:
-            from qiskit_aer import AerSimulator
-            from qiskit.primitives import BackendSamplerV2
-            cpu_backend = AerSimulator(method="statevector")
-            sampler = BackendSamplerV2(backend=cpu_backend, options={"default_shots": shots})
-            print("VQC: using CPU Aer simulator", flush=True)
-            return sampler
-        except Exception as e:
-            print(f"VQC: CPU Aer failed ({e}), using reference StatevectorSampler", flush=True)
-            return Sampler(default_shots=shots)
+    def _make_sampler(shots: int):
+        """Create a StatevectorSampler for VQC training.
+
+        BackendSamplerV2 (Aer GPU/CPU) is incompatible with SamplerQNN in
+        qiskit-machine-learning 0.7.x — it calls .run() with V1-style args.
+        StatevectorSampler provides exact quantum simulation and works
+        correctly with SamplerQNN's V2 detection.
+        """
+        print("VQC: using StatevectorSampler (exact simulation)", flush=True)
+        return Sampler(default_shots=shots)
 
     def _fit_quantum(
         self,
@@ -235,7 +224,7 @@ class VQCMarketClassifier:
 
         self.circuit_depth = len(circuit.data)
 
-        sampler = self._make_aer_sampler(self.shots)
+        sampler = self._make_sampler(self.shots)
         qnn = SamplerQNN(
             circuit=circuit,
             input_params=self.feature_map.parameters,
