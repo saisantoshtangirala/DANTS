@@ -52,9 +52,11 @@ the environment.
 """
 
 import argparse
+import atexit
 import json
 import os
 import re
+import signal
 import sys
 import time
 
@@ -62,6 +64,32 @@ import requests
 
 REST_BASE = "https://rest.runpod.io/v1"
 DEFAULT_IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
+
+# Tracks the pod that should be terminated if this process is killed
+# (e.g. GitHub Actions sends SIGTERM on job cancellation). Both the
+# atexit hook and the SIGTERM handler check this.
+_active_pod: dict | None = None  # {"api_key": ..., "pod_id": ...}
+
+
+def _cleanup_active_pod() -> None:
+    """Terminate the active RunPod pod if one exists. Safe to call multiple times."""
+    global _active_pod
+    pod = _active_pod
+    if pod is None:
+        return
+    _active_pod = None
+    print(f"Cleanup: terminating active pod {pod['pod_id']}")
+    terminate_pod(pod["api_key"], pod["pod_id"])
+
+
+def _sigterm_handler(signum, frame) -> None:
+    print(f"Received signal {signum} - cleaning up RunPod pod before exit")
+    _cleanup_active_pod()
+    sys.exit(128 + signum)
+
+
+atexit.register(_cleanup_active_pod)
+signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
 def build_start_command(repo: str, branch: str, train_timeout_seconds: int) -> str:
@@ -277,19 +305,24 @@ def launch_and_wait(
     Returns True only if a pod both booted and self-terminated
     normally within its timeout.
     """
+    global _active_pod
     for attempt in range(1, max_launch_attempts + 1):
         pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb)
         pod_id = pod["id"]
+        _active_pod = {"api_key": api_key, "pod_id": pod_id}
         print(
             f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} "
             f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
         )
 
         if wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds):
-            return poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds)
+            result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds)
+            _active_pod = None
+            return result
 
         print(f"Pod {pod_id} failed to boot (likely a RunPod host-side issue) - terminating and retrying")
         terminate_pod(api_key, pod_id)
+        _active_pod = None
 
     print(f"Gave up after {max_launch_attempts} launch attempts - pod never booted", file=sys.stderr)
     return False
