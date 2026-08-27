@@ -370,7 +370,7 @@ def main() -> None:
     parser.add_argument("--branch", required=True, help="Branch the pod trains against")
     parser.add_argument("--gpu-ids-json", required=True, help='JSON array of GPU type IDs, e.g. select_gpu.py output')
     parser.add_argument("--container-disk-gb", type=int, default=40)
-    parser.add_argument("--boot-timeout-seconds", type=int, default=600, help="Max time to wait for the container to actually start (10m default - large PyTorch images can take 5+ min to pull on first boot)")
+    parser.add_argument("--boot-timeout-seconds", type=int, default=1500, help="Max time to wait for the container to actually start (25m default - the ~15GB PyTorch base image regularly takes 15-25min to pull on community cloud hosts that don't have it cached)")
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
     parser.add_argument("--poll-timeout-seconds", type=int, default=11400, help="Outer safety-net cap once booted (3h10m default)")
