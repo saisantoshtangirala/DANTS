@@ -185,7 +185,7 @@ def create_pod(
     env: dict,
     start_command: str,
     container_disk_gb: int = 40,
-    cloud_type: str = "COMMUNITY",
+    cloud_type: str = "SECURE",
 ) -> dict:
     payload = {
         "name": "astra-trade-qml-training",
@@ -305,6 +305,7 @@ def launch_and_wait(
     boot_timeout_seconds: int,
     train_poll_timeout_seconds: int,
     max_launch_attempts: int = 3,
+    cloud_type: str = "SECURE",
 ) -> bool:
     """
     Create a pod and wait for it to boot; if it never boots (a
@@ -316,7 +317,7 @@ def launch_and_wait(
     """
     global _active_pod
     for attempt in range(1, max_launch_attempts + 1):
-        pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb)
+        pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud_type)
         pod_id = pod["id"]
         _active_pod = {"api_key": api_key, "pod_id": pod_id}
         print(
@@ -379,7 +380,8 @@ def main() -> None:
     parser.add_argument("--branch", required=True, help="Branch the pod trains against")
     parser.add_argument("--gpu-ids-json", required=True, help='JSON array of GPU type IDs, e.g. select_gpu.py output')
     parser.add_argument("--container-disk-gb", type=int, default=40)
-    parser.add_argument("--boot-timeout-seconds", type=int, default=1500, help="Max time to wait for the container to actually start (25m default - the ~15GB PyTorch base image regularly takes 15-25min to pull on community cloud hosts that don't have it cached)")
+    parser.add_argument("--cloud-type", default="SECURE", choices=["SECURE", "COMMUNITY"], help="RunPod cloud type (SECURE = RunPod datacenters with pre-cached images, COMMUNITY = third-party hosts)")
+    parser.add_argument("--boot-timeout-seconds", type=int, default=600, help="Max time to wait for the container to start (10m default for SECURE cloud where images are pre-cached)")
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
     parser.add_argument("--poll-timeout-seconds", type=int, default=11400, help="Outer safety-net cap once booted (3h10m default)")
@@ -413,6 +415,7 @@ def main() -> None:
         boot_timeout_seconds=args.boot_timeout_seconds,
         train_poll_timeout_seconds=args.poll_timeout_seconds,
         max_launch_attempts=args.max_launch_attempts,
+        cloud_type=args.cloud_type,
     )
     if not completed:
         print("::error::Training pod never completed - either it repeatedly failed to boot or timed out mid-training", file=sys.stderr)
