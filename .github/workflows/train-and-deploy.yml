@@ -38,12 +38,12 @@ permissions:
 jobs:
   train:
     runs-on: ubuntu-latest
-    # launch_training_pod.py's own timeouts: up to 3 launch attempts x 25min
+    # launch_training_pod.py's own timeouts: up to 3 launch attempts x 30min
     # boot check (worst case, all fail to boot) + the 190min poll-timeout
-    # once a pod does boot = up to 265min. Padded above that so the script's
+    # once a pod does boot = up to 280min. Padded above that so the script's
     # own clean failure/retry logic always gets to finish before GitHub's
     # job timeout would hard-kill it mid-retry.
-    timeout-minutes: 280
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
