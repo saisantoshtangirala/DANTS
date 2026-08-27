@@ -316,12 +316,26 @@ def launch_and_wait(
     normally within its timeout.
     """
     global _active_pod
+    cloud_types = [cloud_type]
+    if cloud_type == "SECURE":
+        cloud_types.append("COMMUNITY")
+
     for attempt in range(1, max_launch_attempts + 1):
-        pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud_type)
+        for ct in cloud_types:
+            try:
+                pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=ct)
+                break
+            except RuntimeError as e:
+                print(f"Launch attempt {attempt}/{max_launch_attempts}: create_pod failed on {ct} cloud ({e})")
+                continue
+        else:
+            print(f"Launch attempt {attempt}/{max_launch_attempts}: no instances available on any cloud type")
+            continue
+
         pod_id = pod["id"]
         _active_pod = {"api_key": api_key, "pod_id": pod_id}
         print(
-            f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} "
+            f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} on {ct} cloud "
             f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
         )
 
