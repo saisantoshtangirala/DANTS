@@ -294,7 +294,8 @@ class YFinanceDataProvider:
 
         try:
             history = yf.Ticker(yahoo_symbol).history(
-                start=start_date, end=end_date, interval="1d", auto_adjust=True
+                start=start_date, end=end_date, interval="1d", auto_adjust=True,
+                timeout=30,
             )
         except Exception as e:
             print(f"Error downloading {symbol} ({yahoo_symbol}) from Yahoo Finance: {e}")

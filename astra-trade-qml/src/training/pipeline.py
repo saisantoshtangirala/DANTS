@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import structlog
 
 from src.data.feature_engineering import FeatureConfig, FeatureEngineer
 from src.data.nse_ingestion import KiteDataProvider, NSEDataIngestion, YFinanceDataProvider
@@ -19,6 +20,8 @@ from src.models.quantum.hybrid_model import HybridQMLModel
 from src.trading.live_feed import KiteLiveFeed
 from src.utils.database import DatabaseManager
 from src.utils.metrics import generate_performance_report
+
+logger = structlog.get_logger("astra_trade.pipeline")
 
 
 def build_hybrid_model_config(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -102,7 +105,8 @@ class TrainingPipeline:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=lookback_days)
 
-        for symbol in symbols:
+        for i, symbol in enumerate(symbols, 1):
+            logger.info("data_ingestion_symbol", symbol=symbol, progress=f"{i}/{len(symbols)}")
             df = pd.DataFrame()
 
             if self.kite_feed is not None:
@@ -115,15 +119,14 @@ class TrainingPipeline:
                 df = self.ingestion.download_historical_range(symbol, start_date, end_date)
 
             if df.empty:
-                # NSE archive is behind Akamai bot protection that blocks
-                # datacenter/CI IPs outright (see download_historical_range's
-                # fail-fast) - Yahoo Finance doesn't have that problem, so
-                # it's a meaningfully more reliable free fallback here, not
-                # just a redundant retry.
+                logger.info("trying_yfinance_fallback", symbol=symbol)
                 df = self.yfinance_ingestion.download_historical_range(symbol, start_date, end_date)
 
             if not df.empty:
+                logger.info("symbol_data_ready", symbol=symbol, rows=len(df))
                 self.raw_data[symbol] = df
+            else:
+                logger.warning("symbol_no_data", symbol=symbol)
 
         if not self.raw_data and symbols:
             # Neither Kite nor the NSE archive produced anything for any
@@ -265,16 +268,26 @@ class TrainingPipeline:
     def run_full_pipeline(self) -> Dict[str, Any]:
         """Run every daily_schedule task in order and return a task->result summary."""
         summary: Dict[str, Any] = {}
+
+        logger.info("pipeline_stage_starting", stage="data_ingestion")
         summary["data_ingestion"] = f"{len(self.data_ingestion())} symbols ingested"
         summary["used_synthetic_data"] = self.used_synthetic_data
-        summary["feature_engineering"] = f"{len(self.feature_engineering())} symbols featured"
+        logger.info("pipeline_stage_done", stage="data_ingestion", result=summary["data_ingestion"])
 
+        logger.info("pipeline_stage_starting", stage="feature_engineering")
+        summary["feature_engineering"] = f"{len(self.feature_engineering())} symbols featured"
+        logger.info("pipeline_stage_done", stage="feature_engineering", result=summary["feature_engineering"])
+
+        logger.info("pipeline_stage_starting", stage="model_training")
         training_metrics = self.classical_and_quantum_training()
         summary["classical_training"] = training_metrics
         summary["quantum_optimization"] = training_metrics
         summary["ensemble_optimization"] = training_metrics
+        logger.info("pipeline_stage_done", stage="model_training")
 
+        logger.info("pipeline_stage_starting", stage="backtest_validation")
         summary["backtest_validation"] = self.backtest_validation()
+        logger.info("pipeline_stage_done", stage="backtest_validation")
 
         # Never let a data-source outage silently overwrite a real deployed
         # model with one trained on synthetic noise - skip model_deployment
