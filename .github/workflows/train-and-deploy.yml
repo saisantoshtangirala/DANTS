@@ -67,7 +67,7 @@ jobs:
 
       - name: Write RunPod SSH key
         run: |
-          echo "${{ secrets.RUNPOD_SSH_KEY }}" > /tmp/runpod_ssh_key
+          echo "${{ secrets.RUNPOD_SSH_KEY }}" | base64 -d > /tmp/runpod_ssh_key
           chmod 600 /tmp/runpod_ssh_key
 
       - name: Launch training pod and wait for completion

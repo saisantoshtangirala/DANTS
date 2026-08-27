@@ -582,10 +582,15 @@ def main() -> None:
     ssh_key_path = args.ssh_key_file
     ssh_key_tmpfile = None
     if not ssh_key_path:
-        ssh_key_content = os.environ.get("RUNPOD_SSH_KEY", "").strip()
-        if ssh_key_content:
+        ssh_key_b64 = os.environ.get("RUNPOD_SSH_KEY", "").strip()
+        if ssh_key_b64:
+            import base64
+            try:
+                ssh_key_content = base64.b64decode(ssh_key_b64).decode()
+            except Exception:
+                ssh_key_content = ssh_key_b64
             ssh_key_tmpfile = tempfile.NamedTemporaryFile(mode="w", suffix="_runpod_ssh", delete=False)
-            ssh_key_tmpfile.write(ssh_key_content + "\n")
+            ssh_key_tmpfile.write(ssh_key_content if ssh_key_content.endswith("\n") else ssh_key_content + "\n")
             ssh_key_tmpfile.close()
             os.chmod(ssh_key_tmpfile.name, 0o600)
             ssh_key_path = ssh_key_tmpfile.name
