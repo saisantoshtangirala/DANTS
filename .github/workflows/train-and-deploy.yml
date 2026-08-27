@@ -65,6 +65,11 @@ jobs:
           echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
           echo "Selected GPUs: $GPU_IDS"
 
+      - name: Write RunPod SSH key
+        run: |
+          echo "${{ secrets.RUNPOD_SSH_KEY }}" > /tmp/runpod_ssh_key
+          chmod 600 /tmp/runpod_ssh_key
+
       - name: Launch training pod and wait for completion
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
@@ -79,6 +84,7 @@ jobs:
             --repo "${{ github.repository }}" \
             --branch "${{ github.ref_name }}" \
             --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
             > >(tee /tmp/launch_training_pod.log) 2>&1
 
       - name: Summarize training run

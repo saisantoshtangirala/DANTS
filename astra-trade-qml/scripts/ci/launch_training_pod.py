@@ -46,9 +46,9 @@ Usage:
         --repo owner/repo --branch main \\
         --gpu-ids-json '["RTX 3080 Ti","RTX 4090"]' \\
         --train-timeout-seconds 10800
-Reads RUNPOD_API_KEY, GH_TOKEN, and (optionally) KITE_API_KEY /
-KITE_API_SECRET / KITE_USER_ID / KITE_PASSWORD / KITE_TOTP_SECRET from
-the environment.
+Reads RUNPOD_API_KEY, GH_TOKEN, and (optionally) RUNPOD_SSH_KEY,
+KITE_API_KEY / KITE_API_SECRET / KITE_USER_ID / KITE_PASSWORD /
+KITE_TOTP_SECRET from the environment.
 """
 
 import argparse
@@ -57,7 +57,10 @@ import json
 import os
 import re
 import signal
+import subprocess
 import sys
+import tempfile
+import threading
 import time
 
 import requests
@@ -138,44 +141,8 @@ git config user.name "RunPod Training Bot"
 REPO_URL="https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git"
 LOG_FILE=/workspace/training.log
 
-# Background process: push live logs to model-artifacts every 90 seconds.
-# Uses the GitHub Contents API instead of git checkout to avoid switching
-# branches in the working directory where training is running.
-(
-  LOG_SHA=""
-  while true; do
-    sleep 90
-    if [ -f "$LOG_FILE" ]; then
-      LOG_B64=$(base64 -w0 "$LOG_FILE")
-      if [ -z "$LOG_SHA" ]; then
-        # Check if file already exists to get its SHA for updates
-        LOG_SHA=$(curl -sS -H "Authorization: Bearer ${{GH_TOKEN}}" \
-          "https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/live_training.log?ref=model-artifacts" \
-          2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
-      fi
-      SHA_FIELD=""
-      if [ -n "$LOG_SHA" ]; then
-        SHA_FIELD=", \"sha\": \"$LOG_SHA\""
-      fi
-      RESP=$(curl -sS -X PUT \
-        -H "Authorization: Bearer ${{GH_TOKEN}}" \
-        -H "Content-Type: application/json" \
-        "https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/live_training.log" \
-        -d "{{\"message\": \"Live training log $(date -u +%H:%M:%S)\", \"content\": \"$LOG_B64\", \"branch\": \"model-artifacts\" $SHA_FIELD}}" \
-        2>/dev/null || echo "{{}}")
-      NEW_SHA=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('content',{{}}).get('sha',''))" 2>/dev/null || echo "")
-      if [ -n "$NEW_SHA" ]; then
-        LOG_SHA="$NEW_SHA"
-      fi
-    fi
-  done
-) &
-LOG_PUSH_PID=$!
-
 PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train 2>&1 | tee "$LOG_FILE"
 TRAIN_EXIT=${{PIPESTATUS[0]}}
-
-kill $LOG_PUSH_PID 2>/dev/null || true
 
 mkdir -p models/latest logs
 {{
@@ -320,66 +287,124 @@ def wait_for_pod_boot(api_key: str, pod_id: str, boot_timeout_seconds: int, poll
         time.sleep(poll_interval)
 
 
-def _fetch_live_log(repo: str, gh_token: str, lines_seen: int) -> tuple[str, int]:
-    """Fetch the live training log from model-artifacts and return new lines."""
-    url = f"https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/live_training.log"
-    try:
-        resp = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github.raw+json"},
-            params={"ref": "model-artifacts"},
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            return "", lines_seen
-        all_lines = resp.text.splitlines()
-        new_lines = all_lines[lines_seen:]
-        if new_lines:
-            return "\n".join(new_lines), len(all_lines)
-        return "", lines_seen
-    except Exception:
-        return "", lines_seen
+class SSHLogStreamer:
+    """Stream a pod's training log to stdout via SSH in a background thread."""
+
+    def __init__(self, pod_id: str, ssh_key_path: str, log_path: str = "/workspace/training.log"):
+        self._pod_id = pod_id
+        self._ssh_key_path = ssh_key_path
+        self._log_path = log_path
+        self._proc: subprocess.Popen | None = None
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._proc and self._proc.poll() is None:
+            self._proc.terminate()
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def _run(self) -> None:
+        # Wait for the log file to appear before tailing
+        tail_cmd = f"while [ ! -f {self._log_path} ]; do sleep 5; done; tail -n +1 -f {self._log_path}"
+        ssh_cmd = [
+            "ssh",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR",
+            "-o", "ServerAliveInterval=30",
+            "-o", "ServerAliveCountMax=3",
+            "-o", "ConnectTimeout=30",
+            "-i", self._ssh_key_path,
+            f"{self._pod_id}@ssh.runpod.io",
+            tail_cmd,
+        ]
+
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            if self._stop.is_set():
+                return
+            try:
+                print(f"SSH log stream: connecting to {self._pod_id}@ssh.runpod.io (attempt {attempt}/{max_retries})...", flush=True)
+                self._proc = subprocess.Popen(
+                    ssh_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    bufsize=1,
+                )
+                print("SSH log stream: connected — streaming pod output ↓", flush=True)
+                for line in iter(self._proc.stdout.readline, b""):
+                    if self._stop.is_set():
+                        return
+                    sys.stdout.buffer.write(line)
+                    sys.stdout.buffer.flush()
+                self._proc.wait()
+                if self._stop.is_set():
+                    return
+                stderr = self._proc.stderr.read().decode(errors="replace").strip()
+                if stderr:
+                    print(f"SSH log stream: connection closed ({stderr})", flush=True)
+                else:
+                    print("SSH log stream: connection closed", flush=True)
+            except Exception as e:
+                print(f"SSH log stream: error ({e})", flush=True)
+
+            if attempt < max_retries and not self._stop.is_set():
+                wait = 10 * attempt
+                print(f"SSH log stream: retrying in {wait}s...", flush=True)
+                self._stop.wait(wait)
 
 
 def poll_until_terminated(
     api_key: str, pod_id: str, timeout_seconds: int, poll_interval: int = 30,
-    repo: str = "", gh_token: str = "",
+    ssh_key_path: str = "",
 ) -> bool:
     """Returns True if the pod self-terminated normally, False if force-stopped on timeout."""
-    start = time.time()
-    log_lines_seen = 0
-    while True:
-        elapsed = time.time() - start
-        status = get_pod_status(api_key, pod_id)
+    streamer = None
+    if ssh_key_path:
+        streamer = SSHLogStreamer(pod_id, ssh_key_path)
+        streamer.start()
 
-        if status is None:
-            print(f"Pod {pod_id} terminated after {elapsed:.0f}s")
-            return True
+    try:
+        start = time.time()
+        while True:
+            elapsed = time.time() - start
+            status = get_pod_status(api_key, pod_id)
 
-        desired = status.get("desiredStatus")
-        if desired == "EXITED":
-            print(f"Pod {pod_id} exited after {elapsed:.0f}s — cleaning up")
-            terminate_pod(api_key, pod_id)
-            return True
+            if status is None:
+                print(f"Pod {pod_id} terminated after {elapsed:.0f}s")
+                return True
 
-        if elapsed > timeout_seconds:
-            print(f"Timeout after {elapsed:.0f}s - force-stopping pod {pod_id}")
-            terminate_pod(api_key, pod_id)
-            return False
+            desired = status.get("desiredStatus")
+            if desired == "EXITED":
+                print(f"Pod {pod_id} exited after {elapsed:.0f}s — cleaning up")
+                terminate_pod(api_key, pod_id)
+                return True
 
-        print(
-            f"Pod {pod_id} still running: elapsed={elapsed:.0f}s desiredStatus={desired} "
-            f"lastStatusChange={status.get('lastStatusChange')!r}"
-        )
+            if elapsed > timeout_seconds:
+                print(f"Timeout after {elapsed:.0f}s - force-stopping pod {pod_id}")
+                terminate_pod(api_key, pod_id)
+                return False
 
-        if repo and gh_token:
-            new_output, log_lines_seen = _fetch_live_log(repo, gh_token, log_lines_seen)
-            if new_output:
-                print(f"--- pod log (lines {log_lines_seen - new_output.count(chr(10))+1}-{log_lines_seen}) ---")
-                print(new_output, flush=True)
-                print("--- end pod log ---")
+            if not ssh_key_path:
+                print(
+                    f"Pod {pod_id} still running: elapsed={elapsed:.0f}s desiredStatus={desired} "
+                    f"lastStatusChange={status.get('lastStatusChange')!r}"
+                )
 
-        time.sleep(poll_interval)
+            time.sleep(poll_interval)
+    finally:
+        if streamer:
+            streamer.stop()
 
 
 def launch_and_wait(
@@ -393,8 +418,7 @@ def launch_and_wait(
     train_poll_timeout_seconds: int,
     max_launch_attempts: int = 3,
     cloud_type: str = "SECURE",
-    repo: str = "",
-    gh_token: str = "",
+    ssh_key_path: str = "",
 ) -> bool:
     """
     Create a pod and wait for it to boot; if it never boots (a
@@ -429,7 +453,7 @@ def launch_and_wait(
         )
 
         if wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds):
-            result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds, repo=repo, gh_token=gh_token)
+            result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds, ssh_key_path=ssh_key_path)
             _active_pod = None
             return result
 
@@ -488,6 +512,7 @@ def main() -> None:
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
     parser.add_argument("--poll-timeout-seconds", type=int, default=11400, help="Outer safety-net cap once booted (3h10m default)")
+    parser.add_argument("--ssh-key-file", default="", help="Path to SSH private key for log streaming (overrides RUNPOD_SSH_KEY env var)")
     args = parser.parse_args()
 
     runpod_key = os.environ.get("RUNPOD_API_KEY")
@@ -495,6 +520,22 @@ def main() -> None:
     if not runpod_key or not gh_token:
         print("RUNPOD_API_KEY and GH_TOKEN environment variables are required", file=sys.stderr)
         sys.exit(1)
+
+    ssh_key_path = args.ssh_key_file
+    ssh_key_tmpfile = None
+    if not ssh_key_path:
+        ssh_key_content = os.environ.get("RUNPOD_SSH_KEY", "").strip()
+        if ssh_key_content:
+            ssh_key_tmpfile = tempfile.NamedTemporaryFile(mode="w", suffix="_runpod_ssh", delete=False)
+            ssh_key_tmpfile.write(ssh_key_content + "\n")
+            ssh_key_tmpfile.close()
+            os.chmod(ssh_key_tmpfile.name, 0o600)
+            ssh_key_path = ssh_key_tmpfile.name
+            print(f"SSH log streaming: key loaded from RUNPOD_SSH_KEY env var ({ssh_key_path})")
+
+    if not ssh_key_path:
+        print("Note: no SSH key provided — pod logs will not be streamed to this terminal. "
+              "Set RUNPOD_SSH_KEY or pass --ssh-key-file to enable.")
 
     gpu_ids = json.loads(args.gpu_ids_json)
 
@@ -508,20 +549,26 @@ def main() -> None:
 
     start_command = build_start_command(args.repo, args.branch, args.train_timeout_seconds)
 
-    completed = launch_and_wait(
-        runpod_key,
-        args.image,
-        gpu_ids,
-        pod_env,
-        start_command,
-        container_disk_gb=args.container_disk_gb,
-        boot_timeout_seconds=args.boot_timeout_seconds,
-        train_poll_timeout_seconds=args.poll_timeout_seconds,
-        max_launch_attempts=args.max_launch_attempts,
-        cloud_type=args.cloud_type,
-        repo=args.repo,
-        gh_token=gh_token,
-    )
+    try:
+        completed = launch_and_wait(
+            runpod_key,
+            args.image,
+            gpu_ids,
+            pod_env,
+            start_command,
+            container_disk_gb=args.container_disk_gb,
+            boot_timeout_seconds=args.boot_timeout_seconds,
+            train_poll_timeout_seconds=args.poll_timeout_seconds,
+            max_launch_attempts=args.max_launch_attempts,
+            cloud_type=args.cloud_type,
+            ssh_key_path=ssh_key_path,
+        )
+    finally:
+        if ssh_key_tmpfile:
+            try:
+                os.unlink(ssh_key_tmpfile.name)
+            except OSError:
+                pass
     if not completed:
         print("::error::Training pod never completed - either it repeatedly failed to boot or timed out mid-training", file=sys.stderr)
         sys.exit(1)
