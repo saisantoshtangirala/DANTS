@@ -12,16 +12,15 @@ import warnings
 
 # Qiskit imports
 try:
-    from qiskit import QuantumCircuit, transpile
-    from qiskit.circuit import ParameterVector
+    from qiskit import QuantumCircuit
+    from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
+    from qiskit.primitives import Sampler
     from qiskit_machine_learning.kernels import FidelityQuantumKernel
     from qiskit_machine_learning.algorithms import QSVC
-    from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
-    from qiskit.primitives import StatevectorSampler as Sampler
     QISKIT_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     QISKIT_AVAILABLE = False
-    warnings.warn("Qiskit not installed. Quantum kernel will fallback to classical.")
+    warnings.warn(f"Qiskit import failed ({e}). Quantum kernel will fallback to classical.")
 
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
@@ -155,8 +154,13 @@ class QuantumKernelClassifier:
 
     @staticmethod
     def _make_sampler():
-        """Create a StatevectorSampler for quantum kernel fidelity computation."""
-        print("Quantum Kernel: using StatevectorSampler (exact simulation)", flush=True)
+        """Create a V1 Sampler for quantum kernel fidelity computation.
+
+        ComputeUncompute (qiskit-algorithms 0.3.x) expects a V1 BaseSampler.
+        The V1 reference Sampler provides exact statevector simulation and
+        is compatible with both ComputeUncompute and FidelityQuantumKernel.
+        """
+        print("Quantum Kernel: using V1 Sampler (statevector, exact simulation)", flush=True)
         return Sampler()
 
     def _fit_quantum(

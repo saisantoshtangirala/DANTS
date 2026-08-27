@@ -19,11 +19,11 @@ try:
     from qiskit_machine_learning.connectors import TorchConnector
     from qiskit_algorithms.optimizers import SPSA, COBYLA, L_BFGS_B
     from qiskit_machine_learning.algorithms.classifiers import NeuralNetworkClassifier
-    from qiskit.primitives import StatevectorSampler as Sampler
+    from qiskit.primitives import Sampler
     QISKIT_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     QISKIT_AVAILABLE = False
-    warnings.warn("Qiskit Machine Learning not installed. VQC will fallback to classical.")
+    warnings.warn(f"Qiskit import failed ({e}). VQC will fallback to classical.")
 
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -197,15 +197,18 @@ class VQCMarketClassifier:
 
     @staticmethod
     def _make_sampler(shots: int):
-        """Create a StatevectorSampler for VQC training.
+        """Create a V1 Sampler for VQC training.
 
-        BackendSamplerV2 (Aer GPU/CPU) is incompatible with SamplerQNN in
-        qiskit-machine-learning 0.7.x — it calls .run() with V1-style args.
-        StatevectorSampler provides exact quantum simulation and works
-        correctly with SamplerQNN's V2 detection.
+        SamplerQNN in qiskit-machine-learning 0.7.x calls .run() with
+        V1-style positional args (circuits, parameter_values).  Both
+        BackendSamplerV2 and StatevectorSampler are V2 primitives whose
+        .run() only accepts a single ``pubs`` argument, so SamplerQNN
+        crashes with "takes 2 positional arguments but 3 were given".
+        The V1 reference Sampler accepts the V1 calling convention and
+        works correctly with SamplerQNN.
         """
-        print("VQC: using StatevectorSampler (exact simulation)", flush=True)
-        return Sampler(default_shots=shots)
+        print("VQC: using V1 Sampler (statevector, exact simulation)", flush=True)
+        return Sampler()
 
     def _fit_quantum(
         self,

@@ -158,6 +158,28 @@ def test_wait_for_pod_boot_returns_false_if_pod_vanishes():
     assert result is False
 
 
+def test_wait_for_pod_boot_returns_true_if_pod_vanishes_late():
+    """Pod ran so fast it vanished before we saw runtime, but elapsed > 90s means it likely completed."""
+    with patch("launch_training_pod.get_pod_status", return_value=None), \
+         patch("launch_training_pod.time.sleep"), \
+         patch("launch_training_pod.time.time", side_effect=[0, 100]):
+        result = ltp.wait_for_pod_boot("key", "pod123", boot_timeout_seconds=1000, poll_interval=0)
+
+    assert result is True
+
+
+def test_wait_for_pod_boot_returns_true_on_exited_status():
+    """Pod already finished its start command — EXITED means it booted and ran."""
+    with patch("launch_training_pod.get_pod_status") as mock_status, patch("launch_training_pod.time.sleep"):
+        mock_status.side_effect = [
+            {"desiredStatus": "RUNNING", "runtime": None},
+            {"desiredStatus": "EXITED", "runtime": None},
+        ]
+        result = ltp.wait_for_pod_boot("key", "pod123", boot_timeout_seconds=1000, poll_interval=0)
+
+    assert result is True
+
+
 def test_poll_until_terminated_returns_true_on_termination():
     with patch("launch_training_pod.get_pod_status") as mock_status, patch("launch_training_pod.time.sleep"):
         mock_status.side_effect = [{"desiredStatus": "RUNNING"}, None]

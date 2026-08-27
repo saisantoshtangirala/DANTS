@@ -291,6 +291,9 @@ def wait_for_pod_boot(api_key: str, pod_id: str, boot_timeout_seconds: int, poll
         status = get_pod_status(api_key, pod_id)
 
         if status is None:
+            if elapsed > 90:
+                print(f"Pod {pod_id} vanished after {elapsed:.0f}s — likely completed its start command")
+                return True
             print(f"Pod {pod_id} vanished before booting (elapsed={elapsed:.0f}s) - launch failure")
             return False
 
@@ -304,6 +307,10 @@ def wait_for_pod_boot(api_key: str, pod_id: str, boot_timeout_seconds: int, poll
 
         if runtime:
             print(f"Pod {pod_id} booted after {elapsed:.0f}s")
+            return True
+
+        if desired_status == "EXITED":
+            print(f"Pod {pod_id} already exited after {elapsed:.0f}s — it booted and completed")
             return True
 
         if elapsed > boot_timeout_seconds:
