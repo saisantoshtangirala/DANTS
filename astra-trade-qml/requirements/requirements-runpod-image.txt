@@ -22,8 +22,8 @@ yfinance>=0.2.40
 scikit-learn>=1.5
 xgboost>=2.0
 
-qiskit>=1.0
-qiskit-machine-learning>=0.7
+qiskit>=1.2,<1.3
+qiskit-machine-learning>=0.7,<0.8
 qiskit-aer-gpu>=0.14
 qiskit-algorithms>=0.3
 
