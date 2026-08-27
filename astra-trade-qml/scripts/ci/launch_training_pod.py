@@ -241,18 +241,41 @@ def get_pod_status(api_key: str, pod_id: str):
     return response.json()
 
 
-def wait_for_pod_boot(api_key: str, pod_id: str, boot_timeout_seconds: int, poll_interval: int = 15) -> bool:
+def _ssh_probe(pod_id: str, ssh_key_path: str) -> bool:
+    """Try a quick SSH connection to see if the pod is reachable."""
+    if not ssh_key_path:
+        return False
+    try:
+        result = subprocess.run(
+            [
+                "ssh",
+                "-o", "StrictHostKeyChecking=no",
+                "-o", "UserKnownHostsFile=/dev/null",
+                "-o", "LogLevel=ERROR",
+                "-o", "ConnectTimeout=10",
+                "-i", ssh_key_path,
+                f"{pod_id}@ssh.runpod.io",
+                "echo ok",
+            ],
+            capture_output=True, timeout=15,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def wait_for_pod_boot(
+    api_key: str, pod_id: str, boot_timeout_seconds: int, poll_interval: int = 15,
+    ssh_key_path: str = "",
+) -> bool:
     """
-    Wait for the pod's container to actually start (RunPod populates
-    `runtime` on the pod once it does - there's no other public signal,
-    since RunPod's API doesn't expose pod logs). Returns False if the
-    pod never boots within boot_timeout_seconds, or vanishes (404)
-    before booting - both indicate a launch-time failure (e.g. the
-    "layer does not exist" container-create error), not a training
-    failure, and should be handled by discarding this pod and trying
-    a fresh one rather than waiting out the full training timeout.
+    Wait for the pod's container to actually start. Primary signal is
+    RunPod populating `runtime` on the pod; fallback is an SSH probe
+    after 120s of desiredStatus=RUNNING without runtime (the REST API
+    sometimes never populates runtime even though the container is up).
     """
     start = time.time()
+    _last_ssh_probe = -999.0
     while True:
         elapsed = time.time() - start
         status = get_pod_status(api_key, pod_id)
@@ -279,6 +302,19 @@ def wait_for_pod_boot(api_key: str, pod_id: str, boot_timeout_seconds: int, poll
         if desired_status == "EXITED":
             print(f"Pod {pod_id} already exited after {elapsed:.0f}s — it booted and completed")
             return True
+
+        if (
+            ssh_key_path
+            and desired_status == "RUNNING"
+            and elapsed > 120
+            and elapsed - _last_ssh_probe > 60
+        ):
+            _last_ssh_probe = elapsed
+            print(f"Pod {pod_id}: runtime still missing after {elapsed:.0f}s — trying SSH probe...")
+            if _ssh_probe(pod_id, ssh_key_path):
+                print(f"Pod {pod_id} booted (confirmed via SSH) after {elapsed:.0f}s")
+                return True
+            print(f"Pod {pod_id}: SSH probe failed — container not reachable yet")
 
         if elapsed > boot_timeout_seconds:
             print(f"Pod {pod_id} did not boot within {boot_timeout_seconds}s - treating as a launch failure")
@@ -452,7 +488,7 @@ def launch_and_wait(
             f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
         )
 
-        if wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds):
+        if wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds, ssh_key_path=ssh_key_path):
             result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds, ssh_key_path=ssh_key_path)
             _active_pod = None
             return result
