@@ -381,7 +381,7 @@ def main() -> None:
     parser.add_argument("--gpu-ids-json", required=True, help='JSON array of GPU type IDs, e.g. select_gpu.py output')
     parser.add_argument("--container-disk-gb", type=int, default=40)
     parser.add_argument("--cloud-type", default="SECURE", choices=["SECURE", "COMMUNITY"], help="RunPod cloud type (SECURE = RunPod datacenters with pre-cached images, COMMUNITY = third-party hosts)")
-    parser.add_argument("--boot-timeout-seconds", type=int, default=600, help="Max time to wait for the container to start (10m default for SECURE cloud where images are pre-cached)")
+    parser.add_argument("--boot-timeout-seconds", type=int, default=1200, help="Max time to wait for the container to start (20m default - the ~15GB PyTorch image can take 10-15min to pull even on SECURE cloud)")
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
     parser.add_argument("--poll-timeout-seconds", type=int, default=11400, help="Outer safety-net cap once booted (3h10m default)")
