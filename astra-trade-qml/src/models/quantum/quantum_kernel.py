@@ -16,6 +16,15 @@ try:
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
     from qiskit.primitives import StatevectorSampler
     QISKIT_AVAILABLE = True
+
+    # qiskit_machine_learning 0.7.x's kernels/__init__.py transitively imports
+    # evolved_operator_ansatz, which only exists in qiskit >= 1.3 (we pin 1.2.x).
+    # Provide a stub so the import chain succeeds; we never call this function.
+    import qiskit.circuit.library as _qcl
+    if not hasattr(_qcl, 'evolved_operator_ansatz'):
+        def _evolved_operator_ansatz_stub(*args, **kwargs):
+            raise NotImplementedError("evolved_operator_ansatz requires qiskit >= 1.3")
+        _qcl.evolved_operator_ansatz = _evolved_operator_ansatz_stub
 except ImportError as e:
     QISKIT_AVAILABLE = False
     warnings.warn(f"Qiskit import failed ({e}). Quantum kernel will fallback to classical.")
