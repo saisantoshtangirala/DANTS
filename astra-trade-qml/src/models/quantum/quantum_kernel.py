@@ -15,8 +15,6 @@ try:
     from qiskit import QuantumCircuit
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
     from qiskit.primitives import Sampler
-    from qiskit_machine_learning.kernels import FidelityQuantumKernel
-    from qiskit_machine_learning.algorithms.classifiers import QSVC
     QISKIT_AVAILABLE = True
 except ImportError as e:
     QISKIT_AVAILABLE = False
@@ -171,10 +169,13 @@ class QuantumKernelClassifier:
         y_val: Optional[np.ndarray] = None,
     ) -> None:
         """Train using quantum kernel SVM."""
+        from qiskit_algorithms.state_fidelities import ComputeUncompute
+        from qiskit_machine_learning.kernels.fidelity_quantum_kernel import FidelityQuantumKernel
+        from qiskit_machine_learning.algorithms.classifiers.qsvc import QSVC
+
         self.feature_map = self._build_feature_map()
 
         sampler = self._make_sampler()
-        from qiskit_algorithms.state_fidelities import ComputeUncompute
         fidelity = ComputeUncompute(sampler=sampler)
         self.quantum_kernel = FidelityQuantumKernel(
             feature_map=self.feature_map,
