@@ -16,7 +16,7 @@ try:
     from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
     from qiskit.primitives import Sampler
     from qiskit_machine_learning.kernels import FidelityQuantumKernel
-    from qiskit_machine_learning.algorithms import QSVC
+    from qiskit_machine_learning.algorithms.classifiers import QSVC
     QISKIT_AVAILABLE = True
 except ImportError as e:
     QISKIT_AVAILABLE = False
