@@ -75,12 +75,11 @@ jobs:
           KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
           KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
         run: |
-          set -o pipefail
-          python3 astra-trade-qml/scripts/ci/launch_training_pod.py \
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
             --repo "${{ github.repository }}" \
             --branch "${{ github.ref_name }}" \
             --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
-            2>&1 | tee /tmp/launch_training_pod.log
+            > >(tee /tmp/launch_training_pod.log) 2>&1
 
       - name: Summarize training run
         if: always()

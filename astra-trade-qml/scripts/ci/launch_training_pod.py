@@ -66,8 +66,9 @@ REST_BASE = "https://rest.runpod.io/v1"
 DEFAULT_IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
 
 # Tracks the pod that should be terminated if this process is killed
-# (e.g. GitHub Actions sends SIGTERM on job cancellation). Both the
-# atexit hook and the SIGTERM handler check this.
+# (e.g. GitHub Actions sends SIGINT on job cancellation, then SIGKILL
+# after a 7.5s grace period). Both the atexit hook and the signal
+# handlers check this.
 _active_pod: dict | None = None  # {"api_key": ..., "pod_id": ...}
 
 
@@ -78,18 +79,26 @@ def _cleanup_active_pod() -> None:
     if pod is None:
         return
     _active_pod = None
-    print(f"Cleanup: terminating active pod {pod['pod_id']}")
-    terminate_pod(pod["api_key"], pod["pod_id"])
+    print(f"Cleanup: terminating active pod {pod['pod_id']}", flush=True)
+    try:
+        requests.delete(
+            f"{REST_BASE}/pods/{pod['pod_id']}",
+            headers={"Authorization": f"Bearer {pod['api_key']}"},
+            timeout=5,
+        )
+    except Exception as e:
+        print(f"Cleanup DELETE failed: {e}", flush=True)
 
 
-def _sigterm_handler(signum, frame) -> None:
-    print(f"Received signal {signum} - cleaning up RunPod pod before exit")
+def _cancel_handler(signum, frame) -> None:
+    print(f"Received signal {signum} - cleaning up RunPod pod before exit", flush=True)
     _cleanup_active_pod()
     sys.exit(128 + signum)
 
 
 atexit.register(_cleanup_active_pod)
-signal.signal(signal.SIGTERM, _sigterm_handler)
+signal.signal(signal.SIGTERM, _cancel_handler)
+signal.signal(signal.SIGINT, _cancel_handler)
 
 
 def build_start_command(repo: str, branch: str, train_timeout_seconds: int) -> str:
