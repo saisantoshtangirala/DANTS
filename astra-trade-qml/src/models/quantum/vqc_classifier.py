@@ -205,8 +205,8 @@ class VQCMarketClassifier:
             sampler = AerSampler(backend=gpu_backend, options={"default_shots": shots})
             print("VQC: using GPU-accelerated Aer simulator", flush=True)
             return sampler
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"VQC: GPU Aer failed ({e}), trying CPU Aer...", flush=True)
         try:
             from qiskit_aer import AerSimulator
             from qiskit_aer.primitives import SamplerV2 as AerSampler
@@ -214,8 +214,8 @@ class VQCMarketClassifier:
             sampler = AerSampler(backend=cpu_backend, options={"default_shots": shots})
             print("VQC: using CPU Aer simulator", flush=True)
             return sampler
-        except Exception:
-            print("VQC: using reference StatevectorSampler (CPU)", flush=True)
+        except Exception as e:
+            print(f"VQC: CPU Aer failed ({e}), using reference StatevectorSampler", flush=True)
             return Sampler(default_shots=shots)
 
     def _fit_quantum(

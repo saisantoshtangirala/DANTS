@@ -163,16 +163,16 @@ class QuantumKernelClassifier:
             sampler = AerSampler(backend=gpu_backend)
             print("Quantum Kernel: using GPU-accelerated Aer simulator", flush=True)
             return sampler
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Quantum Kernel: GPU Aer failed ({e}), trying CPU Aer...", flush=True)
         try:
             from qiskit_aer.primitives import SamplerV2 as AerSampler
             cpu_backend = AerSimulator(method="statevector")
             sampler = AerSampler(backend=cpu_backend)
             print("Quantum Kernel: using CPU Aer simulator", flush=True)
             return sampler
-        except Exception:
-            print("Quantum Kernel: using reference StatevectorSampler (CPU)", flush=True)
+        except Exception as e:
+            print(f"Quantum Kernel: CPU Aer failed ({e}), using reference StatevectorSampler", flush=True)
             return Sampler()
 
     def _fit_quantum(
