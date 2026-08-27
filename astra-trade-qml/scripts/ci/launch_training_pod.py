@@ -259,9 +259,19 @@ def _ssh_probe(pod_id: str, ssh_key_path: str) -> bool:
             ],
             capture_output=True, timeout=15,
         )
+        if result.returncode != 0:
+            stderr = result.stderr.decode(errors="replace").strip()
+            print(f"SSH probe stderr: {stderr}", flush=True)
         return result.returncode == 0
-    except Exception:
+    except Exception as e:
+        print(f"SSH probe exception: {e}", flush=True)
         return False
+
+
+# After this many seconds of desiredStatus=RUNNING without runtime,
+# assume the pod is booted. The REST API sometimes never populates
+# runtime even when the container is up and running.
+_ASSUME_BOOTED_AFTER_RUNNING_SECONDS = 300
 
 
 def wait_for_pod_boot(
@@ -269,13 +279,13 @@ def wait_for_pod_boot(
     ssh_key_path: str = "",
 ) -> bool:
     """
-    Wait for the pod's container to actually start. Primary signal is
-    RunPod populating `runtime` on the pod; fallback is an SSH probe
-    after 120s of desiredStatus=RUNNING without runtime (the REST API
-    sometimes never populates runtime even though the container is up).
+    Wait for the pod's container to actually start. Three signals, tried
+    in order: (1) RunPod populates `runtime`; (2) SSH probe connects;
+    (3) after 300s of desiredStatus=RUNNING, assume booted.
     """
     start = time.time()
     _last_ssh_probe = -999.0
+    _logged_api_response = False
     while True:
         elapsed = time.time() - start
         status = get_pod_status(api_key, pod_id)
@@ -290,6 +300,11 @@ def wait_for_pod_boot(
         runtime = status.get("runtime")
         desired_status = status.get("desiredStatus")
         last_status_change = status.get("lastStatusChange")
+
+        if not _logged_api_response:
+            _logged_api_response = True
+            print(f"Pod {pod_id} API response keys: {sorted(status.keys())}", flush=True)
+
         print(
             f"Pod {pod_id} boot check: elapsed={elapsed:.0f}s desiredStatus={desired_status} "
             f"runtime={'present' if runtime else 'none'} lastStatusChange={last_status_change!r}"
@@ -301,6 +316,13 @@ def wait_for_pod_boot(
 
         if desired_status == "EXITED":
             print(f"Pod {pod_id} already exited after {elapsed:.0f}s — it booted and completed")
+            return True
+
+        if desired_status == "RUNNING" and elapsed > _ASSUME_BOOTED_AFTER_RUNNING_SECONDS:
+            print(
+                f"Pod {pod_id}: desiredStatus=RUNNING for {elapsed:.0f}s without runtime — "
+                f"assuming booted (API may not populate runtime for this pod type)"
+            )
             return True
 
         if (
