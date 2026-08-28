@@ -204,6 +204,7 @@ def create_pod(
         "containerDiskInGb": container_disk_gb,
         "env": env,
         "dockerStartCmd": ["bash", "-c", start_command],
+        "ports": ["22/tcp"],
     }
     response = _request_with_retries(
         "POST",
@@ -241,9 +242,9 @@ def get_pod_status(api_key: str, pod_id: str):
     return response.json()
 
 
-def _ssh_probe(pod_id: str, ssh_key_path: str) -> bool:
-    """Try a quick SSH connection to see if the pod is reachable."""
-    if not ssh_key_path:
+def _ssh_probe(host: str, port: int, ssh_key_path: str) -> bool:
+    """Try a quick SSH connection to see if the pod's sshd is reachable."""
+    if not ssh_key_path or not host:
         return False
     try:
         result = subprocess.run(
@@ -254,7 +255,8 @@ def _ssh_probe(pod_id: str, ssh_key_path: str) -> bool:
                 "-o", "LogLevel=ERROR",
                 "-o", "ConnectTimeout=10",
                 "-i", ssh_key_path,
-                f"{pod_id}@ssh.runpod.io",
+                "-p", str(port),
+                f"root@{host}",
                 "echo ok",
             ],
             capture_output=True, timeout=15,
@@ -268,23 +270,22 @@ def _ssh_probe(pod_id: str, ssh_key_path: str) -> bool:
         return False
 
 
-# After this many seconds of desiredStatus=RUNNING without runtime,
-# assume the pod is booted. The REST API sometimes never populates
-# runtime even when the container is up and running.
-_ASSUME_BOOTED_AFTER_RUNNING_SECONDS = 300
-
-
 def wait_for_pod_boot(
     api_key: str, pod_id: str, boot_timeout_seconds: int, poll_interval: int = 15,
     ssh_key_path: str = "",
-) -> bool:
+) -> dict | None:
     """
-    Wait for the pod's container to actually start. Three signals, tried
-    in order: (1) RunPod populates `runtime`; (2) SSH probe connects;
-    (3) after 300s of desiredStatus=RUNNING, assume booted.
+    Wait for the pod's container to start and become SSH-reachable.
+
+    Polls the REST API for publicIp + portMappings (exposed by the
+    ``"ports": ["22/tcp"]`` flag in the create payload). Once those
+    appear, probes sshd with a short retry loop to confirm the daemon
+    is ready, then returns ``{"host": ip, "port": mapped_port}``.
+
+    Returns None on boot failure (pod vanished too early, timed out,
+    or desiredStatus=EXITED before SSH details appeared).
     """
     start = time.time()
-    _last_ssh_probe = -999.0
     _logged_api_response = False
     while True:
         elapsed = time.time() - start
@@ -293,54 +294,62 @@ def wait_for_pod_boot(
         if status is None:
             if elapsed > 90:
                 print(f"Pod {pod_id} vanished after {elapsed:.0f}s — likely completed its start command")
-                return True
+                return {"host": "", "port": 0}
             print(f"Pod {pod_id} vanished before booting (elapsed={elapsed:.0f}s) - launch failure")
-            return False
+            return None
 
-        runtime = status.get("runtime")
         desired_status = status.get("desiredStatus")
-        last_status_change = status.get("lastStatusChange")
+        public_ip = status.get("publicIp")
+        port_mappings = status.get("portMappings")
 
         if not _logged_api_response:
             _logged_api_response = True
             print(f"Pod {pod_id} API response keys: {sorted(status.keys())}", flush=True)
+            if port_mappings:
+                print(f"Pod {pod_id} portMappings (raw): {port_mappings!r}", flush=True)
+
+        ssh_port = None
+        if port_mappings:
+            if isinstance(port_mappings, list):
+                for pm in port_mappings:
+                    if isinstance(pm, dict):
+                        if pm.get("containerPort") == 22 or pm.get("privatePort") == 22:
+                            ssh_port = pm.get("hostPort") or pm.get("publicPort")
+                            break
+                    elif isinstance(pm, str) and "22/tcp" in pm:
+                        match = re.search(r":(\d+)$", pm)
+                        if match:
+                            ssh_port = int(match.group(1))
+                            break
+            elif isinstance(port_mappings, dict):
+                if "22" in port_mappings:
+                    ssh_port = port_mappings["22"]
+                elif "22/tcp" in port_mappings:
+                    ssh_port = port_mappings["22/tcp"]
 
         print(
             f"Pod {pod_id} boot check: elapsed={elapsed:.0f}s desiredStatus={desired_status} "
-            f"runtime={'present' if runtime else 'none'} lastStatusChange={last_status_change!r}"
-        )
-
-        if runtime:
-            print(f"Pod {pod_id} booted after {elapsed:.0f}s")
-            return True
+            f"publicIp={public_ip!r} sshPort={ssh_port!r}"
+        , flush=True)
 
         if desired_status == "EXITED":
             print(f"Pod {pod_id} already exited after {elapsed:.0f}s — it booted and completed")
-            return True
+            return {"host": "", "port": 0}
 
-        if desired_status == "RUNNING" and elapsed > _ASSUME_BOOTED_AFTER_RUNNING_SECONDS:
-            print(
-                f"Pod {pod_id}: desiredStatus=RUNNING for {elapsed:.0f}s without runtime — "
-                f"assuming booted (API may not populate runtime for this pod type)"
-            )
-            return True
-
-        if (
-            ssh_key_path
-            and desired_status == "RUNNING"
-            and elapsed > 120
-            and elapsed - _last_ssh_probe > 60
-        ):
-            _last_ssh_probe = elapsed
-            print(f"Pod {pod_id}: runtime still missing after {elapsed:.0f}s — trying SSH probe...")
-            if _ssh_probe(pod_id, ssh_key_path):
-                print(f"Pod {pod_id} booted (confirmed via SSH) after {elapsed:.0f}s")
-                return True
-            print(f"Pod {pod_id}: SSH probe failed — container not reachable yet")
+        if public_ip and ssh_port:
+            print(f"Pod {pod_id}: publicIp={public_ip} sshPort={ssh_port} — waiting for sshd...", flush=True)
+            for sshd_attempt in range(1, 13):
+                if _ssh_probe(public_ip, int(ssh_port), ssh_key_path):
+                    print(f"Pod {pod_id} booted and SSH-reachable after {time.time() - start:.0f}s")
+                    return {"host": public_ip, "port": int(ssh_port)}
+                print(f"  sshd not ready yet (attempt {sshd_attempt}/12), retrying in 10s...")
+                time.sleep(10)
+            print(f"Pod {pod_id}: sshd never became reachable at {public_ip}:{ssh_port}")
+            return {"host": public_ip, "port": int(ssh_port)}
 
         if elapsed > boot_timeout_seconds:
             print(f"Pod {pod_id} did not boot within {boot_timeout_seconds}s - treating as a launch failure")
-            return False
+            return None
 
         time.sleep(poll_interval)
 
@@ -348,8 +357,9 @@ def wait_for_pod_boot(
 class SSHLogStreamer:
     """Stream a pod's training log to stdout via SSH in a background thread."""
 
-    def __init__(self, pod_id: str, ssh_key_path: str, log_path: str = "/workspace/training.log"):
-        self._pod_id = pod_id
+    def __init__(self, host: str, port: int, ssh_key_path: str, log_path: str = "/workspace/training.log"):
+        self._host = host
+        self._port = port
         self._ssh_key_path = ssh_key_path
         self._log_path = log_path
         self._proc: subprocess.Popen | None = None
@@ -372,7 +382,6 @@ class SSHLogStreamer:
             self._thread.join(timeout=5)
 
     def _run(self) -> None:
-        # Wait for the log file to appear before tailing
         tail_cmd = f"while [ ! -f {self._log_path} ]; do sleep 5; done; tail -n +1 -f {self._log_path}"
         ssh_cmd = [
             "ssh",
@@ -383,16 +392,17 @@ class SSHLogStreamer:
             "-o", "ServerAliveCountMax=3",
             "-o", "ConnectTimeout=30",
             "-i", self._ssh_key_path,
-            f"{self._pod_id}@ssh.runpod.io",
+            "-p", str(self._port),
+            f"root@{self._host}",
             tail_cmd,
         ]
 
-        max_retries = 3
+        max_retries = 5
         for attempt in range(1, max_retries + 1):
             if self._stop.is_set():
                 return
             try:
-                print(f"SSH log stream: connecting to {self._pod_id}@ssh.runpod.io (attempt {attempt}/{max_retries})...", flush=True)
+                print(f"SSH log stream: connecting to root@{self._host}:{self._port} (attempt {attempt}/{max_retries})...", flush=True)
                 self._proc = subprocess.Popen(
                     ssh_cmd,
                     stdout=subprocess.PIPE,
@@ -424,12 +434,12 @@ class SSHLogStreamer:
 
 def poll_until_terminated(
     api_key: str, pod_id: str, timeout_seconds: int, poll_interval: int = 30,
-    ssh_key_path: str = "",
+    ssh_key_path: str = "", ssh_host: str = "", ssh_port: int = 0,
 ) -> bool:
     """Returns True if the pod self-terminated normally, False if force-stopped on timeout."""
     streamer = None
-    if ssh_key_path:
-        streamer = SSHLogStreamer(pod_id, ssh_key_path)
+    if ssh_key_path and ssh_host and ssh_port:
+        streamer = SSHLogStreamer(ssh_host, ssh_port, ssh_key_path)
         streamer.start()
 
     try:
@@ -453,7 +463,7 @@ def poll_until_terminated(
                 terminate_pod(api_key, pod_id)
                 return False
 
-            if not ssh_key_path:
+            if not streamer:
                 print(
                     f"Pod {pod_id} still running: elapsed={elapsed:.0f}s desiredStatus={desired} "
                     f"lastStatusChange={status.get('lastStatusChange')!r}"
@@ -510,8 +520,14 @@ def launch_and_wait(
             f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
         )
 
-        if wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds, ssh_key_path=ssh_key_path):
-            result = poll_until_terminated(api_key, pod_id, timeout_seconds=train_poll_timeout_seconds, ssh_key_path=ssh_key_path)
+        boot_info = wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds, ssh_key_path=ssh_key_path)
+        if boot_info is not None:
+            result = poll_until_terminated(
+                api_key, pod_id, timeout_seconds=train_poll_timeout_seconds,
+                ssh_key_path=ssh_key_path,
+                ssh_host=boot_info.get("host", ""),
+                ssh_port=boot_info.get("port", 0),
+            )
             _active_pod = None
             return result
 
