@@ -12,8 +12,8 @@ name: Train on RunPod and Deploy to Hetzner
 # parts; a few minutes of install time per run is a fine trade for one
 # less thing that can fail.
 #
-# See scripts/deploy_to_hetzner.sh for the one-time Hetzner setup this
-# depends on (a running docker-compose stack + a KITE_* .env file).
+# See scripts/hetzner_setup.sh for the one-time Hetzner setup this
+# depends on (systemd services + a KITE_* .env file, no Docker needed).
 #
 # NOTE: the schedule below runs this nightly on weekdays, which means
 # recurring RunPod GPU spend (typically well under $1/run - see the
