@@ -51,7 +51,8 @@ echo "Installing/updating Python dependencies..."
 ssh "${SSH_OPTS[@]}" "${HETZNER_USER}@${HETZNER_HOST}" bash <<REMOTE_DEPS
 set -euo pipefail
 cd "$REMOTE_DIR"
-if [[ ! -d venv ]]; then
+if [[ ! -f venv/bin/python3 ]]; then
+    rm -rf venv
     python3.11 -m venv venv
     echo "Created virtualenv"
 fi
