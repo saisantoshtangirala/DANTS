@@ -105,10 +105,13 @@ jobs:
     needs: train
     runs-on: ubuntu-latest
     steps:
-      - name: Check out trained model
+      - name: Check out scripts and source
         uses: actions/checkout@v4
-        with:
-          ref: model-artifacts
+
+      - name: Fetch trained model from model-artifacts branch
+        run: |
+          git fetch origin model-artifacts
+          git checkout origin/model-artifacts -- astra-trade-qml/models/latest
 
       - name: Set up SSH key
         run: |
