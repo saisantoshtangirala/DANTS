@@ -172,7 +172,15 @@ git commit -m "Automated training run $(date -u +%Y-%m-%dT%H:%M:%SZ) (exit=$TRAI
 git push "$REPO_URL" HEAD:model-artifacts --force
 
 POD_ID="${{RUNPOD_POD_ID:-$(hostname)}}"
-curl -sS -X DELETE -H "Authorization: Bearer ${{RUNPOD_API_KEY}}" "https://rest.runpod.io/v1/pods/${{POD_ID}}"
+echo "Training done (exit=$TRAIN_EXIT). Self-terminating pod $POD_ID..."
+curl -sS -X DELETE -H "Authorization: Bearer ${{RUNPOD_API_KEY}}" "https://rest.runpod.io/v1/pods/${{POD_ID}}" || true
+
+# Prevent RunPod from restarting the container after the command exits.
+# The DELETE above is async — the pod may still be running when it returns.
+# Without this, the container exits cleanly and RunPod's restart policy
+# re-executes dockerStartCmd, causing a duplicate training run.
+echo "Waiting for pod termination..."
+sleep infinity
 """
 
 
