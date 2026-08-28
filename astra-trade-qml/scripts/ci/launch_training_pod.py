@@ -596,21 +596,27 @@ def main() -> None:
             ssh_key_path = ssh_key_tmpfile.name
             print(f"SSH log streaming: key loaded from RUNPOD_SSH_KEY env var ({ssh_key_path})")
 
-    # Derive public key from private key to inject into pod via SSH_PUBLIC_KEY
+    # Derive public key to inject into pod via SSH_PUBLIC_KEY env var
     ssh_public_key = ""
     if ssh_key_path:
-        try:
-            result = subprocess.run(
-                ["ssh-keygen", "-y", "-f", ssh_key_path],
-                capture_output=True, timeout=5,
-            )
-            if result.returncode == 0:
-                ssh_public_key = result.stdout.decode().strip()
-                print(f"SSH log streaming: derived public key ({ssh_public_key[:30]}...)")
-            else:
-                print(f"SSH log streaming: could not derive public key: {result.stderr.decode().strip()}")
-        except Exception as e:
-            print(f"SSH log streaming: could not derive public key: {e}")
+        pub_path = ssh_key_path + ".pub"
+        if os.path.exists(pub_path):
+            with open(pub_path) as f:
+                ssh_public_key = f.read().strip()
+            print(f"SSH log streaming: read public key from {pub_path}")
+        else:
+            try:
+                result = subprocess.run(
+                    ["ssh-keygen", "-y", "-f", ssh_key_path],
+                    capture_output=True, timeout=5,
+                )
+                if result.returncode == 0:
+                    ssh_public_key = result.stdout.decode().strip()
+                    print(f"SSH log streaming: derived public key from private key")
+                else:
+                    print(f"SSH log streaming: could not derive public key: {result.stderr.decode().strip()}")
+            except Exception as e:
+                print(f"SSH log streaming: could not derive public key: {e}")
 
     if not ssh_key_path:
         print("Note: no SSH key provided — pod logs will not be streamed to this terminal. "

@@ -65,9 +65,9 @@ jobs:
           echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
           echo "Selected GPUs: $GPU_IDS"
 
-      - name: Write RunPod SSH key
+      - name: Generate ephemeral SSH key for pod log streaming
         run: |
-          echo "${{ secrets.RUNPOD_SSH_KEY }}" | base64 -d > /tmp/runpod_ssh_key
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
           chmod 600 /tmp/runpod_ssh_key
 
       - name: Launch training pod and wait for completion
