@@ -106,11 +106,22 @@ signal.signal(signal.SIGINT, _cancel_handler)
 
 def build_start_command(repo: str, branch: str, train_timeout_seconds: int) -> str:
     return f"""set -uxo pipefail
+
+# Start sshd for CI log streaming — dockerStartCmd overrides the
+# container's default CMD so RunPod's init script that normally starts
+# sshd doesn't run.
+if [ -n "${{SSH_PUBLIC_KEY:-}}" ]; then
+    mkdir -p ~/.ssh /var/run/sshd
+    echo "$SSH_PUBLIC_KEY" >> ~/.ssh/authorized_keys
+    chmod 700 ~/.ssh
+    chmod 600 ~/.ssh/authorized_keys
+    /usr/sbin/sshd 2>/dev/null || service ssh start 2>/dev/null || true
+    echo "sshd started for log streaming"
+fi
+
 mkdir -p /workspace
 cd /workspace
 
-# CUDA diagnostics and initialization - RunPod containers sometimes need
-# explicit driver init before PyTorch can see the GPU
 echo "=== GPU diagnostics ==="
 nvidia-smi || echo "WARNING: nvidia-smi failed"
 ldconfig 2>/dev/null || true
@@ -407,7 +418,6 @@ class SSHLogStreamer:
                     ssh_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    bufsize=1,
                 )
                 print("SSH log stream: connected — streaming pod output ↓", flush=True)
                 for line in iter(self._proc.stdout.readline, b""):
