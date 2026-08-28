@@ -17,6 +17,7 @@ set -euo pipefail
 INSTALL_DIR="/opt/astra-trade-qml"
 VENV_DIR="$INSTALL_DIR/venv"
 SVC_USER="astra"
+PYTHON="python3.11"
 
 echo "=== Astra-Trade QML: Hetzner one-time setup ==="
 
@@ -32,14 +33,21 @@ fi
 mkdir -p "$INSTALL_DIR"/{src,config,models/latest,data,logs,requirements,scripts}
 chown -R "$SVC_USER:$SVC_USER" "$INSTALL_DIR"
 
-# Install Python 3.10+ and venv if missing
-if ! command -v python3 &>/dev/null; then
-    apt-get update && apt-get install -y python3 python3-venv python3-pip
+# Install Python 3.11 (system python may be too new for ML wheels)
+if ! command -v "$PYTHON" &>/dev/null; then
+    apt-get update
+    apt-get install -y software-properties-common
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get update
+    apt-get install -y "$PYTHON" "${PYTHON}-venv" "${PYTHON}-dev"
+    echo "Installed $PYTHON"
+else
+    echo "$PYTHON already installed"
 fi
 
-# Create virtualenv
+# Create virtualenv with Python 3.11
 if [[ ! -d "$VENV_DIR" ]]; then
-    python3 -m venv "$VENV_DIR"
+    "$PYTHON" -m venv "$VENV_DIR"
     echo "Created virtualenv at $VENV_DIR"
 else
     echo "Virtualenv already exists at $VENV_DIR"

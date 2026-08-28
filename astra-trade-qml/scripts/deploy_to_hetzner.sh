@@ -52,7 +52,7 @@ ssh "${SSH_OPTS[@]}" "${HETZNER_USER}@${HETZNER_HOST}" bash <<REMOTE_DEPS
 set -euo pipefail
 cd "$REMOTE_DIR"
 if [[ ! -d venv ]]; then
-    python3 -m venv venv
+    python3.11 -m venv venv
     echo "Created virtualenv"
 fi
 venv/bin/pip install --quiet --upgrade pip
