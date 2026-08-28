@@ -205,6 +205,9 @@ class TrainingPipeline:
         X[split:] = scaler.transform(X[split:])
         self._feature_scaler = scaler
 
+        # Zero-variance features produce NaN after scaling; replace with 0
+        np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+
         return X[:split], y[:split], X[split:], y[split:], feature_cols
 
     def classical_and_quantum_training(self) -> Dict[str, Any]:

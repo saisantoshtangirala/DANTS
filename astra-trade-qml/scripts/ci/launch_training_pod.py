@@ -126,12 +126,24 @@ fi
 mkdir -p /workspace
 cd /workspace
 
+# Create the log file immediately so SSH log streamer starts showing
+# output from boot (not just from when training starts).
+LOG_FILE=/workspace/training.log
+touch "$LOG_FILE"
+
+# From here, tee all stdout+stderr to the log file so the SSH
+# streamer sees git clone, pip install, GPU diagnostics, and any
+# crash messages — not just training output.
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 echo "=== GPU diagnostics ==="
 nvidia-smi || echo "WARNING: nvidia-smi failed"
 ldconfig 2>/dev/null || true
 python3 -c "import torch; torch.cuda.init(); print(f'CUDA available: {{torch.cuda.is_available()}}, device: {{torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}}')" || echo "WARNING: CUDA init check failed"
 
+set +x  # hide token from trace
 git clone --branch {branch} --single-branch "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" repo
+set -x
 cd repo/astra-trade-qml
 
 pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
@@ -153,11 +165,13 @@ except: pass
 git config user.email "runpod-bot@astra-trade-qml.local"
 git config user.name "RunPod Training Bot"
 
+set +x  # hide token from trace
 REPO_URL="https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git"
-LOG_FILE=/workspace/training.log
+set -x
 
-PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train 2>&1 | tee "$LOG_FILE"
-TRAIN_EXIT=${{PIPESTATUS[0]}}
+echo "=== Starting training ==="
+PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train 2>&1
+TRAIN_EXIT=$?
 
 mkdir -p models/latest logs
 {{
@@ -169,7 +183,9 @@ cp "$LOG_FILE" logs/training_full.log 2>/dev/null || true
 git checkout -B model-artifacts
 git add -f models/latest logs
 git commit -m "Automated training run $(date -u +%Y-%m-%dT%H:%M:%SZ) (exit=$TRAIN_EXIT)"
+set +x  # hide token from trace
 git push "$REPO_URL" HEAD:model-artifacts --force
+set -x
 
 POD_ID="${{RUNPOD_POD_ID:-$(hostname)}}"
 echo "Training done (exit=$TRAIN_EXIT). Self-terminating pod $POD_ID..."

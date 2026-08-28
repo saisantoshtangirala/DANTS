@@ -77,13 +77,10 @@ class XGBoostMarketModel:
             "early_stopping_rounds": early_stopping_rounds,
         }
 
-        try:
-            import torch
-            if torch.cuda.is_available():
-                self.params["device"] = "cuda"
-                print(f"XGBoost: using GPU (CUDA)")
-        except ImportError:
-            pass
+        # XGBoost GPU (device="cuda") requires a CUDA-compiled build;
+        # the pip package is CPU-only and segfaults if forced onto CUDA.
+        # CPU hist is fast enough for tabular data — leave GPU for LSTM
+        # and quantum models.
 
         self.early_stopping_rounds = early_stopping_rounds
         self.model = None
