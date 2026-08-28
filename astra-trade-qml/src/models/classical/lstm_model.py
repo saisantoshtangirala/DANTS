@@ -86,34 +86,24 @@ class LSTMClassifier(nn.Module):
         self.fc1 = nn.Linear(hidden_size * self.num_directions, hidden_size // 2)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size // 2, num_classes)
-        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass.
-
-        Args:
-            x: Input tensor (batch_size, seq_len, input_size)
-
-        Returns:
-            Class probabilities (batch_size, num_classes)
-        """
-        # Initialize hidden state
         h0 = torch.zeros(self.num_layers * self.num_directions, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers * self.num_directions, x.size(0), self.hidden_size).to(x.device)
 
-        # LSTM forward
         out, _ = self.lstm(x, (h0, c0))
 
-        # Take last timestep
         out = out[:, -1, :]
         out = self.dropout(out)
         out = self.fc1(out)
         out = self.relu(out)
         out = self.fc2(out)
-        out = self.softmax(out)
-
+        # Raw logits — CrossEntropyLoss applies log-softmax internally
         return out
+
+    def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
+        """Softmax over logits for inference-time probability estimates."""
+        return torch.softmax(self.forward(x), dim=1)
 
 
 class LSTMModel:
@@ -205,8 +195,14 @@ class LSTMModel:
             val_dataset = LSTMDataset(X_val, y_val, self.sequence_length)
             val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
-        # Loss and optimizer
-        criterion = nn.CrossEntropyLoss()
+        # Compute class weights from training labels to handle imbalanced classes
+        mapped_labels = np.array([{-1: 0, 0: 1, 1: 2}.get(int(l), 1) for l in y_train])
+        class_counts = np.bincount(mapped_labels, minlength=3).astype(float)
+        class_counts = np.maximum(class_counts, 1.0)
+        class_weights = len(mapped_labels) / (3.0 * class_counts)
+        weight_tensor = torch.FloatTensor(class_weights).to(self.device)
+
+        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         # verbose was removed from ReduceLROnPlateau in newer torch releases;
         # the training loop already prints loss/accuracy every 10 epochs below.
@@ -333,8 +329,8 @@ class LSTMModel:
         X_seq = torch.FloatTensor(np.array(sequences)).to(self.device)
 
         with torch.no_grad():
-            outputs = self.model(X_seq)
-            probabilities = outputs.cpu().numpy()
+            logits = self.model(X_seq)
+            probabilities = torch.softmax(logits, dim=1).cpu().numpy()
 
         # Pad beginning with neutral predictions
         padding = np.ones((self.sequence_length - 1, 3)) / 3.0

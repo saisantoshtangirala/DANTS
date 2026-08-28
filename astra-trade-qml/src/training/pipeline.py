@@ -99,7 +99,7 @@ class TrainingPipeline:
         self.featured_data: Dict[str, pd.DataFrame] = {}
         self.used_synthetic_data = False
 
-    def data_ingestion(self, lookback_days: int = 365) -> Dict[str, pd.DataFrame]:
+    def data_ingestion(self, lookback_days: int = 1825) -> Dict[str, pd.DataFrame]:
         """Task: download historical OHLCV for the focus universe (Kite first, NSE archive fallback)."""
         symbols = self.data_cfg.get("symbols", {}).get("focus_universe", [])
         end_date = datetime.now()
@@ -181,18 +181,30 @@ class TrainingPipeline:
         return self.featured_data
 
     def _pooled_training_matrix(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list]:
-        """Pool feature matrices from all symbols into one chronologically-split training set."""
+        """Pool feature matrices from all symbols into one date-sorted, normalized training set."""
         frames = [df for df in self.featured_data.values() if not df.empty]
         if not frames:
             raise ValueError("No featured data available. Run feature_engineering() first.")
 
         pooled = pd.concat(frames, ignore_index=True)
+
+        # Sort by date to prevent temporal leakage in the train/val split
+        if "date" in pooled.columns:
+            pooled = pooled.sort_values("date").reset_index(drop=True)
+
         feature_cols = self.feature_engineer.get_feature_columns(pooled)
 
         X = pooled[feature_cols].to_numpy()
         y = pooled["label"].to_numpy()
 
+        # Standardize features so cross-symbol absolute values don't dominate
+        from sklearn.preprocessing import StandardScaler
         split = int(len(X) * 0.8)
+        scaler = StandardScaler()
+        X[:split] = scaler.fit_transform(X[:split])
+        X[split:] = scaler.transform(X[split:])
+        self._feature_scaler = scaler
+
         return X[:split], y[:split], X[split:], y[split:], feature_cols
 
     def classical_and_quantum_training(self) -> Dict[str, Any]:

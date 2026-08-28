@@ -119,6 +119,12 @@ class XGBoostMarketModel:
         if feature_names:
             self.feature_names = feature_names
 
+        # Compute per-sample weights to handle class imbalance
+        class_counts = np.bincount(y_train_mapped, minlength=3).astype(float)
+        class_counts = np.maximum(class_counts, 1.0)
+        weight_per_class = len(y_train_mapped) / (3.0 * class_counts)
+        sample_weights = np.array([weight_per_class[c] for c in y_train_mapped])
+
         self.model = xgb.XGBClassifier(**self.params)
 
         eval_set = [(X_train, y_train_mapped)]
@@ -130,6 +136,7 @@ class XGBoostMarketModel:
             X_train,
             y_train_mapped,
             eval_set=eval_set,
+            sample_weight=sample_weights,
             verbose=False,
         )
 
