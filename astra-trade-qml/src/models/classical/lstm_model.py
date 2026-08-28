@@ -196,8 +196,10 @@ class LSTMModel:
             val_dataset = LSTMDataset(X_val, y_val, self.sequence_length)
             val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
-        # Compute class weights from training labels to handle imbalanced classes
-        mapped_labels = np.array([{-1: 0, 0: 1, 1: 2}.get(int(l), 1) for l in y_train])
+        # Compute class weights from labels the DataLoader actually uses
+        # (LSTMDataset targets start at index sequence_length-1)
+        windowed_labels = y_train[self.sequence_length - 1:]
+        mapped_labels = np.array([{-1: 0, 0: 1, 1: 2}.get(int(l), 1) for l in windowed_labels])
         class_counts = np.bincount(mapped_labels, minlength=3).astype(float)
         class_counts = np.maximum(class_counts, 1.0)
         class_weights = len(mapped_labels) / (3.0 * class_counts)

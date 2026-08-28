@@ -4,7 +4,7 @@ Manages SQLite/PostgreSQL connections for trade journal, model metrics, and audi
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from contextlib import contextmanager
@@ -180,6 +180,30 @@ class DatabaseManager:
         query += " ORDER BY timestamp DESC"
 
         return pd.read_sql_query(query, self.engine, params=params)
+
+    def get_trade_statistics(self, lookback_days: int = 90) -> Dict[str, float]:
+        """Compute win_rate, avg_win_pct, avg_loss_pct from recent closed trades for position sizing."""
+        cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+        query = """
+        SELECT pnl, pnl_pct FROM trades
+        WHERE status = 'CLOSED' AND timestamp >= :cutoff AND pnl IS NOT NULL AND pnl_pct IS NOT NULL
+        ORDER BY timestamp DESC
+        """
+        df = pd.read_sql_query(query, self.engine, params={"cutoff": cutoff})
+
+        defaults = {"win_rate": 0.5, "avg_win_pct": 0.015, "avg_loss_pct": 0.008}
+        if df.empty:
+            return defaults
+
+        wins = df[df["pnl"] > 0]
+        losses = df[df["pnl"] < 0]
+        total = len(df)
+
+        return {
+            "win_rate": len(wins) / total if total > 0 else defaults["win_rate"],
+            "avg_win_pct": float(wins["pnl_pct"].mean()) if not wins.empty else defaults["avg_win_pct"],
+            "avg_loss_pct": float(abs(losses["pnl_pct"].mean())) if not losses.empty else defaults["avg_loss_pct"],
+        }
 
     def get_performance_summary(self, days: int = 30) -> Dict[str, Any]:
         """

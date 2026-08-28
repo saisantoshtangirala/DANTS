@@ -191,10 +191,12 @@ def run_paper(config: dict, logger) -> None:
                         pass
                 engine.check_exits(prices, profit_target_pct, stop_loss_pct, india_vix)
 
+                trade_stats = db.get_trade_statistics()
+
                 for symbol in symbols:
                     try:
                         _process_symbol_cycle(
-                            symbol, live_feed, feature_engineer, model, engine, interval, indicators
+                            symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats
                         )
                     except Exception as e:
                         logger.error("symbol_processing_failed", symbol=symbol, error=str(e))
@@ -208,7 +210,7 @@ def run_paper(config: dict, logger) -> None:
         scheduler.shutdown(wait=False)
 
 
-def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, interval, indicators) -> None:
+def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats=None) -> None:
     """One signal-generation cycle for a single symbol, given the current regime indicators."""
     ohlcv = live_feed.get_recent_ohlcv(symbol, interval=interval)
     if ohlcv.empty:
@@ -236,6 +238,7 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
             except Exception:
                 pass
 
+    stats = trade_stats or {}
     engine.process_symbol(
         symbol=symbol,
         class_probabilities=class_probabilities,
@@ -243,6 +246,9 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
         indicators=indicators,
         model_version=model.model_version,
         quantum_depth=model.get_quantum_metrics().get("vqc_depth", 0),
+        win_rate=stats.get("win_rate", 0.5),
+        avg_win_pct=stats.get("avg_win_pct", 0.015),
+        avg_loss_pct=stats.get("avg_loss_pct", 0.008),
         sub_model_probabilities=sub_model_probs if sub_model_probs else None,
     )
 

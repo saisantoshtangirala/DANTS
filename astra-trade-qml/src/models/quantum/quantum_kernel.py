@@ -141,20 +141,38 @@ class QuantumKernelClassifier:
             # Take first n_qubits features
             X_processed = X_scaled[:, :self.n_qubits]
 
+        # Preprocess validation data the same way (transform, not fit)
+        X_val_processed = None
+        y_val_mapped = None
+        if X_val is not None and y_val is not None:
+            y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
+            X_val_scaled = self.scaler.transform(X_val)
+            if self.use_pca and self.pca is not None:
+                X_val_pca = self.pca.transform(X_val_scaled)
+                if X_val_pca.shape[1] > self.n_qubits:
+                    X_val_processed = X_val_pca[:, :self.n_qubits]
+                elif X_val_pca.shape[1] < self.n_qubits:
+                    padding = np.zeros((X_val_pca.shape[0], self.n_qubits - X_val_pca.shape[1]))
+                    X_val_processed = np.hstack([X_val_pca, padding])
+                else:
+                    X_val_processed = X_val_pca
+            else:
+                X_val_processed = X_val_scaled[:, :self.n_qubits]
+
         # Try quantum approach; fall back to classical only on failure
         if QISKIT_AVAILABLE:
             try:
-                self._fit_quantum(X_processed, y_train_mapped, X_val, y_val)
+                self._fit_quantum(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
                 self.is_quantum = True
             except Exception as e:
                 if self.fallback_to_classical:
                     print(f"Quantum training failed: {e}. Falling back to classical SVM.", flush=True)
-                    self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
+                    self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
                     self.is_quantum = False
                 else:
                     raise
         else:
-            self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
+            self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
             self.is_quantum = False
 
         return self.training_metrics
@@ -224,6 +242,10 @@ class QuantumKernelClassifier:
             "training_samples": len(X_sub),
         }
 
+        if X_val is not None and y_val is not None:
+            val_pred = self.qsvc.predict(X_val)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
+
     def _fit_classical(
         self,
         X: np.ndarray,
@@ -247,6 +269,10 @@ class QuantumKernelClassifier:
             "is_quantum": False,
             "fallback_reason": "classical_mode",
         }
+
+        if X_val is not None and y_val is not None:
+            val_pred = self.classical_svm.predict(X_val)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """

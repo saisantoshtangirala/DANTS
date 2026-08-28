@@ -188,20 +188,40 @@ class VQCMarketClassifier:
         self._minmax_scaler = MinMaxScaler()
         X_normalized = self._minmax_scaler.fit_transform(X_processed)
 
+        # Preprocess validation data the same way (transform, not fit)
+        X_val_processed = None
+        X_val_normalized = None
+        y_val_mapped = None
+        if X_val is not None and y_val is not None:
+            y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
+            X_val_scaled = self.scaler.transform(X_val)
+            if self.use_pca and self.pca is not None:
+                X_val_pca = self.pca.transform(X_val_scaled)
+                if X_val_pca.shape[1] > self.n_qubits:
+                    X_val_processed = X_val_pca[:, :self.n_qubits]
+                elif X_val_pca.shape[1] < self.n_qubits:
+                    padding = np.zeros((X_val_pca.shape[0], self.n_qubits - X_val_pca.shape[1]))
+                    X_val_processed = np.hstack([X_val_pca, padding])
+                else:
+                    X_val_processed = X_val_pca
+            else:
+                X_val_processed = X_val_scaled[:, :self.n_qubits]
+            X_val_normalized = self._minmax_scaler.transform(X_val_processed)
+
         # Try quantum approach; fall back to classical only on failure
         if QISKIT_AVAILABLE:
             try:
-                self._fit_quantum(X_normalized, y_train_mapped, X_val, y_val)
+                self._fit_quantum(X_normalized, y_train_mapped, X_val_normalized, y_val_mapped)
                 self.is_quantum = True
             except Exception as e:
                 if self.fallback_to_classical:
                     print(f"VQC training failed: {e}. Falling back to classical MLP.", flush=True)
-                    self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
+                    self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
                     self.is_quantum = False
                 else:
                     raise
         else:
-            self._fit_classical(X_processed, y_train_mapped, X_val, y_val)
+            self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
             self.is_quantum = False
 
         return self.training_metrics
@@ -291,6 +311,10 @@ class VQCMarketClassifier:
             "num_parameters": len(self.ansatz.parameters),
         }
 
+        if X_val is not None and y_val is not None:
+            val_pred = self.vqc.predict(X_val)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
+
     def _fit_classical(
         self,
         X: np.ndarray,
@@ -299,19 +323,32 @@ class VQCMarketClassifier:
         y_val: Optional[np.ndarray] = None,
     ) -> None:
         """Train using classical MLP fallback."""
-        self.classical_mlp = MLPClassifier(
-            hidden_layer_sizes=(128, 64, 32),
-            activation="relu",
-            solver="adam",
-            alpha=0.001,
-            batch_size="auto",
-            learning_rate="adaptive",
-            max_iter=500,
-            early_stopping=True,
-            validation_fraction=0.1,
-            n_iter_no_change=20,
-            random_state=42,
-        )
+        if X_val is not None and y_val is not None:
+            self.classical_mlp = MLPClassifier(
+                hidden_layer_sizes=(128, 64, 32),
+                activation="relu",
+                solver="adam",
+                alpha=0.001,
+                batch_size="auto",
+                learning_rate="adaptive",
+                max_iter=500,
+                early_stopping=False,
+                random_state=42,
+            )
+        else:
+            self.classical_mlp = MLPClassifier(
+                hidden_layer_sizes=(128, 64, 32),
+                activation="relu",
+                solver="adam",
+                alpha=0.001,
+                batch_size="auto",
+                learning_rate="adaptive",
+                max_iter=500,
+                early_stopping=True,
+                validation_fraction=0.1,
+                n_iter_no_change=20,
+                random_state=42,
+            )
 
         self.classical_mlp.fit(X, y)
 
@@ -322,6 +359,10 @@ class VQCMarketClassifier:
             "fallback_reason": "classical_mode",
             "hidden_layers": [128, 64, 32],
         }
+
+        if X_val is not None and y_val is not None:
+            val_pred = self.classical_mlp.predict(X_val)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """

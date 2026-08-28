@@ -240,7 +240,8 @@ class FeatureEngineer:
     def _add_vwap_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add VWAP (Volume Weighted Average Price) features."""
         typical_price = (df["high"] + df["low"] + df["close"]) / 3
-        vwap = (typical_price * df["volume"]).cumsum() / df["volume"].cumsum()
+        window = self.config.vwap_period
+        vwap = (typical_price * df["volume"]).rolling(window).sum() / df["volume"].rolling(window).sum()
 
         df["vwap"] = vwap
         df["vwap_deviation"] = (df["close"] - df["vwap"]) / df["vwap"]
