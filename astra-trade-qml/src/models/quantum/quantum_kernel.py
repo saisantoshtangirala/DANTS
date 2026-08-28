@@ -280,9 +280,12 @@ class QuantumKernelClassifier:
                 exp_decisions = np.exp(decisions - np.max(decisions, axis=1, keepdims=True))
                 proba = exp_decisions / np.sum(exp_decisions, axis=1, keepdims=True)
 
-                # Ensure 3 classes
+                # Ensure 3 classes — redistribute into 3 columns with
+                # hold getting a share rather than being locked at 0.0
                 if proba.shape[1] == 2:
-                    proba = np.column_stack([proba[:, 0], np.zeros(len(proba)), proba[:, 1]])
+                    hold_prob = np.minimum(proba[:, 0], proba[:, 1])
+                    total = proba[:, 0] + hold_prob + proba[:, 1]
+                    proba = np.column_stack([proba[:, 0] / total, hold_prob / total, proba[:, 1] / total])
                 return proba
             except Exception:
                 pass

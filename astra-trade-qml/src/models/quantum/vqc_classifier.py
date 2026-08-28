@@ -185,7 +185,8 @@ class VQCMarketClassifier:
             X_processed = X_scaled[:, :self.n_qubits]
 
         # Normalize to [0, 1] for feature map encoding
-        X_normalized = MinMaxScaler().fit_transform(X_processed)
+        self._minmax_scaler = MinMaxScaler()
+        X_normalized = self._minmax_scaler.fit_transform(X_processed)
 
         # Try quantum approach; fall back to classical only on failure
         if QISKIT_AVAILABLE:
@@ -344,7 +345,10 @@ class VQCMarketClassifier:
         else:
             X_processed = X_scaled[:, :self.n_qubits]
 
-        X_normalized = MinMaxScaler().fit_transform(X_processed)
+        if hasattr(self, "_minmax_scaler") and self._minmax_scaler is not None:
+            X_normalized = self._minmax_scaler.transform(X_processed)
+        else:
+            X_normalized = MinMaxScaler().fit_transform(X_processed)
 
         if self.is_quantum and self.vqc is not None:
             try:

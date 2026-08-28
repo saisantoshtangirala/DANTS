@@ -3,6 +3,7 @@ LSTM-based sequence model for time-series prediction.
 Handles feature sequences and outputs probability distributions over actions.
 """
 
+import copy
 import numpy as np
 import pandas as pd
 import torch
@@ -279,7 +280,7 @@ class LSTMModel:
                     best_val_loss = avg_val_loss
                     patience_counter = 0
                     # Save best model
-                    self.best_state = self.model.state_dict().copy()
+                    self.best_state = copy.deepcopy(self.model.state_dict())
                 else:
                     patience_counter += 1
 
@@ -318,22 +319,29 @@ class LSTMModel:
 
         self.model.eval()
 
-        # Create sequences
+        n_sequences = len(X) - self.sequence_length
+        if n_sequences <= 0:
+            return np.ones((len(X), 3)) / 3.0
+
         sequences = []
-        for i in range(len(X) - self.sequence_length + 1):
+        for i in range(n_sequences):
             sequences.append(X[i:i + self.sequence_length])
 
-        if not sequences:
-            return np.zeros((len(X), 3))
+        X_seq = torch.FloatTensor(np.array(sequences))
 
-        X_seq = torch.FloatTensor(np.array(sequences)).to(self.device)
-
+        # Predict in batches to avoid GPU OOM
+        batch_size = self.batch_size
+        all_proba = []
         with torch.no_grad():
-            logits = self.model(X_seq)
-            probabilities = torch.softmax(logits, dim=1).cpu().numpy()
+            for start in range(0, len(X_seq), batch_size):
+                batch = X_seq[start:start + batch_size].to(self.device)
+                logits = self.model(batch)
+                proba = torch.softmax(logits, dim=1).cpu().numpy()
+                all_proba.append(proba)
 
-        # Pad beginning with neutral predictions
-        padding = np.ones((self.sequence_length - 1, 3)) / 3.0
+        probabilities = np.vstack(all_proba)
+
+        padding = np.ones((self.sequence_length, 3)) / 3.0
         probabilities = np.vstack([padding, probabilities])
 
         return probabilities

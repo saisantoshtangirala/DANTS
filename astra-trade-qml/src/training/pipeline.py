@@ -197,9 +197,15 @@ class TrainingPipeline:
         X = pooled[feature_cols].to_numpy()
         y = pooled["label"].to_numpy()
 
-        # Standardize features so cross-symbol absolute values don't dominate
+        # Split by date so all rows from the same trading day stay together,
+        # preventing cross-symbol temporal leakage at the boundary.
         from sklearn.preprocessing import StandardScaler
-        split = int(len(X) * 0.8)
+        if "date" in pooled.columns:
+            unique_dates = pooled["date"].unique()
+            split_date = unique_dates[int(len(unique_dates) * 0.8)]
+            split = int((pooled["date"] < split_date).sum())
+        else:
+            split = int(len(X) * 0.8)
         scaler = StandardScaler()
         X[:split] = scaler.fit_transform(X[:split])
         X[split:] = scaler.transform(X[split:])
@@ -242,9 +248,7 @@ class TrainingPipeline:
         return metrics
 
     def backtest_validation(self) -> Dict[str, Any]:
-        """Task: out-of-sample backtest of the freshly trained ensemble."""
-        validation_cfg = self.training_cfg.get("validation", {})
-        oos_pct = validation_cfg.get("out_of_sample_pct", 0.20)
+        """Task: out-of-sample backtest on a held-out 10% slice beyond the validation set."""
         initial_capital = self.config["trading"]["capital"]["initial"]
 
         results = {}
@@ -253,12 +257,18 @@ class TrainingPipeline:
                 continue
 
             feature_cols = self.feature_engineer.get_feature_columns(df)
-            split = int(len(df) * (1 - oos_pct))
-            oos = df.iloc[split:].reset_index(drop=True)
+            # Train uses 0-80%, val uses 80-90%, OOS backtest uses 90-100%
+            oos_start = int(len(df) * 0.9)
+            oos = df.iloc[oos_start:].reset_index(drop=True)
             if oos.empty:
                 continue
 
             X_oos = oos[feature_cols].to_numpy()
+
+            if hasattr(self, "_feature_scaler") and self._feature_scaler is not None:
+                X_oos = self._feature_scaler.transform(X_oos)
+                np.nan_to_num(X_oos, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+
             predicted_labels = self.model.predict(X_oos)
             confidence = self.model.get_signal_confidence(X_oos)
 

@@ -52,7 +52,8 @@ class NSEDataIngestion:
         if date is None:
             date = self._get_last_trading_day()
 
-        date_str = date.strftime("%Y/%b/cm%d%b%Ybhav.csv.zip")
+        mon = date.strftime("%b").upper()
+        date_str = f"{date.year}/{mon}/cm{date.strftime('%d')}{mon}{date.year}bhav.csv.zip"
         url = f"{self.BASE_URL}/{date_str}"
 
         try:
@@ -107,7 +108,8 @@ class NSEDataIngestion:
         if date is None:
             date = self._get_last_trading_day()
 
-        date_str = date.strftime("%Y/%b/fo%d%b%Ybhav.csv.zip")
+        mon = date.strftime("%b").upper()
+        date_str = f"{date.year}/{mon}/fo{date.strftime('%d')}{mon}{date.year}bhav.csv.zip"
         url = f"{self.FNO_URL}/{date_str}"
 
         try:
@@ -232,15 +234,24 @@ class NSEDataIngestion:
         return result
 
     def _get_last_trading_day(self) -> datetime:
-        """Get the most recent trading day."""
-        today = datetime.now()
-        if today.weekday() >= 5:  # Saturday or Sunday
-            days_back = today.weekday() - 4
-            return today - timedelta(days=days_back)
-        # Check if market has closed (after 15:30 IST)
-        if today.hour < 16:
-            return today - timedelta(days=1)
-        return today
+        """Get the most recent trading day (weekday)."""
+        try:
+            from zoneinfo import ZoneInfo
+            now = datetime.now(ZoneInfo("Asia/Kolkata"))
+        except Exception:
+            now = datetime.now()
+
+        # Before market close, use previous day as reference
+        if now.hour < 16:
+            day = now - timedelta(days=1)
+        else:
+            day = now
+
+        # Roll back to the most recent weekday
+        while day.weekday() >= 5:
+            day -= timedelta(days=1)
+
+        return day
 
 
 class YFinanceDataProvider:

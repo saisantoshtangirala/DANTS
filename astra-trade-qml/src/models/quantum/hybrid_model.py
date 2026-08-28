@@ -268,6 +268,7 @@ class HybridQMLModel:
             y = y[idx]
             print(f"  Subsampled to {max_meta_samples} samples for meta-learner", flush=True)
 
+        uniform = np.ones((len(X), 3)) / 3.0
         predictions = []
         model_names = []
 
@@ -288,8 +289,11 @@ class HybridQMLModel:
                 predictions.append(pred)
                 model_names.append(name)
                 print(f"  {name} predict_proba: {elapsed:.1f}s ({len(X)} samples)", flush=True)
+            else:
+                predictions.append(uniform.copy())
+                model_names.append(name)
 
-        if not predictions:
+        if not any(name for name in model_names):
             print("  No models available for meta-learner", flush=True)
             return
 
@@ -300,6 +304,7 @@ class HybridQMLModel:
         y_mapped = np.array([label_map.get(int(yi), 1) for yi in y])
 
         self.meta_learner.fit(X_meta, y_mapped)
+        self._meta_model_names = model_names
 
         self.sub_model_weights = {}
         for name, pred in zip(model_names, predictions):
@@ -347,8 +352,9 @@ class HybridQMLModel:
             predictions[name] = pred if pred is not None else uniform.copy()
 
         if method == "meta_learner" and self.meta_learner is not None:
-            # Stack all predictions for meta-learner
-            X_meta = np.hstack([predictions[name] for name in predictions])
+            meta_names = getattr(self, "_meta_model_names", list(predictions.keys()))
+            X_meta = np.hstack([predictions.get(name, uniform.copy()) for name in meta_names])
+            X_meta = np.where(np.isfinite(X_meta), X_meta, 1.0 / 3.0)
             return self.meta_learner.predict_proba(X_meta)
 
         elif method == "weighted_average":

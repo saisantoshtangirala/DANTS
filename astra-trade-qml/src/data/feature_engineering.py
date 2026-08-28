@@ -128,8 +128,8 @@ class FeatureEngineer:
         gain = delta.where(delta > 0, 0)
         loss = -delta.where(delta < 0, 0)
 
-        avg_gain = gain.rolling(self.config.rsi_period).mean()
-        avg_loss = loss.rolling(self.config.rsi_period).mean()
+        avg_gain = gain.ewm(alpha=1.0 / self.config.rsi_period, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1.0 / self.config.rsi_period, adjust=False).mean()
 
         rs = avg_gain / avg_loss
         df["rsi_14"] = 100 - (100 / (1 + rs))
@@ -185,11 +185,11 @@ class FeatureEngineer:
 
     def _add_adx(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add ADX (Average Directional Index) features."""
-        plus_dm = df["high"].diff()
-        minus_dm = -df["low"].diff()
+        plus_dm_raw = df["high"].diff()
+        minus_dm_raw = -df["low"].diff()
 
-        plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0)
-        minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0)
+        plus_dm = plus_dm_raw.where((plus_dm_raw > minus_dm_raw) & (plus_dm_raw > 0), 0)
+        minus_dm = minus_dm_raw.where((minus_dm_raw > plus_dm_raw) & (minus_dm_raw > 0), 0)
 
         atr = df["atr_14"]
 
@@ -298,8 +298,8 @@ class FeatureEngineer:
         # CCI (Commodity Channel Index)
         typical_price = (df["high"] + df["low"] + df["close"]) / 3
         tp_sma = typical_price.rolling(20).mean()
-        tp_std = typical_price.rolling(20).std()
-        df["cci"] = (typical_price - tp_sma) / (0.015 * tp_std)
+        tp_mad = typical_price.rolling(20).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
+        df["cci"] = (typical_price - tp_sma) / (0.015 * tp_mad)
 
         return df
 
@@ -326,11 +326,15 @@ class FeatureEngineer:
 
         future_return = df["close"].shift(-forward_periods) / df["close"] - 1
 
-        df["label"] = 0  # Hold
-        df.loc[future_return > profit_threshold, "label"] = 1   # Buy/Profit
-        df.loc[future_return < loss_threshold, "label"] = -1    # Sell/Loss
-
         df["future_return"] = future_return
+
+        # Rows where future_return is NaN (last forward_periods rows) have no
+        # ground truth — drop them so they don't bias training toward "hold".
+        df = df.dropna(subset=["future_return"]).reset_index(drop=True)
+
+        df["label"] = 0  # Hold
+        df.loc[df["future_return"] > profit_threshold, "label"] = 1   # Buy/Profit
+        df.loc[df["future_return"] < loss_threshold, "label"] = -1    # Sell/Loss
 
         return df
 

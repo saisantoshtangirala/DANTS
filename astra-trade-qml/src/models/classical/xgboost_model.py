@@ -124,10 +124,12 @@ class XGBoostMarketModel:
 
         self.model = xgb.XGBClassifier(**self.params)
 
-        eval_set = [(X_train, y_train_mapped)]
+        eval_set = []
         if X_val is not None and y_val is not None:
             y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
             eval_set.append((X_val, y_val_mapped))
+        else:
+            eval_set.append((X_train, y_train_mapped))
 
         self.model.fit(
             X_train,
@@ -243,8 +245,9 @@ class XGBoostMarketModel:
             X_train, X_val = X[train_idx], X[val_idx]
             y_train, y_val = y_mapped[train_idx], y_mapped[val_idx]
 
-            model = xgb.XGBClassifier(**self.params)
-            model.fit(X_train, y_train, verbose=False)
+            cv_params = {k: v for k, v in self.params.items() if k != "early_stopping_rounds"}
+            model = xgb.XGBClassifier(**cv_params)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
 
             pred = model.predict(X_val)
 
