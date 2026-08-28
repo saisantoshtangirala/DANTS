@@ -192,19 +192,19 @@ class DatabaseManager:
             Dictionary with performance metrics
         """
         query = """
-        SELECT 
+        SELECT
             COUNT(*) as total_trades,
             SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as winning_trades,
             SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END) as losing_trades,
             SUM(pnl) as total_pnl,
             AVG(pnl_pct) as avg_return_pct,
             AVG(confidence) as avg_confidence
-        FROM trades 
-        WHERE timestamp >= datetime('now', '-{} days')
+        FROM trades
+        WHERE timestamp >= datetime('now', '-' || CAST(:days AS TEXT) || ' days')
         AND status = 'CLOSED'
-        """.format(days)
+        """
 
-        df = pd.read_sql_query(query, self.engine)
+        df = pd.read_sql_query(query, self.engine, params={"days": int(days)})
 
         if df.empty or df["total_trades"].iloc[0] == 0:
             return {

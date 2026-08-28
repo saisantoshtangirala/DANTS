@@ -199,7 +199,8 @@ class QuantumKernelClassifier:
         # kernel matrix is O(n^2) quantum circuit evaluations)
         max_samples = min(len(X), 300)
         if len(X) > max_samples:
-            indices = np.random.choice(len(X), max_samples, replace=False)
+            rng = np.random.default_rng(42)
+            indices = rng.choice(len(X), max_samples, replace=False)
             X_sub = X[indices]
             y_sub = y[indices]
         else:
@@ -287,8 +288,9 @@ class QuantumKernelClassifier:
                     total = proba[:, 0] + hold_prob + proba[:, 1]
                     proba = np.column_stack([proba[:, 0] / total, hold_prob / total, proba[:, 1] / total])
                 return proba
-            except Exception:
-                pass
+            except Exception as e:
+                import warnings
+                warnings.warn(f"Quantum kernel predict_proba failed: {e}. Falling back to classical.")
 
         if self.classical_svm is not None:
             return self.classical_svm.predict_proba(X_processed)

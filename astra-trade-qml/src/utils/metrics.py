@@ -24,7 +24,7 @@ def calculate_sharpe_ratio(
     Returns:
         Annualized Sharpe ratio
     """
-    if returns.empty or returns.std() == 0:
+    if returns.empty or len(returns) < 2 or returns.std() == 0:
         return 0.0
 
     daily_rf = risk_free_rate / periods_per_year
@@ -94,8 +94,8 @@ def calculate_kelly_fraction(
     Returns:
         Recommended position size as fraction of capital
     """
-    if avg_loss == 0:
-        return fraction
+    if avg_loss <= 0:
+        return 0.0
 
     win_loss_ratio = avg_win / avg_loss
     kelly = (win_rate * win_loss_ratio - (1 - win_rate)) / win_loss_ratio
@@ -145,7 +145,7 @@ def calculate_calmar_ratio(
     max_dd, _, _ = calculate_max_drawdown(equity_curve)
 
     if max_dd == 0:
-        return 0.0
+        return float("inf") if annualized_return > 0 else 0.0
 
     return annualized_return / abs(max_dd)
 

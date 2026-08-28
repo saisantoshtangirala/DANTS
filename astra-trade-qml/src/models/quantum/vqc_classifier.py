@@ -257,7 +257,8 @@ class VQCMarketClassifier:
         # Subsample for faster quantum training
         max_samples = min(len(X), 300)
         if len(X) > max_samples:
-            indices = np.random.choice(len(X), max_samples, replace=False)
+            rng = np.random.default_rng(42)
+            indices = rng.choice(len(X), max_samples, replace=False)
             X_sub = X[indices]
             y_sub = y[indices]
         else:
@@ -352,13 +353,21 @@ class VQCMarketClassifier:
 
         if self.is_quantum and self.vqc is not None:
             try:
-                # SamplerQNN's output is a genuine per-class probability
-                # distribution (see _fit_quantum), so NeuralNetworkClassifier
-                # exposes real probabilities directly - no need to fake them
-                # from hard predictions.
-                return self.vqc.predict_proba(X_normalized)
-            except Exception:
-                pass
+                # NeuralNetworkClassifier exposes predict() but not
+                # predict_proba().  Convert hard predictions to one-hot
+                # probabilities (the SamplerQNN already produces
+                # distribution-quality outputs internally).
+                preds = self.vqc.predict(X_normalized)
+                n = len(X_normalized)
+                proba = np.ones((n, self.NUM_CLASSES)) * (0.1 / (self.NUM_CLASSES - 1))
+                for i, p in enumerate(preds):
+                    c = int(p) % self.NUM_CLASSES
+                    proba[i, c] = 0.9
+                row_sums = proba.sum(axis=1, keepdims=True)
+                proba /= row_sums
+                return proba
+            except Exception as e:
+                warnings.warn(f"VQC predict failed: {e}. Falling back to classical.")
 
         if self.classical_mlp is not None:
             return self.classical_mlp.predict_proba(X_processed)
@@ -417,7 +426,11 @@ class VQCMarketClassifier:
 
         import pickle
         with open(save_path / "preprocessor.pkl", "wb") as f:
-            pickle.dump({"scaler": self.scaler, "pca": self.pca}, f)
+            pickle.dump({
+                "scaler": self.scaler,
+                "pca": self.pca,
+                "minmax_scaler": getattr(self, "_minmax_scaler", None),
+            }, f)
 
         if not self.is_quantum and self.classical_mlp is not None:
             import joblib
@@ -443,6 +456,7 @@ class VQCMarketClassifier:
             preproc = pickle.load(f)
             self.scaler = preproc["scaler"]
             self.pca = preproc.get("pca")
+            self._minmax_scaler = preproc.get("minmax_scaler")
 
         if not self.is_quantum:
             import joblib

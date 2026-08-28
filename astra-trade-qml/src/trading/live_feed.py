@@ -11,6 +11,12 @@ history.
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
+try:
+    from zoneinfo import ZoneInfo
+    _IST = ZoneInfo("Asia/Kolkata")
+except Exception:
+    _IST = None
+
 import pandas as pd
 
 from src.data.nse_ingestion import KiteDataProvider
@@ -49,7 +55,7 @@ class KiteLiveFeed:
         if token is None:
             return pd.DataFrame()
 
-        to_date = datetime.now()
+        to_date = datetime.now(_IST) if _IST else datetime.now()
         from_date = to_date - timedelta(days=days)
         return self.kite.get_historical_data(token, from_date, to_date, interval=interval)
 

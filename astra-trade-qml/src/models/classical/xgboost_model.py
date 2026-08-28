@@ -124,20 +124,24 @@ class XGBoostMarketModel:
 
         self.model = xgb.XGBClassifier(**self.params)
 
-        eval_set = []
         if X_val is not None and y_val is not None:
             y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
-            eval_set.append((X_val, y_val_mapped))
+            self.model.fit(
+                X_train,
+                y_train_mapped,
+                eval_set=[(X_val, y_val_mapped)],
+                sample_weight=sample_weights,
+                verbose=False,
+            )
         else:
-            eval_set.append((X_train, y_train_mapped))
-
-        self.model.fit(
-            X_train,
-            y_train_mapped,
-            eval_set=eval_set,
-            sample_weight=sample_weights,
-            verbose=False,
-        )
+            no_es_params = {k: v for k, v in self.params.items() if k != "early_stopping_rounds"}
+            self.model = xgb.XGBClassifier(**no_es_params)
+            self.model.fit(
+                X_train,
+                y_train_mapped,
+                sample_weight=sample_weights,
+                verbose=False,
+            )
 
         # Calculate metrics
         train_pred = self.model.predict(X_train)
@@ -299,6 +303,8 @@ class XGBoostMarketModel:
         self.training_metrics = metadata.get("training_metrics", {})
         self.class_names = metadata.get("class_names", ["loss", "hold", "profit"])
 
-        # Load model
         self.model = xgb.XGBClassifier(**self.params)
         self.model.load_model(str(load_path / "xgboost_model.json"))
+        # Restore sklearn wrapper state so predict_proba works correctly
+        self.model.classes_ = np.array([0, 1, 2])
+        self.model.n_classes_ = 3

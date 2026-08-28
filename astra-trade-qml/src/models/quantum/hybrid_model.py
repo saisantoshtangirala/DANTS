@@ -233,23 +233,51 @@ class HybridQMLModel:
 
     @staticmethod
     def _predict_with_timeout(model, name: str, X: np.ndarray, timeout_seconds: int = 120) -> Optional[np.ndarray]:
-        """Run model.predict_proba with a wall-clock timeout via SIGALRM."""
-        def _alarm_handler(signum, frame):
-            raise TimeoutError(f"{name} predict_proba exceeded {timeout_seconds}s")
+        """Run model.predict_proba with a wall-clock timeout.
 
-        old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
-        signal.alarm(timeout_seconds)
-        try:
-            return model.predict_proba(X)
-        except TimeoutError:
-            print(f"  {name} predict_proba timed out after {timeout_seconds}s — skipping", flush=True)
-            return None
-        except Exception as e:
-            print(f"  {name} predict_proba failed: {e}", flush=True)
-            return None
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+        Uses SIGALRM when called from the main thread; falls back to a
+        threading-based timeout otherwise (SIGALRM can only be set from
+        the main thread).
+        """
+        import threading
+
+        if threading.current_thread() is threading.main_thread():
+            def _alarm_handler(signum, frame):
+                raise TimeoutError(f"{name} predict_proba exceeded {timeout_seconds}s")
+
+            old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+            signal.alarm(timeout_seconds)
+            try:
+                return model.predict_proba(X)
+            except TimeoutError:
+                print(f"  {name} predict_proba timed out after {timeout_seconds}s — skipping", flush=True)
+                return None
+            except Exception as e:
+                print(f"  {name} predict_proba failed: {e}", flush=True)
+                return None
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+        else:
+            result = [None]
+            exc = [None]
+
+            def _run():
+                try:
+                    result[0] = model.predict_proba(X)
+                except Exception as e:
+                    exc[0] = e
+
+            t = threading.Thread(target=_run, daemon=True)
+            t.start()
+            t.join(timeout=timeout_seconds)
+            if t.is_alive():
+                print(f"  {name} predict_proba timed out after {timeout_seconds}s — skipping", flush=True)
+                return None
+            if exc[0] is not None:
+                print(f"  {name} predict_proba failed: {exc[0]}", flush=True)
+                return None
+            return result[0]
 
     def _train_meta_learner(self, X: np.ndarray, y: np.ndarray) -> None:
         """
@@ -358,13 +386,17 @@ class HybridQMLModel:
             return self.meta_learner.predict_proba(X_meta)
 
         elif method == "weighted_average":
-            # Weighted average of all predictions
             weights = self.sub_model_weights or {name: 1.0 / len(predictions) for name in predictions}
 
             ensemble_proba = np.zeros((len(X), 3))
+            total_weight = 0.0
             for name, pred in predictions.items():
                 weight = weights.get(name, 1.0 / len(predictions))
                 ensemble_proba += weight * pred
+                total_weight += weight
+
+            if total_weight > 0:
+                ensemble_proba /= total_weight
 
             return ensemble_proba
 
@@ -442,7 +474,6 @@ class HybridQMLModel:
         save_path = Path(path)
         save_path.mkdir(parents=True, exist_ok=True)
 
-        # Save metadata
         metadata = {
             "model_version": self.model_version,
             "training_timestamp": self.training_timestamp,
@@ -451,6 +482,7 @@ class HybridQMLModel:
             "classical_weight": self.classical_weight,
             "quantum_weight": self.quantum_weight,
             "performance_history": self.performance_history,
+            "_meta_model_names": getattr(self, "_meta_model_names", None),
         }
 
         with open(save_path / "hybrid_metadata.json", "w") as f:
@@ -494,14 +526,21 @@ class HybridQMLModel:
         self.classical_weight = metadata["classical_weight"]
         self.quantum_weight = metadata["quantum_weight"]
         self.performance_history = metadata.get("performance_history", [])
+        self._meta_model_names = metadata.get("_meta_model_names")
 
         # Load meta-learner
         import joblib
         if (load_path / "meta_learner.pkl").exists():
             self.meta_learner = joblib.load(load_path / "meta_learner.pkl")
 
-        # Load sub-models (lazy - build then load)
-        self.build_models(input_size=50)  # Will be overridden on load
+        # LSTM saves its own input_size in lstm_config.json; read it to
+        # build all sub-models at the correct width before loading weights.
+        lstm_config_path = load_path / "lstm" / "lstm_config.json"
+        input_size = 50
+        if lstm_config_path.exists():
+            with open(lstm_config_path, "r") as f:
+                input_size = json.load(f).get("input_size", 50)
+        self.build_models(input_size=input_size)
 
         if (load_path / "lstm").exists():
             self.lstm_model.load(load_path / "lstm")

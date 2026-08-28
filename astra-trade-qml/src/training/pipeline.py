@@ -197,24 +197,27 @@ class TrainingPipeline:
         X = pooled[feature_cols].to_numpy()
         y = pooled["label"].to_numpy()
 
-        # Split by date so all rows from the same trading day stay together,
-        # preventing cross-symbol temporal leakage at the boundary.
+        # Three-way split: train 0-80%, val 80-90%, OOS 90-100%.
+        # Split by date so all rows from the same trading day stay together.
         from sklearn.preprocessing import StandardScaler
         if "date" in pooled.columns:
             unique_dates = pooled["date"].unique()
-            split_date = unique_dates[int(len(unique_dates) * 0.8)]
-            split = int((pooled["date"] < split_date).sum())
+            train_date = unique_dates[int(len(unique_dates) * 0.8)]
+            val_date = unique_dates[int(len(unique_dates) * 0.9)]
+            train_end = int((pooled["date"] < train_date).sum())
+            val_end = int((pooled["date"] < val_date).sum())
         else:
-            split = int(len(X) * 0.8)
+            train_end = int(len(X) * 0.8)
+            val_end = int(len(X) * 0.9)
         scaler = StandardScaler()
-        X[:split] = scaler.fit_transform(X[:split])
-        X[split:] = scaler.transform(X[split:])
+        X[:train_end] = scaler.fit_transform(X[:train_end])
+        X[train_end:] = scaler.transform(X[train_end:])
         self._feature_scaler = scaler
 
         # Zero-variance features produce NaN after scaling; replace with 0
         np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
-        return X[:split], y[:split], X[split:], y[split:], feature_cols
+        return X[:train_end], y[:train_end], X[train_end:val_end], y[train_end:val_end], feature_cols
 
     def classical_and_quantum_training(self) -> Dict[str, Any]:
         """

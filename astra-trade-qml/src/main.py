@@ -158,6 +158,7 @@ def run_paper(config: dict, logger) -> None:
 
             if market_open and not was_market_open:
                 engine.risk_manager.reset_daily()
+                engine.regime_detector.reset()
                 logger.info("daily_risk_state_reset")
 
             if not market_open and was_market_open:
