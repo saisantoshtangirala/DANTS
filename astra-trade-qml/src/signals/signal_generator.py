@@ -135,7 +135,7 @@ class SignalGenerator:
     ) -> float:
         """Fraction of sub-models whose top prediction matches the ensemble's."""
         if not sub_model_probabilities:
-            return 1.0
+            return 0.5
         agree = sum(
             1 for proba in sub_model_probabilities.values() if int(np.argmax(proba)) == class_idx
         )

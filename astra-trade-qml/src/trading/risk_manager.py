@@ -99,8 +99,8 @@ class RiskManager:
             else 0.0
         )
         daily_loss_pct = (
-            -self.state.daily_pnl / self.state.starting_capital
-            if self.state.starting_capital > 0
+            -self.state.daily_pnl / self.state.current_capital
+            if self.state.current_capital > 0
             else 0.0
         )
 
@@ -118,7 +118,7 @@ class RiskManager:
 
         return reason
 
-    def record_trade_result(self, pnl: float) -> None:
+    def record_trade_result(self, pnl: float, india_vix: Optional[float] = None) -> None:
         """Update running risk state after a trade closes, then re-check circuit breakers."""
         self.state.current_capital += pnl
         self.state.daily_pnl += pnl
@@ -129,7 +129,7 @@ class RiskManager:
         else:
             self.state.consecutive_losses = 0
 
-        self.check_circuit_breakers()
+        self.check_circuit_breakers(india_vix=india_vix)
 
     def consecutive_loss_size_multiplier(self) -> float:
         """Halve position sizing after `consecutive_loss_limit` losses in a row."""

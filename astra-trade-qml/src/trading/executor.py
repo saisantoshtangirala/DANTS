@@ -78,6 +78,10 @@ class TradingEngine:
         if not self.risk_manager.can_open_position():
             return signal
 
+        # Close any existing position for this symbol before opening a new one
+        if symbol in self.broker.open_positions:
+            self.close_symbol(symbol, price)
+
         regime_multiplier = self.regime_detector.position_size_multiplier(regime)
         size_pct = self.risk_manager.position_size(
             confidence=signal.confidence,
@@ -146,3 +150,47 @@ class TradingEngine:
                 )
 
         return pnl
+
+    def check_exits(
+        self,
+        prices: Dict[str, float],
+        profit_target_pct: float = 0.015,
+        stop_loss_pct: float = 0.008,
+        india_vix: Optional[float] = None,
+    ) -> None:
+        """Check stop-loss and take-profit for all open positions, closing any that hit."""
+        self.risk_manager.check_circuit_breakers(india_vix=india_vix)
+
+        for symbol in list(self.broker.open_positions.keys()):
+            pos = self.broker.open_positions[symbol]
+            price = prices.get(symbol)
+            if price is None:
+                continue
+
+            if pos.action == "BUY":
+                pnl_pct = (price - pos.entry_price) / pos.entry_price
+            else:
+                pnl_pct = (pos.entry_price - price) / pos.entry_price
+
+            if pnl_pct >= profit_target_pct or pnl_pct <= -stop_loss_pct:
+                reason = "take_profit" if pnl_pct >= profit_target_pct else "stop_loss"
+                if self.logger:
+                    log_trade_event(
+                        self.logger,
+                        event_type=reason.upper(),
+                        symbol=symbol,
+                        action="CLOSE",
+                        confidence=0.0,
+                        regime="",
+                        model_version="",
+                        quantum_depth=0,
+                        metadata={"exit_price": price, "pnl_pct": pnl_pct},
+                    )
+                self.close_symbol(symbol, price)
+
+    def close_all_positions(self, prices: Dict[str, float]) -> None:
+        """Close all open positions (end-of-day squaring)."""
+        for symbol in list(self.broker.open_positions.keys()):
+            price = prices.get(symbol)
+            if price is not None:
+                self.close_symbol(symbol, price)

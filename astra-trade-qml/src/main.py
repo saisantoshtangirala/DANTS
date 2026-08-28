@@ -139,6 +139,9 @@ def run_paper(config: dict, logger) -> None:
     symbols = config["data"]["symbols"]["focus_universe"]
     interval = config["data"]["timeframes"]["intraday"]
     poll_seconds = 300  # matches the 5-min intraday timeframe
+    signal_targets = config.get("signals", {}).get("targets", {}).get("intraday", {})
+    profit_target_pct = signal_targets.get("profit_target_pct", 0.015)
+    stop_loss_pct = signal_targets.get("stop_loss_pct", 0.008)
 
     logger.info(
         "paper_trading_started",
@@ -147,10 +150,46 @@ def run_paper(config: dict, logger) -> None:
         starting_capital=engine.risk_manager.state.starting_capital,
     )
 
+    was_market_open = False
+
     try:
         while True:
-            if is_market_open(config["trading"]["schedule"], timezone=config["project"]["timezone"]):
+            market_open = is_market_open(config["trading"]["schedule"], timezone=config["project"]["timezone"])
+
+            if market_open and not was_market_open:
+                engine.risk_manager.reset_daily()
+                logger.info("daily_risk_state_reset")
+
+            if not market_open and was_market_open:
+                # EOD: close all open positions
+                prices = {}
+                for symbol in symbols:
+                    try:
+                        ohlcv = live_feed.get_recent_ohlcv(symbol, interval=interval)
+                        if not ohlcv.empty:
+                            prices[symbol] = float(ohlcv["close"].iloc[-1])
+                    except Exception:
+                        pass
+                engine.close_all_positions(prices)
+                logger.info("eod_positions_closed", count=len(prices))
+
+            was_market_open = market_open
+
+            if market_open:
                 indicators = live_feed.get_regime_indicators()
+                india_vix = indicators.get("india_vix")
+
+                # Check exits (stop-loss / take-profit / VIX breaker) first
+                prices = {}
+                for symbol in symbols:
+                    try:
+                        ohlcv = live_feed.get_recent_ohlcv(symbol, interval=interval)
+                        if not ohlcv.empty:
+                            prices[symbol] = float(ohlcv["close"].iloc[-1])
+                    except Exception:
+                        pass
+                engine.check_exits(prices, profit_target_pct, stop_loss_pct, india_vix)
+
                 for symbol in symbols:
                     try:
                         _process_symbol_cycle(
@@ -183,6 +222,19 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
     class_probabilities = model.predict_proba(X)[0]
     price = float(ohlcv["close"].iloc[-1])
 
+    sub_model_probs = {}
+    for name, sub_model in [
+        ("lstm", model.lstm_model),
+        ("xgboost", model.xgb_model),
+        ("qkernel", model.qkernel_model),
+        ("vqc", model.vqc_model),
+    ]:
+        if sub_model is not None:
+            try:
+                sub_model_probs[name] = sub_model.predict_proba(X)[0]
+            except Exception:
+                pass
+
     engine.process_symbol(
         symbol=symbol,
         class_probabilities=class_probabilities,
@@ -190,6 +242,7 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
         indicators=indicators,
         model_version=model.model_version,
         quantum_depth=model.get_quantum_metrics().get("vqc_depth", 0),
+        sub_model_probabilities=sub_model_probs if sub_model_probs else None,
     )
 
 
