@@ -115,8 +115,12 @@ if [ -n "${{SSH_PUBLIC_KEY:-}}" ]; then
     echo "$SSH_PUBLIC_KEY" >> ~/.ssh/authorized_keys
     chmod 700 ~/.ssh
     chmod 600 ~/.ssh/authorized_keys
-    /usr/sbin/sshd 2>/dev/null || service ssh start 2>/dev/null || true
-    echo "sshd started for log streaming"
+    ssh-keygen -A 2>&1 || true
+    if [ -f /etc/ssh/sshd_config ]; then
+        sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+        sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+    fi
+    /usr/sbin/sshd && echo "sshd started for log streaming" || echo "WARNING: sshd failed to start"
 fi
 
 mkdir -p /workspace
@@ -281,6 +285,27 @@ def _ssh_probe(host: str, port: int, ssh_key_path: str) -> bool:
         return False
 
 
+def _parse_ssh_port(port_mappings) -> int | None:
+    """Extract the host-side SSH port from RunPod's portMappings field."""
+    if not port_mappings:
+        return None
+    if isinstance(port_mappings, list):
+        for pm in port_mappings:
+            if isinstance(pm, dict):
+                if pm.get("containerPort") == 22 or pm.get("privatePort") == 22:
+                    return pm.get("hostPort") or pm.get("publicPort")
+            elif isinstance(pm, str) and "22/tcp" in pm:
+                match = re.search(r":(\d+)$", pm)
+                if match:
+                    return int(match.group(1))
+    elif isinstance(port_mappings, dict):
+        if "22" in port_mappings:
+            return port_mappings["22"]
+        if "22/tcp" in port_mappings:
+            return port_mappings["22/tcp"]
+    return None
+
+
 def wait_for_pod_boot(
     api_key: str, pod_id: str, boot_timeout_seconds: int, poll_interval: int = 15,
     ssh_key_path: str = "",
@@ -289,15 +314,20 @@ def wait_for_pod_boot(
     Wait for the pod's container to start and become SSH-reachable.
 
     Polls the REST API for publicIp + portMappings (exposed by the
-    ``"ports": ["22/tcp"]`` flag in the create payload). Once those
-    appear, probes sshd with a short retry loop to confirm the daemon
-    is ready, then returns ``{"host": ip, "port": mapped_port}``.
+    ``"ports": ["22/tcp"]`` flag in the create payload). The port
+    mapping typically appears long before the container actually
+    starts (while the image is still pulling), so the SSH probe runs
+    on every poll cycle until sshd responds or the boot timeout
+    expires.
 
-    Returns None on boot failure (pod vanished too early, timed out,
-    or desiredStatus=EXITED before SSH details appeared).
+    Returns ``{"host": ip, "port": mapped_port}`` on success, or
+    None on boot failure.
     """
     start = time.time()
     _logged_api_response = False
+    _logged_port_mappings = False
+    ssh_host = ""
+    ssh_port = 0
     while True:
         elapsed = time.time() - start
         status = get_pod_status(api_key, pod_id)
@@ -305,7 +335,7 @@ def wait_for_pod_boot(
         if status is None:
             if elapsed > 90:
                 print(f"Pod {pod_id} vanished after {elapsed:.0f}s — likely completed its start command")
-                return {"host": "", "port": 0}
+                return {"host": ssh_host, "port": ssh_port}
             print(f"Pod {pod_id} vanished before booting (elapsed={elapsed:.0f}s) - launch failure")
             return None
 
@@ -316,49 +346,39 @@ def wait_for_pod_boot(
         if not _logged_api_response:
             _logged_api_response = True
             print(f"Pod {pod_id} API response keys: {sorted(status.keys())}", flush=True)
-            if port_mappings:
-                print(f"Pod {pod_id} portMappings (raw): {port_mappings!r}", flush=True)
 
-        ssh_port = None
-        if port_mappings:
-            if isinstance(port_mappings, list):
-                for pm in port_mappings:
-                    if isinstance(pm, dict):
-                        if pm.get("containerPort") == 22 or pm.get("privatePort") == 22:
-                            ssh_port = pm.get("hostPort") or pm.get("publicPort")
-                            break
-                    elif isinstance(pm, str) and "22/tcp" in pm:
-                        match = re.search(r":(\d+)$", pm)
-                        if match:
-                            ssh_port = int(match.group(1))
-                            break
-            elif isinstance(port_mappings, dict):
-                if "22" in port_mappings:
-                    ssh_port = port_mappings["22"]
-                elif "22/tcp" in port_mappings:
-                    ssh_port = port_mappings["22/tcp"]
+        if port_mappings and not _logged_port_mappings:
+            _logged_port_mappings = True
+            print(f"Pod {pod_id} portMappings (raw): {port_mappings!r}", flush=True)
+
+        if public_ip and port_mappings and not ssh_host:
+            parsed_port = _parse_ssh_port(port_mappings)
+            if parsed_port:
+                ssh_host = public_ip
+                ssh_port = int(parsed_port)
+                print(f"Pod {pod_id}: SSH endpoint discovered: {ssh_host}:{ssh_port}", flush=True)
 
         print(
             f"Pod {pod_id} boot check: elapsed={elapsed:.0f}s desiredStatus={desired_status} "
-            f"publicIp={public_ip!r} sshPort={ssh_port!r}"
+            f"publicIp={public_ip!r} sshPort={ssh_port or None!r}"
         , flush=True)
 
         if desired_status == "EXITED":
             print(f"Pod {pod_id} already exited after {elapsed:.0f}s — it booted and completed")
-            return {"host": "", "port": 0}
+            return {"host": ssh_host, "port": ssh_port}
 
-        if public_ip and ssh_port:
-            print(f"Pod {pod_id}: publicIp={public_ip} sshPort={ssh_port} — waiting for sshd...", flush=True)
-            for sshd_attempt in range(1, 13):
-                if _ssh_probe(public_ip, int(ssh_port), ssh_key_path):
-                    print(f"Pod {pod_id} booted and SSH-reachable after {time.time() - start:.0f}s")
-                    return {"host": public_ip, "port": int(ssh_port)}
-                print(f"  sshd not ready yet (attempt {sshd_attempt}/12), retrying in 10s...")
-                time.sleep(10)
-            print(f"Pod {pod_id}: sshd never became reachable at {public_ip}:{ssh_port}")
-            return {"host": public_ip, "port": int(ssh_port)}
+        if ssh_host and ssh_port and ssh_key_path:
+            if _ssh_probe(ssh_host, ssh_port, ssh_key_path):
+                print(f"Pod {pod_id} booted and SSH-reachable after {elapsed:.0f}s")
+                return {"host": ssh_host, "port": ssh_port}
 
         if elapsed > boot_timeout_seconds:
+            if ssh_host:
+                print(
+                    f"Pod {pod_id}: boot timeout after {elapsed:.0f}s — sshd never responded at "
+                    f"{ssh_host}:{ssh_port}, returning endpoint anyway for streamer retries"
+                )
+                return {"host": ssh_host, "port": ssh_port}
             print(f"Pod {pod_id} did not boot within {boot_timeout_seconds}s - treating as a launch failure")
             return None
 
@@ -408,7 +428,7 @@ class SSHLogStreamer:
             tail_cmd,
         ]
 
-        max_retries = 5
+        max_retries = 20
         for attempt in range(1, max_retries + 1):
             if self._stop.is_set():
                 return
@@ -437,7 +457,7 @@ class SSHLogStreamer:
                 print(f"SSH log stream: error ({e})", flush=True)
 
             if attempt < max_retries and not self._stop.is_set():
-                wait = 10 * attempt
+                wait = min(30, 10 * attempt)
                 print(f"SSH log stream: retrying in {wait}s...", flush=True)
                 self._stop.wait(wait)
 
