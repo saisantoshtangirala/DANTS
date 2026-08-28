@@ -596,6 +596,22 @@ def main() -> None:
             ssh_key_path = ssh_key_tmpfile.name
             print(f"SSH log streaming: key loaded from RUNPOD_SSH_KEY env var ({ssh_key_path})")
 
+    # Derive public key from private key to inject into pod via SSH_PUBLIC_KEY
+    ssh_public_key = ""
+    if ssh_key_path:
+        try:
+            result = subprocess.run(
+                ["ssh-keygen", "-y", "-f", ssh_key_path],
+                capture_output=True, timeout=5,
+            )
+            if result.returncode == 0:
+                ssh_public_key = result.stdout.decode().strip()
+                print(f"SSH log streaming: derived public key ({ssh_public_key[:30]}...)")
+            else:
+                print(f"SSH log streaming: could not derive public key: {result.stderr.decode().strip()}")
+        except Exception as e:
+            print(f"SSH log streaming: could not derive public key: {e}")
+
     if not ssh_key_path:
         print("Note: no SSH key provided — pod logs will not be streamed to this terminal. "
               "Set RUNPOD_SSH_KEY or pass --ssh-key-file to enable.")
@@ -606,6 +622,8 @@ def main() -> None:
         "RUNPOD_API_KEY": runpod_key,
         "GH_TOKEN": gh_token,
     }
+    if ssh_public_key:
+        pod_env["SSH_PUBLIC_KEY"] = ssh_public_key
     for kite_var in ["KITE_API_KEY", "KITE_API_SECRET", "KITE_USER_ID", "KITE_PASSWORD", "KITE_TOTP_SECRET"]:
         if os.environ.get(kite_var):
             pod_env[kite_var] = os.environ[kite_var]
