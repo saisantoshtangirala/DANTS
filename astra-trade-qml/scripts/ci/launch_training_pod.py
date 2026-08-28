@@ -136,10 +136,12 @@ touch "$LOG_FILE"
 # crash messages — not just training output.
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-echo "=== GPU diagnostics ==="
+echo "=== GPU diagnostics (pre-install) ==="
 nvidia-smi || echo "WARNING: nvidia-smi failed"
 ldconfig 2>/dev/null || true
-python3 -c "import torch; torch.cuda.init(); print(f'CUDA available: {{torch.cuda.is_available()}}, device: {{torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}}')" || echo "WARNING: CUDA init check failed"
+# Do NOT call torch.cuda.init() here — pip install below may change
+# CUDA libraries, corrupting an already-initialized CUDA context and
+# causing "CUDA unknown error" for the entire rest of the process.
 
 set +x  # hide token from trace
 git clone --branch {branch} --single-branch "https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git" repo
@@ -148,9 +150,11 @@ cd repo/astra-trade-qml
 
 pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
 
-# Verify CUDA after pip install (packages can affect torch's CUDA detection)
+# First CUDA init happens here, AFTER pip install — safe to initialize.
+echo "=== GPU diagnostics (post-install) ==="
 python3 -c "
 import torch
+torch.cuda.init()
 print(f'PyTorch {{torch.__version__}}, CUDA available: {{torch.cuda.is_available()}}')
 if torch.cuda.is_available():
     print(f'GPU: {{torch.cuda.get_device_name(0)}}, VRAM: {{torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}} GB')
@@ -551,26 +555,18 @@ def launch_and_wait(
     normally within its timeout.
     """
     global _active_pod
-    cloud_types = [cloud_type]
-    if cloud_type == "SECURE":
-        cloud_types.append("COMMUNITY")
 
     for attempt in range(1, max_launch_attempts + 1):
-        for ct in cloud_types:
-            try:
-                pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=ct)
-                break
-            except RuntimeError as e:
-                print(f"Launch attempt {attempt}/{max_launch_attempts}: create_pod failed on {ct} cloud ({e})")
-                continue
-        else:
-            print(f"Launch attempt {attempt}/{max_launch_attempts}: no instances available on any cloud type")
+        try:
+            pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud_type)
+        except RuntimeError as e:
+            print(f"Launch attempt {attempt}/{max_launch_attempts}: create_pod failed on {cloud_type} cloud ({e})")
             continue
 
         pod_id = pod["id"]
         _active_pod = {"api_key": api_key, "pod_id": pod_id}
         print(
-            f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} on {ct} cloud "
+            f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} on {cloud_type} cloud "
             f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
         )
 
