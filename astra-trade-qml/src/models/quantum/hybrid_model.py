@@ -9,6 +9,7 @@ from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
 import json
 import time as _time
+import signal
 from datetime import datetime
 
 from sklearn.linear_model import LogisticRegression
@@ -230,6 +231,26 @@ class HybridQMLModel:
 
         return metrics
 
+    @staticmethod
+    def _predict_with_timeout(model, name: str, X: np.ndarray, timeout_seconds: int = 120) -> Optional[np.ndarray]:
+        """Run model.predict_proba with a wall-clock timeout via SIGALRM."""
+        def _alarm_handler(signum, frame):
+            raise TimeoutError(f"{name} predict_proba exceeded {timeout_seconds}s")
+
+        old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+        signal.alarm(timeout_seconds)
+        try:
+            return model.predict_proba(X)
+        except TimeoutError:
+            print(f"  {name} predict_proba timed out after {timeout_seconds}s — skipping", flush=True)
+            return None
+        except Exception as e:
+            print(f"  {name} predict_proba failed: {e}", flush=True)
+            return None
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+
     def _train_meta_learner(self, X: np.ndarray, y: np.ndarray) -> None:
         """
         Train meta-learner using sub-model predictions.
@@ -238,67 +259,54 @@ class HybridQMLModel:
             X: Features
             y: Labels
         """
-        # Collect predictions from all trained models
+        max_meta_samples = 300
+        if len(X) > max_meta_samples:
+            rng = np.random.default_rng(42)
+            idx = rng.choice(len(X), size=max_meta_samples, replace=False)
+            idx.sort()
+            X = X[idx]
+            y = y[idx]
+            print(f"  Subsampled to {max_meta_samples} samples for meta-learner", flush=True)
+
         predictions = []
         model_names = []
 
-        if self.lstm_model is not None:
-            try:
-                pred = self.lstm_model.predict_proba(X)
-                predictions.append(pred)
-                model_names.append("lstm")
-            except Exception:
-                pass
+        models = [
+            ("lstm", self.lstm_model, 60),
+            ("xgboost", self.xgb_model, 60),
+            ("qkernel", self.qkernel_model, 180),
+            ("vqc", self.vqc_model, 180),
+        ]
 
-        if self.xgb_model is not None:
-            try:
-                pred = self.xgb_model.predict_proba(X)
+        for name, model, timeout in models:
+            if model is None:
+                continue
+            t0 = _time.monotonic()
+            pred = self._predict_with_timeout(model, name, X, timeout_seconds=timeout)
+            elapsed = _time.monotonic() - t0
+            if pred is not None:
                 predictions.append(pred)
-                model_names.append("xgboost")
-            except Exception:
-                pass
-
-        if self.qkernel_model is not None:
-            try:
-                pred = self.qkernel_model.predict_proba(X)
-                predictions.append(pred)
-                model_names.append("qkernel")
-            except Exception:
-                pass
-
-        if self.vqc_model is not None:
-            try:
-                pred = self.vqc_model.predict_proba(X)
-                predictions.append(pred)
-                model_names.append("vqc")
-            except Exception:
-                pass
+                model_names.append(name)
+                print(f"  {name} predict_proba: {elapsed:.1f}s ({len(X)} samples)", flush=True)
 
         if not predictions:
             print("  No models available for meta-learner", flush=True)
             return
 
-        # Stack predictions horizontally
         X_meta = np.hstack(predictions)
-
-        # Replace any inf/NaN from failed sub-models with uniform priors
         X_meta = np.where(np.isfinite(X_meta), X_meta, 1.0 / 3.0)
 
-        # Map labels
         label_map = {-1: 0, 0: 1, 1: 2}
         y_mapped = np.array([label_map.get(int(yi), 1) for yi in y])
 
-        # Train meta-learner
         self.meta_learner.fit(X_meta, y_mapped)
 
-        # Calculate ensemble weights based on validation performance
         self.sub_model_weights = {}
         for name, pred in zip(model_names, predictions):
             pred_labels = np.argmax(pred, axis=1)
             acc = accuracy_score(y_mapped, pred_labels)
             self.sub_model_weights[name] = max(0.1, acc)
 
-        # Normalize weights
         total_weight = sum(self.sub_model_weights.values())
         self.sub_model_weights = {k: v / total_weight for k, v in self.sub_model_weights.items()}
 
@@ -322,35 +330,21 @@ class HybridQMLModel:
         if not self.is_trained:
             return np.ones((len(X), 3)) / 3.0
 
+        uniform = np.ones((len(X), 3)) / 3.0
         predictions = {}
 
-        # LSTM predictions
-        if self.lstm_model is not None:
-            try:
-                predictions["lstm"] = self.lstm_model.predict_proba(X)
-            except Exception:
-                predictions["lstm"] = np.ones((len(X), 3)) / 3.0
+        models = [
+            ("lstm", self.lstm_model, 60),
+            ("xgboost", self.xgb_model, 60),
+            ("qkernel", self.qkernel_model, 300),
+            ("vqc", self.vqc_model, 300),
+        ]
 
-        # XGBoost predictions
-        if self.xgb_model is not None:
-            try:
-                predictions["xgboost"] = self.xgb_model.predict_proba(X)
-            except Exception:
-                predictions["xgboost"] = np.ones((len(X), 3)) / 3.0
-
-        # Quantum Kernel predictions
-        if self.qkernel_model is not None:
-            try:
-                predictions["qkernel"] = self.qkernel_model.predict_proba(X)
-            except Exception:
-                predictions["qkernel"] = np.ones((len(X), 3)) / 3.0
-
-        # VQC predictions
-        if self.vqc_model is not None:
-            try:
-                predictions["vqc"] = self.vqc_model.predict_proba(X)
-            except Exception:
-                predictions["vqc"] = np.ones((len(X), 3)) / 3.0
+        for name, model, timeout in models:
+            if model is None:
+                continue
+            pred = self._predict_with_timeout(model, name, X, timeout_seconds=timeout)
+            predictions[name] = pred if pred is not None else uniform.copy()
 
         if method == "meta_learner" and self.meta_learner is not None:
             # Stack all predictions for meta-learner
