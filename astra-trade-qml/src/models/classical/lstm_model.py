@@ -157,7 +157,7 @@ class LSTMModel:
             input_size=self.input_size,
             hidden_size=self.hidden_size,
             num_layers=self.num_layers,
-            num_classes=3,
+            num_classes=2,
             dropout=self.dropout,
         ).to(self.device)
 

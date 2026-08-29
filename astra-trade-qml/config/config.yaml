@@ -62,7 +62,7 @@ models:
       n_estimators: 200
       subsample: 0.8
       colsample_bytree: 0.8
-      objective: "multi:softprob"
+      objective: "binary:logistic"
 
   quantum:
     backend: "qiskit"               # qiskit | pennylane

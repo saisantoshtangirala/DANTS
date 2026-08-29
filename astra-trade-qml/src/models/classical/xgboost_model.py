@@ -32,10 +32,9 @@ class XGBoostMarketModel:
         gamma: float = 0.1,
         reg_alpha: float = 0.1,
         reg_lambda: float = 1.0,
-        objective: str = "multi:softprob",
-        num_class: int = 2,
+        objective: str = "binary:logistic",
         early_stopping_rounds: int = 20,
-        eval_metric: str = "mlogloss",
+        eval_metric: str = "logloss",
         random_state: int = 42,
     ):
         """
@@ -52,7 +51,6 @@ class XGBoostMarketModel:
             reg_alpha: L1 regularization
             reg_lambda: L2 regularization
             objective: XGBoost objective function
-            num_class: Number of classes (3: loss, hold, profit)
             early_stopping_rounds: Rounds to wait before stopping
             eval_metric: Evaluation metric
             random_state: Random seed
@@ -68,7 +66,6 @@ class XGBoostMarketModel:
             "reg_alpha": reg_alpha,
             "reg_lambda": reg_lambda,
             "objective": objective,
-            "num_class": num_class,
             "eval_metric": eval_metric,
             "random_state": random_state,
             "n_jobs": -1,
