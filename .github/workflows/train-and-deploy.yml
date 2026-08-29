@@ -36,6 +36,18 @@ on:
     # default branch to 'master' so these cron runs pick up the latest code.
     - cron: "0 11 * * 1-5"
 
+# launch_training_pod.py creates the RunPod pod under a fixed name
+# ("astra-trade-qml-training"), not one unique per run - two runs firing
+# close together (e.g. a push landing right as someone triggers
+# workflow_dispatch) collide on that name and can knock each other's pod
+# out from under them. Serialize instead of parallelizing: queue the new
+# run behind whichever is already in flight rather than cancelling it -
+# a half-finished training run silently producing no model is worse than
+# a few extra minutes of queue time.
+concurrency:
+  group: train-and-deploy
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
