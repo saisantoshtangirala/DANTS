@@ -309,3 +309,77 @@ def test_check_training_exit_code_returns_none_when_marker_missing():
     with patch("launch_training_pod.requests.get") as mock_get:
         mock_get.return_value = MagicMock(status_code=404, text="Not Found")
         assert ltp.check_training_exit_code("owner/repo", "main", "token") is None
+
+
+def test_check_fresh_completion_marker_detects_marker_after_since():
+    from datetime import datetime, timezone
+    since = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with patch("launch_training_pod.requests.get") as mock_get:
+        mock_get.return_value = MagicMock(
+            status_code=200, text="exit=0\nfinished_at=2026-01-01T00:30:00Z\n",
+        )
+        result = ltp.check_fresh_completion_marker("owner/repo", "token", since)
+
+    assert result == datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)
+
+
+def test_check_fresh_completion_marker_ignores_stale_marker():
+    """A marker left over from a previous run (finished before this pod
+    even launched) must not be mistaken for the current pod completing."""
+    from datetime import datetime, timezone
+    since = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)  # pod launched at 1am
+    with patch("launch_training_pod.requests.get") as mock_get:
+        mock_get.return_value = MagicMock(
+            status_code=200, text="exit=0\nfinished_at=2026-01-01T00:30:00Z\n",  # marker from before launch
+        )
+        result = ltp.check_fresh_completion_marker("owner/repo", "token", since)
+
+    assert result is None
+
+
+def test_check_fresh_completion_marker_returns_none_when_marker_missing():
+    with patch("launch_training_pod.requests.get") as mock_get:
+        mock_get.return_value = MagicMock(status_code=404, text="Not Found")
+        from datetime import datetime, timezone
+        result = ltp.check_fresh_completion_marker("owner/repo", "token", datetime.now(timezone.utc))
+
+    assert result is None
+
+
+def test_poll_until_terminated_force_terminates_on_fresh_git_marker():
+    """
+    Regression test for the real failure this was built for: a pod's
+    self-DELETE call can succeed from RunPod's API perspective while the
+    underlying pod resource never tears down, leaving desiredStatus
+    stuck at RUNNING forever even though training finished and pushed
+    its results. The git marker must be treated as authoritative and
+    force-terminate the pod rather than waiting on status forever.
+    """
+    from datetime import datetime, timezone
+    launched_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with patch("launch_training_pod.get_pod_status", return_value={"desiredStatus": "RUNNING"}), \
+         patch("launch_training_pod.check_fresh_completion_marker",
+               return_value=datetime(2026, 1, 1, 0, 5, tzinfo=timezone.utc)), \
+         patch("launch_training_pod.terminate_pod") as mock_terminate, \
+         patch("launch_training_pod.time.sleep"), \
+         patch("launch_training_pod.time.time", side_effect=[0, 61]):
+        result = ltp.poll_until_terminated(
+            "key", "pod123", timeout_seconds=1000, poll_interval=0,
+            repo="owner/repo", gh_token="token", launched_at=launched_at,
+        )
+
+    assert result is True
+    mock_terminate.assert_called_once_with("key", "pod123")
+
+
+def test_poll_until_terminated_ignores_git_marker_when_repo_not_given():
+    """Without repo/gh_token, the git-marker fallback must not be consulted
+    at all (e.g. call sites that don't have GH_TOKEN available)."""
+    with patch("launch_training_pod.get_pod_status") as mock_status, \
+         patch("launch_training_pod.check_fresh_completion_marker") as mock_marker, \
+         patch("launch_training_pod.time.sleep"):
+        mock_status.side_effect = [{"desiredStatus": "RUNNING"}, None]
+        result = ltp.poll_until_terminated("key", "pod123", timeout_seconds=1000, poll_interval=0)
+
+    assert result is True
+    mock_marker.assert_not_called()

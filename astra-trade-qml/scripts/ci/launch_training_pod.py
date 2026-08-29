@@ -62,6 +62,7 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import datetime, timezone
 
 import requests
 
@@ -530,17 +531,26 @@ class SSHLogStreamer:
 def poll_until_terminated(
     api_key: str, pod_id: str, timeout_seconds: int, poll_interval: int = 30,
     ssh_key_path: str = "", ssh_host: str = "", ssh_port: int = 0,
+    repo: str = "", gh_token: str = "", launched_at: "datetime | None" = None,
 ) -> bool:
-    """Returns True if the pod self-terminated normally, False if force-stopped on timeout."""
+    """Returns True if the pod finished (self-terminated, or we detected
+    completion via git and force-terminated it ourselves), False if
+    force-stopped on timeout without ever finishing."""
     streamer = None
     if ssh_key_path and ssh_host and ssh_port:
         streamer = SSHLogStreamer(ssh_host, ssh_port, ssh_key_path)
         streamer.start()
 
+    check_git_marker = bool(repo and gh_token and launched_at is not None)
+    marker_check_interval = 60  # git-marker polling doesn't need every 30s cycle
+    last_marker_check = 0.0
+
     try:
         start = time.time()
         while True:
             elapsed = time.time() - start
+
+            # Primary signal: the pod's own self-DELETE / status change.
             status = get_pod_status(api_key, pod_id)
 
             if status is None:
@@ -552,6 +562,28 @@ def poll_until_terminated(
                 print(f"Pod {pod_id} exited after {elapsed:.0f}s — cleaning up")
                 terminate_pod(api_key, pod_id)
                 return True
+
+            # Secondary, independent signal: the pod already pushed its
+            # results and a completion marker to model-artifacts. A
+            # pod's self-DELETE call is "curl ... || true" - it can
+            # succeed from RunPod's API perspective while the underlying
+            # pod resource never actually tears down, which would
+            # otherwise strand this loop waiting forever on a pod that
+            # has nothing left to do. Git has pushed reliably every time
+            # this session, so trust it and terminate the pod ourselves
+            # rather than wait on a self-termination that may never land.
+            if check_git_marker and elapsed - last_marker_check >= marker_check_interval:
+                last_marker_check = elapsed
+                finished_at = check_fresh_completion_marker(repo, gh_token, launched_at)
+                if finished_at is not None:
+                    print(
+                        f"Pod {pod_id}: training finished at {finished_at.isoformat()} per "
+                        f"model-artifacts (self-termination hasn't taken effect after {elapsed:.0f}s) "
+                        f"— force-terminating now",
+                        flush=True,
+                    )
+                    terminate_pod(api_key, pod_id)
+                    return True
 
             if elapsed > timeout_seconds:
                 print(f"Timeout after {elapsed:.0f}s - force-stopping pod {pod_id}")
@@ -582,14 +614,22 @@ def launch_and_wait(
     max_launch_attempts: int = 3,
     cloud_type: str = "SECURE",
     ssh_key_path: str = "",
+    repo: str = "",
+    gh_token: str = "",
 ) -> bool:
     """
     Create a pod and wait for it to boot; if it never boots (a
     launch-time/host-side failure), discard it and retry on a fresh pod
     up to max_launch_attempts times. Once a pod boots, hand off to
     poll_until_terminated for the (much longer) training-completion wait.
-    Returns True only if a pod both booted and self-terminated
-    normally within its timeout.
+    Returns True only if a pod both booted and completed (self-terminated,
+    or was force-terminated once we detected it had finished via git)
+    within its timeout.
+
+    repo/gh_token, when given, let poll_until_terminated cross-check
+    completion against the model-artifacts branch instead of relying
+    solely on the pod's own (unreliable - see check_fresh_completion_marker)
+    self-termination.
     """
     global _active_pod
 
@@ -602,6 +642,7 @@ def launch_and_wait(
 
         pod_id = pod["id"]
         _active_pod = {"api_key": api_key, "pod_id": pod_id}
+        launched_at = datetime.now(timezone.utc)
         print(
             f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} on {cloud_type} cloud "
             f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
@@ -614,6 +655,7 @@ def launch_and_wait(
                 ssh_key_path=ssh_key_path,
                 ssh_host=boot_info.get("host", ""),
                 ssh_port=boot_info.get("port", 0),
+                repo=repo, gh_token=gh_token, launched_at=launched_at,
             )
             _active_pod = None
             return result
@@ -626,18 +668,15 @@ def launch_and_wait(
     return False
 
 
-def check_training_exit_code(repo: str, branch: str, gh_token: str) -> "int | None":
+def _fetch_last_run_status_text(repo: str, gh_token: str) -> "str | None":
+    """Fetch logs/last_run_status.txt's raw content from the
+    model-artifacts branch via the GitHub Contents API, or None if it's
+    missing/unreachable.
+
+    The Contents API (not raw.githubusercontent.com, which doesn't
+    reliably authenticate against private repos) with the raw media type
+    returns the file body directly.
     """
-    Read back logs/last_run_status.txt from the model-artifacts branch
-    the pod just pushed, and return the training process's own exit
-    code. Returns None if the marker is missing (the pod never got far
-    enough to write it - already surfaced separately by
-    launch_and_wait's boot-failure handling, so this is a defense-in-
-    depth check, not the primary signal).
-    """
-    # The GitHub Contents API (not raw.githubusercontent.com, which doesn't
-    # reliably authenticate against private repos) with the raw media type
-    # returns the file body directly.
     url = f"https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/last_run_status.txt"
     try:
         response = requests.get(
@@ -647,18 +686,69 @@ def check_training_exit_code(repo: str, branch: str, gh_token: str) -> "int | No
             timeout=15,
         )
     except (requests.ConnectionError, requests.Timeout) as e:
-        print(f"Warning: could not fetch last_run_status.txt to verify training exit code: {e}")
+        print(f"Warning: could not fetch last_run_status.txt: {e}")
         return None
 
     if response.status_code != 200:
-        print(f"Warning: last_run_status.txt not found on model-artifacts ({response.status_code}) for branch {branch}")
+        return None
+    return response.text
+
+
+def check_training_exit_code(repo: str, branch: str, gh_token: str) -> "int | None":
+    """
+    Read back logs/last_run_status.txt from the model-artifacts branch
+    the pod just pushed, and return the training process's own exit
+    code. Returns None if the marker is missing (the pod never got far
+    enough to write it - already surfaced separately by
+    launch_and_wait's boot-failure handling, so this is a defense-in-
+    depth check, not the primary signal).
+    """
+    text = _fetch_last_run_status_text(repo, gh_token)
+    if text is None:
+        print(f"Warning: last_run_status.txt not found on model-artifacts for branch {branch}")
         return None
 
-    match = re.search(r"^exit=(\d+)$", response.text, re.MULTILINE)
+    match = re.search(r"^exit=(\d+)$", text, re.MULTILINE)
     if not match:
-        print(f"Warning: could not parse exit code from last_run_status.txt: {response.text!r}")
+        print(f"Warning: could not parse exit code from last_run_status.txt: {text!r}")
         return None
     return int(match.group(1))
+
+
+def check_fresh_completion_marker(repo: str, gh_token: str, since: datetime) -> "datetime | None":
+    """
+    Check whether logs/last_run_status.txt on model-artifacts shows a
+    finished_at timestamp after `since` - i.e. the CURRENT pod pushed a
+    completion marker, not a stale one left over from an earlier run.
+    Returns the parsed finished_at datetime if fresh, else None.
+
+    This exists because a pod's self-DELETE call (curl ... || true,
+    silently swallowing any failure) is not a reliable completion
+    signal on its own: observed in practice, training can finish, push
+    its results to model-artifacts, and call DELETE on itself
+    successfully from RunPod's API perspective, while the pod's
+    underlying resource never actually tears down - leaving
+    poll_until_terminated's status-based wait stuck indefinitely even
+    though the work is done. Git (which has pushed reliably on every
+    run this session) is a more trustworthy completion signal than
+    RunPod's pod-status API, so we poll it independently and force-
+    terminate the pod ourselves the moment we see it, rather than
+    depending on the pod's self-termination succeeding.
+    """
+    text = _fetch_last_run_status_text(repo, gh_token)
+    if text is None:
+        return None
+
+    match = re.search(r"^finished_at=(\S+)$", text, re.MULTILINE)
+    if not match:
+        return None
+
+    try:
+        finished_at = datetime.strptime(match.group(1), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+    return finished_at if finished_at > since else None
 
 
 def main() -> None:
@@ -754,6 +844,8 @@ def main() -> None:
             max_launch_attempts=args.max_launch_attempts,
             cloud_type=args.cloud_type,
             ssh_key_path=ssh_key_path,
+            repo=args.repo,
+            gh_token=gh_token,
         )
     finally:
         if ssh_key_tmpfile:
