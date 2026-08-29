@@ -113,6 +113,62 @@ def test_create_pod_raises_with_error_body_on_failure():
             assert "no instances available" in str(e)
 
 
+def test_terminate_stale_pods_by_name_terminates_matching_pods():
+    """
+    Regression test: a pod that leaks past a cancelled run's cleanup
+    (SIGKILL racing the SIGINT handler's DELETE call) sits on RunPod's
+    infrastructure indefinitely under the fixed pod name, burning
+    GPU-hours - a fresh launch must always sweep for one first.
+    """
+    pods_response = MagicMock(
+        status_code=200,
+        json=lambda: [
+            {"id": "stale1", "name": "astra-trade-qml-training"},
+            {"id": "other", "name": "some-other-pod"},
+            {"id": "stale2", "name": "astra-trade-qml-training"},
+        ],
+    )
+    with patch("launch_training_pod._request_with_retries", return_value=pods_response), \
+         patch("launch_training_pod.terminate_pod") as mock_terminate:
+        ltp.terminate_stale_pods_by_name("key", "astra-trade-qml-training")
+
+    terminated_ids = {call.args[1] for call in mock_terminate.call_args_list}
+    assert terminated_ids == {"stale1", "stale2"}
+
+
+def test_terminate_stale_pods_by_name_noop_when_none_match():
+    pods_response = MagicMock(status_code=200, json=lambda: [{"id": "other", "name": "some-other-pod"}])
+    with patch("launch_training_pod._request_with_retries", return_value=pods_response), \
+         patch("launch_training_pod.terminate_pod") as mock_terminate:
+        ltp.terminate_stale_pods_by_name("key", "astra-trade-qml-training")
+
+    mock_terminate.assert_not_called()
+
+
+def test_terminate_stale_pods_by_name_handles_dict_response_shape():
+    """RunPod's list-pods response shape (bare list vs {"pods": [...]}) isn't
+    guaranteed - handle both rather than assuming one."""
+    pods_response = MagicMock(
+        status_code=200,
+        json=lambda: {"pods": [{"id": "stale1", "name": "astra-trade-qml-training"}]},
+    )
+    with patch("launch_training_pod._request_with_retries", return_value=pods_response), \
+         patch("launch_training_pod.terminate_pod") as mock_terminate:
+        ltp.terminate_stale_pods_by_name("key", "astra-trade-qml-training")
+
+    mock_terminate.assert_called_once_with("key", "stale1")
+
+
+def test_terminate_stale_pods_by_name_survives_list_failure():
+    """A failure to list pods must not crash the launch - it's a
+    best-effort sweep, not a hard prerequisite."""
+    with patch("launch_training_pod._request_with_retries", side_effect=RuntimeError("boom")), \
+         patch("launch_training_pod.terminate_pod") as mock_terminate:
+        ltp.terminate_stale_pods_by_name("key", "astra-trade-qml-training")  # must not raise
+
+    mock_terminate.assert_not_called()
+
+
 def test_get_pod_status_returns_none_on_404():
     with patch("launch_training_pod.requests.request") as mock_request:
         mock_request.return_value = MagicMock(status_code=404)

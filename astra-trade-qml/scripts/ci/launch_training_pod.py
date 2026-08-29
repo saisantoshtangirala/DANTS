@@ -273,6 +273,43 @@ def terminate_pod(api_key: str, pod_id: str) -> None:
         print(f"Warning: failed to terminate pod {pod_id}: {e}")
 
 
+def terminate_stale_pods_by_name(api_key: str, name: str) -> None:
+    """
+    Terminate any existing pod with this fixed name before creating a new
+    one. Cleanup on cancellation (_cancel_handler / atexit) is
+    best-effort: GitHub Actions sends SIGINT then SIGKILL after a ~7.5s
+    grace period, and if that DELETE call doesn't finish in time (or the
+    signal doesn't propagate before SIGKILL), the pod itself keeps
+    running on RunPod's infrastructure - it isn't tied to the CI
+    runner's lifetime once launched. Since every pod uses the same fixed
+    name, a leaked one from a prior cancelled run would otherwise sit
+    there burning GPU-hours indefinitely. This makes a fresh run
+    self-healing regardless of why a previous cleanup didn't run: always
+    start by clearing anything already using this name.
+    """
+    try:
+        response = _request_with_retries(
+            "GET", f"{REST_BASE}/pods", headers={"Authorization": f"Bearer {api_key}"}, timeout=15
+        )
+    except RuntimeError as e:
+        print(f"Warning: could not list existing pods to check for stale ones: {e}")
+        return
+
+    if response.status_code >= 400:
+        print(f"Warning: listing pods failed ({response.status_code}): {response.text[:300]}")
+        return
+
+    pods = response.json()
+    if isinstance(pods, dict):
+        pods = pods.get("pods", pods.get("data", []))
+
+    stale = [p for p in pods if p.get("name") == name]
+    for pod in stale:
+        pod_id = pod.get("id")
+        print(f"Found stale pod {pod_id} named {name!r} from a previous run - terminating before launch", flush=True)
+        terminate_pod(api_key, pod_id)
+
+
 def get_pod_status(api_key: str, pod_id: str):
     """Returns the pod's status dict, or None if it's already gone (404)."""
     response = _request_with_retries(
@@ -701,6 +738,8 @@ def main() -> None:
             pod_env[kite_var] = os.environ[kite_var]
 
     start_command = build_start_command(args.repo, args.branch, args.train_timeout_seconds)
+
+    terminate_stale_pods_by_name(runpod_key, "astra-trade-qml-training")
 
     try:
         completed = launch_and_wait(
