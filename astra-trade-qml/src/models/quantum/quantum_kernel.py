@@ -241,8 +241,22 @@ class QuantumKernelClassifier:
         }
 
         if X_val is not None and y_val is not None:
-            val_pred = self.qsvc.predict(X_val)
-            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
+            # Quantum kernel prediction cost is O(n_val * n_train) circuit
+            # evaluations, so scoring the full validation set here (which
+            # can be thousands of rows) dwarfs the QSVC fit itself. This is
+            # only a diagnostic metric for the training log, so cap it to
+            # the same sample budget used for training.
+            max_val_samples = min(len(X_val), max_samples)
+            if len(X_val) > max_val_samples:
+                rng = np.random.default_rng(43)
+                val_indices = rng.choice(len(X_val), max_val_samples, replace=False)
+                X_val_sub = X_val[val_indices]
+                y_val_sub = y_val[val_indices]
+            else:
+                X_val_sub = X_val
+                y_val_sub = y_val
+            val_pred = self.qsvc.predict(X_val_sub)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val_sub))
 
     def _fit_classical(
         self,

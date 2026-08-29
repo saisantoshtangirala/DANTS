@@ -185,7 +185,9 @@ class HybridQMLModel:
                 "is_quantum": qkernel_metrics.get("is_quantum", False),
             }
             elapsed = _time.monotonic() - t0
-            print(f"  Quantum Kernel trained in {elapsed:.1f}s. Acc: {qkernel_metrics.get('train_accuracy', 0):.4f}", flush=True)
+            print(f"  Quantum Kernel trained in {elapsed:.1f}s. "
+                  f"Train acc: {qkernel_metrics.get('train_accuracy', 0):.4f}, "
+                  f"Val acc: {qkernel_metrics.get('val_accuracy', float('nan')):.4f}", flush=True)
             if not qkernel_metrics.get("is_quantum", False):
                 print("  Quantum Kernel using classical fallback", flush=True)
         except Exception as e:
@@ -204,7 +206,9 @@ class HybridQMLModel:
                 "circuit_depth": vqc_metrics.get("circuit_depth", 0),
             }
             elapsed = _time.monotonic() - t0
-            print(f"  VQC trained in {elapsed:.1f}s. Acc: {vqc_metrics.get('train_accuracy', 0):.4f}", flush=True)
+            print(f"  VQC trained in {elapsed:.1f}s. "
+                  f"Train acc: {vqc_metrics.get('train_accuracy', 0):.4f}, "
+                  f"Val acc: {vqc_metrics.get('val_accuracy', float('nan')):.4f}", flush=True)
             if not vqc_metrics.get("is_quantum", False):
                 print("  VQC using classical fallback", flush=True)
         except Exception as e:
