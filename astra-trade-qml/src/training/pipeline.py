@@ -295,6 +295,14 @@ class TrainingPipeline:
         pooled = pooled.dropna(subset=["label"]).reset_index(drop=True)
 
         feature_cols = self.feature_engineer.get_feature_columns(pooled)
+        # backtest_validation() must score each symbol against the exact
+        # same feature columns the model was trained on - recomputing
+        # get_feature_columns() independently per symbol can disagree
+        # (e.g. one symbol's data has a gap that suppresses a
+        # frequency-dependent feature another symbol's data has), which
+        # surfaces as a sklearn shape-mismatch deep inside a sub-model's
+        # predict_proba().
+        self._trained_feature_cols = feature_cols
 
         X = pooled[feature_cols].to_numpy()
         y = pooled["label"].to_numpy().astype(int)
@@ -389,11 +397,16 @@ class TrainingPipeline:
         circuit = CircuitCheck()
 
         results = {}
+        # Must match the pooled training matrix's columns exactly (see the
+        # comment in _pooled_training_matrix) - never recompute
+        # get_feature_columns() per symbol here.
+        feature_cols = getattr(self, "_trained_feature_cols", None)
+        if feature_cols is None:
+            raise ValueError("No trained feature columns available. Run classical_and_quantum_training() first.")
+
         for symbol, df in self.featured_data.items():
             if df.empty:
                 continue
-
-            feature_cols = self.feature_engineer.get_feature_columns(df)
 
             # Use the same date-based cutoff as the pooled training split
             if hasattr(self, "_oos_date_cutoff") and self._oos_date_cutoff is not None and "date" in df.columns:
@@ -403,6 +416,15 @@ class TrainingPipeline:
                 oos = df.iloc[oos_start:].reset_index(drop=True)
             if oos.empty:
                 continue
+
+            # A column present for the pooled training set but absent for
+            # this symbol (e.g. a frequency-dependent feature suppressed
+            # by a data gap) becomes NaN here, cleaned up below by the
+            # same transform_features() nan_to_num pass every other
+            # feature goes through - never a shape mismatch.
+            missing_cols = [c for c in feature_cols if c not in oos.columns]
+            for col in missing_cols:
+                oos[col] = np.nan
 
             X_oos = oos[feature_cols].to_numpy()
             X_oos = self.model.transform_features(X_oos)

@@ -259,6 +259,8 @@ def _process_symbol_cycle(
     symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats=None, capital_cap=None
 ) -> None:
     """One signal-generation cycle for a single symbol, given the current regime indicators."""
+    import numpy as np
+
     ohlcv = live_feed.get_recent_ohlcv(symbol, interval=interval)
     if ohlcv.empty:
         return
@@ -267,7 +269,19 @@ def _process_symbol_cycle(
     if featured.empty:
         return
 
-    feature_cols = feature_engineer.get_feature_columns(featured)
+    # Must match the columns the model was actually trained on - not
+    # recomputed from this symbol's own live-fetched data, which can
+    # disagree (e.g. a frequency-dependent feature that a data gap
+    # suppresses for this symbol but not others), producing a sklearn
+    # shape mismatch deep inside a sub-model's predict_proba().
+    feature_cols = (
+        model.xgb_model.feature_names
+        if model.xgb_model is not None and model.xgb_model.feature_names
+        else feature_engineer.get_feature_columns(featured)
+    )
+    for col in feature_cols:
+        if col not in featured.columns:
+            featured[col] = np.nan
 
     # Pass enough rows for LSTM to form at least one sequence
     seq_len = model.lstm_model.sequence_length if model.lstm_model else 0

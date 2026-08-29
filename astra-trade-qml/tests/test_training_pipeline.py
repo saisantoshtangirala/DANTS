@@ -155,6 +155,7 @@ def test_backtest_validation_applies_costs_and_confidence_gating(config):
     })
     pipeline.featured_data = {"RELIANCE": df}
     pipeline._oos_date_cutoff = dates[0]
+    pipeline._trained_feature_cols = ["feature_a"]
 
     # Rows 0 and 1: confident UP signal with a real future_return -> trade.
     # Row 3: same future_return, but confidence (0.55) sits below the
@@ -200,6 +201,51 @@ def test_backtest_validation_applies_costs_and_confidence_gating(config):
         for close in (100.0, 101.0)
     )
     assert report["total_pnl"] < gross_pnl
+
+
+def test_backtest_validation_uses_trained_feature_columns_not_per_symbol_recompute(config):
+    """
+    Regression test: backtest_validation() must score every symbol
+    against the exact columns the model was trained on
+    (_trained_feature_cols), never recompute get_feature_columns()
+    independently per symbol. Two symbols with different column sets
+    (e.g. one missing a frequency-dependent feature because of a data
+    gap) used to disagree with what the pooled training matrix was built
+    from, causing a sklearn "X has N features, expected M" shape
+    mismatch inside a sub-model's predict_proba().
+
+    Without _trained_feature_cols set, this must fail loudly rather than
+    silently recompute per-symbol columns.
+    """
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+
+    dates = pd.date_range("2024-01-01 09:15", periods=3, freq="5min")
+    # This symbol's data is missing "extra_feature" - simulates the real
+    # scenario where a data gap suppressed a feature for this symbol but
+    # not others during pooled training.
+    df = pd.DataFrame({
+        "date": dates,
+        "close": [100.0, 101.0, 102.0],
+        "feature_a": [1.0, 2.0, 3.0],
+        "future_return": [0.01, np.nan, np.nan],
+        "label": [1.0, np.nan, np.nan],
+    })
+    pipeline.featured_data = {"RELIANCE": df}
+    pipeline._oos_date_cutoff = dates[0]
+    pipeline.model = _FakeModel(np.array([[0.05, 0.95], [0.5, 0.5], [0.5, 0.5]]))
+
+    with pytest.raises(ValueError, match="trained feature columns"):
+        pipeline.backtest_validation()
+
+    # Now set the trained columns to include a feature this symbol's data
+    # lacks - backtest_validation must fill it (NaN -> 0 downstream) and
+    # run successfully instead of raising a KeyError/shape mismatch.
+    pipeline._trained_feature_cols = ["feature_a", "extra_feature"]
+    results = pipeline.backtest_validation()
+
+    assert "RELIANCE" in results
+    assert results["RELIANCE"]["total_trades"] == 1
 
 
 def test_capital_allocation_excludes_symbol_with_listing_continuity_failure(config):

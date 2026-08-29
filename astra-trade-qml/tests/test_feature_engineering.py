@@ -128,3 +128,47 @@ def test_generate_all_features_handles_intraday_5min_data():
     assert "intraday_vwap" in result.columns
     assert "intraday_vwap_dev" in result.columns
     assert result["intraday_vwap"].isna().sum() == 0
+
+
+def test_intraday_features_survive_data_gaps():
+    """
+    Regression test: pd.infer_freq() requires a PERFECTLY regular
+    timestamp sequence, so a single missing bar (routine with real
+    intraday data - thin-liquidity gaps, provider hiccups) made it
+    return None, silently dropping intraday_vwap/session_progress/
+    bars_to_close for that symbol while other, gap-free symbols still
+    got them. Pooling symbols with different column sets together, then
+    scoring a backtest slice against a per-symbol recomputation of the
+    same columns, produced a sklearn shape-mismatch deep inside a
+    sub-model's predict_proba() ("qkernel predict_proba failed: ...").
+    The bar-spacing detection must tolerate a gap like this.
+    """
+    rng = np.random.default_rng(11)
+    n = 200
+    dates = pd.date_range("2024-01-01 09:15", periods=n, freq="5min")
+    # Drop a handful of bars scattered through the middle - pd.infer_freq
+    # returns None for this; median bar spacing is still ~5min.
+    dates = dates.delete([40, 41, 90, 130, 131, 132])
+
+    n = len(dates)
+    close = 100 + np.cumsum(rng.normal(0, 0.3, n))
+    close = np.maximum(close, 1.0)
+    open_ = close + rng.normal(0, 0.1, n)
+    high = np.maximum(open_, close) + np.abs(rng.normal(0, 0.1, n))
+    low = np.minimum(open_, close) - np.abs(rng.normal(0, 0.1, n))
+    volume = rng.integers(100, 10_000, n).astype(float)
+
+    df = pd.DataFrame(
+        {"date": dates, "open": open_, "high": high, "low": low, "close": close, "volume": volume}
+    )
+
+    assert pd.infer_freq(df["date"]) is None  # confirms the gap actually breaks infer_freq
+
+    engineer = FeatureEngineer(FeatureConfig(lookback_periods=60))
+    result = engineer.generate_all_features(df)
+
+    assert not result.empty
+    assert "intraday_vwap" in result.columns
+    assert "session_progress" in result.columns
+    assert "bars_to_close" in result.columns
+    assert result["intraday_vwap"].isna().sum() == 0

@@ -247,10 +247,27 @@ class FeatureEngineer:
         df["vwap_deviation"] = (df["close"] - df["vwap"]) / df["vwap"]
         df["above_vwap"] = (df["close"] > df["vwap"]).astype(int)
 
-        # Intraday VWAP reset (for 5-min data, reset daily)
-        inferred_freq = pd.infer_freq(df["date"]) if "date" in df.columns else None
-        if inferred_freq in ["5min", "15min"]:
-            bar_minutes = 5.0 if inferred_freq == "5min" else 15.0
+        # Intraday VWAP reset (for 5-min/15-min data, reset daily).
+        #
+        # pd.infer_freq() requires a PERFECTLY regular timestamp sequence -
+        # a single missing bar anywhere in the window (routine with real
+        # Yahoo/Kite intraday data: thin-liquidity gaps, provider hiccups)
+        # makes it return None. With several symbols pooled, that meant
+        # some symbols got these columns and others didn't, so the pooled
+        # training matrix and a per-symbol backtest slice could end up
+        # with different column counts - a mismatch that surfaces as a
+        # sklearn "X has N features, expected M" exception deep in a
+        # sub-model's predict_proba(). Use the median bar spacing instead,
+        # which tolerates the occasional gap.
+        bar_minutes = None
+        if "date" in df.columns and len(df) > 1:
+            median_gap = df["date"].diff().dt.total_seconds().median() / 60.0
+            if abs(median_gap - 5.0) < 1.0:
+                bar_minutes = 5.0
+            elif abs(median_gap - 15.0) < 2.0:
+                bar_minutes = 15.0
+
+        if bar_minutes is not None:
             date_only = df["date"].dt.date
             cum_tp_vol = (typical_price * df["volume"]).groupby(date_only).cumsum()
             cum_vol = df["volume"].groupby(date_only).cumsum()
