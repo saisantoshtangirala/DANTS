@@ -22,6 +22,8 @@ name: Train on RunPod and Deploy to Hetzner
 # trigger training manually via workflow_dispatch until you've watched
 # a few real runs.
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
       min_vram_gb:
@@ -30,6 +32,8 @@ on:
         default: "12"
   schedule:
     # 16:30 IST = 11:00 UTC, weekdays - matches config.yaml's training_window start.
+    # Scheduled runs execute against the default branch; set the repo's
+    # default branch to 'master' so these cron runs pick up the latest code.
     - cron: "0 11 * * 1-5"
 
 permissions:
