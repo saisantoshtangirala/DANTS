@@ -320,6 +320,12 @@ class QuantumKernelClassifier:
                     proba = proba[:, :2]
                     proba = proba / proba.sum(axis=1, keepdims=True)
                 return proba
+            except TimeoutError:
+                # Let the caller's wall-clock timeout (hybrid_model.py's
+                # _predict_with_timeout) see this and exclude the model
+                # from the ensemble entirely, instead of masking a
+                # never-finished prediction as a legitimate uniform one.
+                raise
             except Exception as e:
                 import warnings
                 warnings.warn(f"Quantum kernel predict_proba failed: {e}. Falling back to classical.")

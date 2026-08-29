@@ -405,6 +405,12 @@ class VQCMarketClassifier:
                 row_sums = proba.sum(axis=1, keepdims=True)
                 proba /= row_sums
                 return proba
+            except TimeoutError:
+                # Let the caller's wall-clock timeout (hybrid_model.py's
+                # _predict_with_timeout) see this and exclude the model
+                # from the ensemble entirely, instead of masking a
+                # never-finished prediction as a legitimate uniform one.
+                raise
             except Exception as e:
                 warnings.warn(f"VQC predict failed: {e}. Falling back to classical.")
 

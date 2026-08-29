@@ -304,6 +304,7 @@ class HybridQMLModel:
         uniform = np.ones((len(X), 2)) / 2.0
         predictions = []
         model_names = []
+        timed_out_names = set()
 
         models = [
             ("lstm", self.lstm_model, 60),
@@ -325,6 +326,8 @@ class HybridQMLModel:
             else:
                 predictions.append(uniform.copy())
                 model_names.append(name)
+                timed_out_names.add(name)
+                print(f"  {name} predict_proba timed out after {timeout}s — excluding from ensemble weight", flush=True)
 
         if not any(name for name in model_names):
             print("  No models available for meta-learner", flush=True)
@@ -338,14 +341,24 @@ class HybridQMLModel:
         self.meta_learner.fit(X_meta, y_mapped)
         self._meta_model_names = model_names
 
+        # A model that timed out only contributed an uninformative uniform
+        # column (fed to the meta-learner so LogisticRegression can learn
+        # to ignore it). It must get zero weight here too — an
+        # argmax([0.5, 0.5]) always picks class 0, so scoring it against
+        # accuracy_score would otherwise credit it with "skill" equal to
+        # the DOWN-class frequency, not any real prediction.
         self.sub_model_weights = {}
         for name, pred in zip(model_names, predictions):
+            if name in timed_out_names:
+                self.sub_model_weights[name] = 0.0
+                continue
             pred_labels = np.argmax(pred, axis=1)
             acc = accuracy_score(y_mapped, pred_labels)
             self.sub_model_weights[name] = max(0.1, acc)
 
         total_weight = sum(self.sub_model_weights.values())
-        self.sub_model_weights = {k: v / total_weight for k, v in self.sub_model_weights.items()}
+        if total_weight > 0:
+            self.sub_model_weights = {k: v / total_weight for k, v in self.sub_model_weights.items()}
 
         print(f"  Meta-learner trained with weights: {self.sub_model_weights}", flush=True)
 
