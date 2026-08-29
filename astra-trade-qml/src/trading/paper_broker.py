@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from src.trading.costs import CostCalculator
+from src.trading.market_rules import round_to_tick
 from src.utils.database import DatabaseManager
 
 
@@ -48,6 +49,7 @@ class PaperBroker:
         strategy: str,
     ) -> OpenPosition:
         """Simulate opening a position and journal it as an OPEN trade."""
+        price = round_to_tick(price)
         trade_id = self.db.log_trade(
             {
                 "symbol": symbol,
@@ -85,6 +87,7 @@ class PaperBroker:
         if position is None:
             return None
 
+        exit_price = round_to_tick(exit_price)
         net_pnl = self.costs.net_pnl(
             entry_price=position.entry_price,
             exit_price=exit_price,

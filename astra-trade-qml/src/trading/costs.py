@@ -33,21 +33,33 @@ class CostCalculator:
 
     def __init__(self, costs_config: Dict[str, Any]):
         self.brokerage_per_order = costs_config.get("brokerage_per_order", 20)
+        # Zerodha (and most discount brokers) charge intraday equity
+        # brokerage as "Rs.20 or 0.03% of turnover, whichever is LOWER" -
+        # not a flat Rs.20 regardless of size. At small position sizes
+        # (this system trades ~10% of a Rs.50,000 account per leg) the
+        # percentage side is what actually applies; a flat Rs.20/order
+        # overstates brokerage by an order of magnitude and can make a
+        # real edge look unprofitable in the backtest.
+        self.brokerage_pct_cap = costs_config.get("brokerage_pct_cap", 0.0003)
         self.stt_pct = costs_config.get("stt_pct", 0.001)
         self.stt_delivery_pct = costs_config.get("stt_delivery_pct", 0.001)
         self.gst_pct = costs_config.get("gst_pct", 0.18)
-        self.transaction_charges_pct = costs_config.get("transaction_charges_pct", 0.00345)
+        self.transaction_charges_pct = costs_config.get("transaction_charges_pct", 0.0000345)
         self.sebi_charges_pct = costs_config.get("sebi_charges_pct", 0.0001)
         self.stamp_duty_pct = costs_config.get("stamp_duty_pct", 0.00015)
         self.slippage_pct = costs_config.get("slippage_pct", 0.0005)
+
+    def _brokerage(self, turnover: float) -> float:
+        return min(self.brokerage_per_order, turnover * self.brokerage_pct_cap)
 
     def entry_cost(self, price: float, quantity: float, delivery: bool = False, side: str = "BUY") -> CostBreakdown:
         """Costs for opening a position. For longs: stamp duty on buy, no STT.
         For shorts: STT on sell, no stamp duty."""
         turnover = price * quantity
+        brokerage = self._brokerage(turnover)
         transaction_charges = turnover * self.transaction_charges_pct
         sebi_charges = turnover * self.sebi_charges_pct
-        gst = (self.brokerage_per_order + transaction_charges) * self.gst_pct
+        gst = (brokerage + transaction_charges) * self.gst_pct
         slippage = turnover * self.slippage_pct
 
         if side in ("SELL", "SHORT"):
@@ -59,7 +71,7 @@ class CostCalculator:
             stamp_duty = turnover * self.stamp_duty_pct
 
         return CostBreakdown(
-            brokerage=self.brokerage_per_order,
+            brokerage=brokerage,
             stt=stt,
             transaction_charges=transaction_charges,
             gst=gst,
@@ -72,9 +84,10 @@ class CostCalculator:
         """Costs for closing a position. For longs: STT on sell side.
         For shorts: stamp duty on buy-to-cover side."""
         turnover = price * quantity
+        brokerage = self._brokerage(turnover)
         transaction_charges = turnover * self.transaction_charges_pct
         sebi_charges = turnover * self.sebi_charges_pct
-        gst = (self.brokerage_per_order + transaction_charges) * self.gst_pct
+        gst = (brokerage + transaction_charges) * self.gst_pct
         slippage = turnover * self.slippage_pct
 
         if side in ("SELL", "SHORT"):
@@ -86,7 +99,7 @@ class CostCalculator:
             stamp_duty = 0.0
 
         return CostBreakdown(
-            brokerage=self.brokerage_per_order,
+            brokerage=brokerage,
             stt=stt,
             transaction_charges=transaction_charges,
             gst=gst,

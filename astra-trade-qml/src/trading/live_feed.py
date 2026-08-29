@@ -59,6 +59,22 @@ class KiteLiveFeed:
         from_date = to_date - timedelta(days=days)
         return self.kite.get_historical_data(token, from_date, to_date, interval=interval)
 
+    def get_historical_range(
+        self, symbol: str, interval: str, from_date: datetime, to_date: datetime
+    ) -> pd.DataFrame:
+        """Fetch OHLCV candles for a symbol over an explicit date range.
+
+        Unlike get_recent_ohlcv (which always ends "now"), this lets the
+        caller chunk a long backfill into windows that respect Kite's
+        per-interval history limits (e.g. ~60-100 days per request for
+        minute-level candles).
+        """
+        token = self.get_instrument_token(symbol)
+        if token is None:
+            return pd.DataFrame()
+
+        return self.kite.get_historical_data(token, from_date, to_date, interval=interval)
+
     def get_regime_indicators(self) -> Dict[str, float]:
         """Compute the indicators regimes.yaml's conditions reference."""
         nifty_df = self.get_recent_ohlcv(self.NIFTY_50_SYMBOL, interval="day", days=90)

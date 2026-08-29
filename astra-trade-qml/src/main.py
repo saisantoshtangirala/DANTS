@@ -57,7 +57,11 @@ def run_train(config: dict, logger) -> None:
 
 
 def run_paper(config: dict, logger) -> None:
+    import json
     import os
+    from datetime import datetime
+    from typing import Dict
+    from zoneinfo import ZoneInfo
 
     from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.triggers.cron import CronTrigger
@@ -70,7 +74,7 @@ def run_paper(config: dict, logger) -> None:
     from src.trading.costs import CostCalculator
     from src.trading.executor import TradingEngine
     from src.trading.live_feed import KiteLiveFeed
-    from src.trading.market_hours import is_market_open
+    from src.trading.market_hours import is_market_open, parse_hhmm
     from src.trading.paper_broker import PaperBroker
     from src.trading.risk_manager import RiskManager
     from src.training.pipeline import build_hybrid_model_config
@@ -136,33 +140,65 @@ def run_paper(config: dict, logger) -> None:
         logger=logger,
     )
 
-    symbols = config["data"]["symbols"]["focus_universe"]
+    # Capital allocation from the last training run's cost-adjusted
+    # backtest (models/latest/allocation.json, written by
+    # TrainingPipeline.model_deployment). Falls back to the full equity
+    # universe with no per-symbol cap if training hasn't produced one yet
+    # (e.g. first run) - the risk manager's pool-wide sizing still applies.
+    equity_universe = config["data"]["symbols"].get("equity_universe", config["data"]["symbols"]["focus_universe"])
+    capital_cap_map: Dict[str, float] = {}
+    allocation_path = model_dir / "allocation.json"
+    if allocation_path.exists():
+        with open(allocation_path, "r") as f:
+            allocation = json.load(f)
+        capital_cap_map = {a["symbol"]: a["allocated_capital"] for a in allocation.get("allocations", [])}
+        symbols = list(capital_cap_map.keys())
+        if not symbols:
+            logger.warning("no_allocated_symbols_falling_back_to_equity_universe", excluded=allocation.get("excluded"))
+            symbols = equity_universe
+    else:
+        logger.warning("no_allocation_file_found", note="Run --mode train first for a cost-adjusted symbol allocation.")
+        symbols = equity_universe
+
     interval = config["data"]["timeframes"]["intraday"]
     poll_seconds = 300  # matches the 5-min intraday timeframe
     signal_targets = config.get("signals", {}).get("targets", {}).get("intraday", {})
     profit_target_pct = signal_targets.get("profit_target_pct", 0.015)
     stop_loss_pct = signal_targets.get("stop_loss_pct", 0.008)
 
+    intraday_cfg = config.get("signals", {}).get("intraday", {})
+    square_off_time = parse_hhmm(intraday_cfg.get("square_off_time", "15:15"))
+    no_new_entry_after = parse_hhmm(intraday_cfg.get("no_new_entry_after", "15:00"))
+    tz = ZoneInfo(config["project"]["timezone"])
+
     logger.info(
         "paper_trading_started",
         symbols=symbols,
+        capital_allocation=capital_cap_map,
         mode=config["trading"]["mode"],
         starting_capital=engine.risk_manager.state.starting_capital,
+        square_off_time=str(square_off_time),
+        no_new_entry_after=str(no_new_entry_after),
     )
 
     was_market_open = False
+    squared_off_today = False
 
     try:
         while True:
             market_open = is_market_open(config["trading"]["schedule"], timezone=config["project"]["timezone"])
+            now_time = datetime.now(tz).time()
 
             if market_open and not was_market_open:
                 engine.risk_manager.reset_daily()
                 engine.regime_detector.reset()
+                squared_off_today = False
                 logger.info("daily_risk_state_reset")
 
             if not market_open and was_market_open:
-                # EOD: close all open positions
+                # Market closed without a square-off firing this session
+                # (e.g. process just started late) - close anything open
+                # rather than carry it overnight.
                 prices = {}
                 for symbol in symbols:
                     try:
@@ -191,15 +227,23 @@ def run_paper(config: dict, logger) -> None:
                         pass
                 engine.check_exits(prices, profit_target_pct, stop_loss_pct, india_vix)
 
-                trade_stats = db.get_trade_statistics()
+                if not squared_off_today and now_time >= square_off_time:
+                    engine.close_all_positions(prices)
+                    squared_off_today = True
+                    logger.info("intraday_square_off", count=len(prices), time=str(now_time))
 
-                for symbol in symbols:
-                    try:
-                        _process_symbol_cycle(
-                            symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats
-                        )
-                    except Exception as e:
-                        logger.error("symbol_processing_failed", symbol=symbol, error=str(e))
+                entries_allowed = not squared_off_today and now_time < no_new_entry_after
+                if entries_allowed:
+                    trade_stats = db.get_trade_statistics()
+
+                    for symbol in symbols:
+                        try:
+                            _process_symbol_cycle(
+                                symbol, live_feed, feature_engineer, model, engine, interval, indicators,
+                                trade_stats, capital_cap=capital_cap_map.get(symbol),
+                            )
+                        except Exception as e:
+                            logger.error("symbol_processing_failed", symbol=symbol, error=str(e))
             else:
                 logger.info("outside_market_hours")
 
@@ -210,7 +254,9 @@ def run_paper(config: dict, logger) -> None:
         scheduler.shutdown(wait=False)
 
 
-def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats=None) -> None:
+def _process_symbol_cycle(
+    symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats=None, capital_cap=None
+) -> None:
     """One signal-generation cycle for a single symbol, given the current regime indicators."""
     ohlcv = live_feed.get_recent_ohlcv(symbol, interval=interval)
     if ohlcv.empty:
@@ -256,6 +302,7 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
         avg_win_pct=stats.get("avg_win_pct", 0.015),
         avg_loss_pct=stats.get("avg_loss_pct", 0.008),
         sub_model_probabilities=sub_model_probs if sub_model_probs else None,
+        capital_cap=capital_cap,
     )
 
 

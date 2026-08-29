@@ -331,6 +331,65 @@ class YFinanceDataProvider:
 
         return history[["symbol", "date", "open", "high", "low", "close", "volume", "turnover"]]
 
+    def download_intraday_range(
+        self,
+        symbol: str,
+        interval: str = "5m",
+    ) -> pd.DataFrame:
+        """
+        Download recent 5-minute OHLCV bars from Yahoo Finance.
+
+        Yahoo hard-caps intraday intervals under 1 day to the trailing 60
+        calendar days regardless of what start/end range is requested, so
+        this always returns whatever history Yahoo still has - it is a
+        fallback for when Kite (which can pull much deeper intraday
+        history) isn't configured, not a substitute for it.
+
+        Args:
+            symbol: NSE symbol (e.g. "RELIANCE") or index name (e.g. "NIFTY 50")
+            interval: yfinance intraday interval (e.g. "5m")
+
+        Returns:
+            DataFrame with the same schema as download_historical_range
+        """
+        try:
+            import yfinance as yf
+        except ImportError:
+            print("yfinance not installed. Install with: pip install yfinance")
+            return pd.DataFrame()
+
+        yahoo_symbol = self._to_yahoo_symbol(symbol)
+
+        try:
+            history = yf.Ticker(yahoo_symbol).history(
+                period="60d", interval=interval, auto_adjust=True, timeout=30,
+            )
+        except Exception as e:
+            print(f"Error downloading intraday {symbol} ({yahoo_symbol}) from Yahoo Finance: {e}")
+            return pd.DataFrame()
+
+        if history.empty:
+            return pd.DataFrame()
+
+        history = history.reset_index()
+        # yfinance names the timestamp column "Datetime" for intraday
+        # intervals (vs "Date" for daily).
+        timestamp_col = "Datetime" if "Datetime" in history.columns else "Date"
+        history = history.rename(columns={
+            timestamp_col: "date",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume",
+        })
+        dates = pd.to_datetime(history["date"])
+        history["date"] = dates.dt.tz_convert("Asia/Kolkata").dt.tz_localize(None) if dates.dt.tz is not None else dates
+        history["symbol"] = symbol
+        history["turnover"] = history["close"] * history["volume"]
+
+        return history[["symbol", "date", "open", "high", "low", "close", "volume", "turnover"]]
+
 
 class KiteDataProvider:
     """

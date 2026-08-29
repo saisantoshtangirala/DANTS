@@ -23,12 +23,13 @@ def is_market_open(
     if current.weekday() >= 5:  # Saturday, Sunday
         return False
 
-    open_time = _parse_hhmm(schedule_cfg["market_open"])
-    close_time = _parse_hhmm(schedule_cfg["market_close"])
+    open_time = parse_hhmm(schedule_cfg["market_open"])
+    close_time = parse_hhmm(schedule_cfg["market_close"])
 
     return open_time <= current.time() <= close_time
 
 
-def _parse_hhmm(value: str) -> dt_time:
+def parse_hhmm(value: str) -> dt_time:
+    """Parse an "HH:MM" config string (e.g. square_off_time, no_new_entry_after)."""
     hour, minute = (int(x) for x in value.split(":"))
     return dt_time(hour=hour, minute=minute)

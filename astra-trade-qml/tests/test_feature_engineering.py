@@ -44,6 +44,53 @@ def test_generate_labels_classifies_up_down_deadzone():
     assert np.isnan(labeled.loc[2, "label"])  # 100 -> 100 is flat, dead zone
 
 
+def test_generate_labels_session_aware_excludes_cross_day_window():
+    """
+    A position squared off before close can never realize a return that
+    depends on the next session's open. session_aware=True must exclude
+    any label whose forward window crosses into a different trading day,
+    even though the raw close-to-close return would otherwise be a clean
+    signal (a large gap here, not dead-zone noise).
+    """
+    engineer = FeatureEngineer()
+    df = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2024-01-01 15:20", "2024-01-01 15:25",  # last two bars of day 1
+            "2024-01-02 09:15", "2024-01-02 09:20",   # first two bars of day 2
+        ]),
+        "close": [100.0, 90.0, 150.0, 150.0],  # big gap between day 1 close and day 2 open
+    })
+    labeled = engineer.generate_labels(
+        df, forward_periods=1, noise_threshold=0.003, session_aware=True
+    )
+
+    # Row 1 (15:25 on day 1) would look ahead to 09:15 on day 2 - a +66%
+    # "return" that a same-day-only strategy could never capture - must be
+    # excluded entirely, not classified as a huge UP move.
+    dates = list(labeled["date"])
+    assert pd.Timestamp("2024-01-01 15:25") not in dates
+
+    # Row 0 (15:20 -> 15:25, same day) is a legitimate same-day label and
+    # must survive: a real -10% move, not dead-zone noise.
+    assert len(labeled) == 2
+    assert labeled.loc[0, "date"] == pd.Timestamp("2024-01-01 15:20")
+    assert labeled.loc[0, "label"] == 0
+
+
+def test_generate_labels_session_aware_keeps_same_day_window():
+    engineer = FeatureEngineer()
+    df = pd.DataFrame({
+        "date": pd.to_datetime(["2024-01-01 09:15", "2024-01-01 09:20", "2024-01-01 09:25"]),
+        "close": [100.0, 90.0, 90.0],
+    })
+    labeled = engineer.generate_labels(
+        df, forward_periods=1, noise_threshold=0.003, session_aware=True
+    )
+
+    assert len(labeled) == 2
+    assert labeled.loc[0, "label"] == 0  # same-day 100 -> 90, DOWN
+
+
 def test_get_feature_columns_excludes_raw_price_data():
     engineer = FeatureEngineer()
     df = pd.DataFrame(columns=["date", "open", "high", "low", "close", "volume", "rsi_14", "label"])

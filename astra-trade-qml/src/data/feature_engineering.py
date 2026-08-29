@@ -248,12 +248,26 @@ class FeatureEngineer:
         df["above_vwap"] = (df["close"] > df["vwap"]).astype(int)
 
         # Intraday VWAP reset (for 5-min data, reset daily)
-        if "date" in df.columns and pd.infer_freq(df["date"]) in ["5min", "15min"]:
+        inferred_freq = pd.infer_freq(df["date"]) if "date" in df.columns else None
+        if inferred_freq in ["5min", "15min"]:
+            bar_minutes = 5.0 if inferred_freq == "5min" else 15.0
             date_only = df["date"].dt.date
             cum_tp_vol = (typical_price * df["volume"]).groupby(date_only).cumsum()
             cum_vol = df["volume"].groupby(date_only).cumsum()
             df["intraday_vwap"] = cum_tp_vol / cum_vol
             df["intraday_vwap_dev"] = (df["close"] - df["intraday_vwap"]) / df["intraday_vwap"]
+
+            # Session-position features: how far into the trading day this
+            # bar is. Without these, the model has no way to learn that a
+            # signal at 15:10 (5 bars from square-off) carries a different
+            # risk/reward than the same technical setup at 09:30.
+            session_open = df["date"].dt.normalize() + pd.Timedelta(hours=9, minutes=15)
+            session_close = df["date"].dt.normalize() + pd.Timedelta(hours=15, minutes=30)
+            session_minutes = (session_close - session_open).dt.total_seconds() / 60.0
+            elapsed_minutes = (df["date"] - session_open).dt.total_seconds() / 60.0
+            df["session_progress"] = (elapsed_minutes / session_minutes).clip(0.0, 1.0)
+            minutes_to_close = (session_close - df["date"]).dt.total_seconds() / 60.0
+            df["bars_to_close"] = (minutes_to_close / bar_minutes).clip(lower=0.0)
 
         return df
 
@@ -311,6 +325,7 @@ class FeatureEngineer:
         df: pd.DataFrame,
         forward_periods: int = 5,
         noise_threshold: float = 0.003,
+        session_aware: bool = False,
     ) -> pd.DataFrame:
         """
         Generate binary classification labels with dead-zone exclusion.
@@ -322,6 +337,12 @@ class FeatureEngineer:
             df: DataFrame with features
             forward_periods: Number of periods to look ahead
             noise_threshold: Returns inside [-threshold, +threshold] are dead zone
+            session_aware: For intraday bars, exclude labels whose forward
+                window crosses into a different trading day. A position
+                that gets squared off before close can never realize a
+                return that depends on the next session's open, so
+                labeling it as if it could is training-time look-ahead
+                into a return the strategy will never actually capture.
 
         Returns:
             DataFrame with 'label' column (1=UP, 0=DOWN, NaN=dead zone)
@@ -331,6 +352,10 @@ class FeatureEngineer:
         future_return = df["close"].shift(-forward_periods) / df["close"] - 1
 
         df["future_return"] = future_return
+
+        if session_aware and "date" in df.columns:
+            same_session = df["date"].dt.date == df["date"].shift(-forward_periods).dt.date
+            df.loc[~same_session, "future_return"] = np.nan
 
         df = df.dropna(subset=["future_return"]).reset_index(drop=True)
 

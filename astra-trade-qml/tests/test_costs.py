@@ -4,14 +4,25 @@ from src.trading.costs import CostCalculator
 
 COSTS_CONFIG = {
     "brokerage_per_order": 20,
+    "brokerage_pct_cap": 0.0003,
     "stt_pct": 0.001,
     "stt_delivery_pct": 0.001,
     "gst_pct": 0.18,
-    "transaction_charges_pct": 0.00345,
+    "transaction_charges_pct": 0.0000345,
     "sebi_charges_pct": 0.0001,
     "stamp_duty_pct": 0.00015,
     "slippage_pct": 0.0005,
 }
+
+
+def test_brokerage_uses_whichever_is_lower():
+    calc = CostCalculator(COSTS_CONFIG)
+    # Small turnover: the 0.03% cap (0.3) is lower than the ₹20 flat fee.
+    small = calc.entry_cost(price=100.0, quantity=10)
+    assert small.brokerage == pytest.approx(0.3)
+    # Large turnover: the ₹20 flat fee is lower than 0.03% of turnover (30).
+    large = calc.entry_cost(price=10_000.0, quantity=10)
+    assert large.brokerage == 20
 
 
 def test_entry_cost_has_no_stt():
@@ -19,7 +30,7 @@ def test_entry_cost_has_no_stt():
     entry = calc.entry_cost(price=100.0, quantity=10)
     assert entry.stt == 0.0
     assert entry.stamp_duty > 0
-    assert entry.brokerage == 20
+    assert entry.brokerage == pytest.approx(0.3)
 
 
 def test_exit_cost_has_no_stamp_duty():

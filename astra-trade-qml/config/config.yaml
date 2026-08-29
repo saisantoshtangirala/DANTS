@@ -19,9 +19,26 @@ infrastructure:
 
 data:
   symbols:
+    # focus_universe: full pool used for training/feature generation and
+    # regime detection (indices included - NIFTY 50 / NIFTY BANK aren't
+    # cash-tradable but their trend feeds the regime detector).
     focus_universe:
       - "NIFTY 50"
       - "NIFTY BANK"
+      - "RELIANCE"
+      - "TCS"
+      - "INFY"
+      - "HDFCBANK"
+      - "ICICIBANK"
+      - "SBIN"
+      - "BHARTIARTL"
+      - "ITC"
+    # equity_universe: the actual cash-equity symbols the paper/live
+    # trading loop and portfolio allocator are allowed to hold positions
+    # in. Deliberately excludes the indices above - you cannot buy "NIFTY
+    # 50" as a cash equity, only via futures/options/ETF, none of which
+    # this system trades.
+    equity_universe:
       - "RELIANCE"
       - "TCS"
       - "INFY"
@@ -37,6 +54,10 @@ data:
     intraday: "5min"                # Primary intraday timeframe
     swing: "1d"                     # Daily timeframe
     features_lookback: 20           # LSTM sequence length (feature indicators handle their own lookback)
+    intraday_lookback_days: 60      # History window for 5-min bar ingestion (Yahoo's intraday cap; Kite is chunked to the same window per request but can cover more calendar days total)
+
+  liquidity:
+    min_adtv_cr: 10                 # Minimum average daily traded value (INR crore) for a symbol to be tradable/allocatable
 
   sources:
     nse_bhavcopy_url: "https://archives.nseindia.com/content/historical/EQUITIES"
@@ -90,7 +111,9 @@ models:
     cv_folds: 5
 
 signals:
-  noise_threshold: 0.01             # Dead zone: |return| < 1% excluded from training
+  noise_threshold: 0.0015           # Dead zone: |return| < 0.15% excluded from training (intraday 25-min horizon moves less than daily)
+  forward_periods: 5                # Bars ahead for the label (5 x 5-min bars = 25-minute forward horizon)
+
   confidence:
     min_threshold: 0.60             # Minimum confidence to execute (matches medium tier)
     tiers:
@@ -116,10 +139,15 @@ signals:
       stop_loss_pct: 0.03           # 3%
       trailing_stop_pct: 0.02       # 2%
 
+  intraday:
+    no_new_entry_after: "15:00"     # Stop opening new positions this late; not enough session left to reach target/exit cleanly
+    square_off_time: "15:15"        # Force-close every open position by this time, ahead of the 15:30 close
+
 trading:
   mode: "paper"                     # paper | live_shadow | live
   capital:
-    initial: 1000000                # INR 10 Lakhs
+    initial: 50000                  # INR 50,000 monthly trading capital
+    monthly_profit_target_inr: 10000  # Reporting target only (20%/month) - never used to size trades or bias signals
     currency: "INR"
 
   position_sizing:
@@ -128,12 +156,17 @@ trading:
     kelly_fraction: 0.25            # Quarter Kelly for safety
     max_position_size_pct: 0.10     # 10% of capital max per position
 
+  allocator:
+    min_backtest_trades: 20         # Minimum OOS backtest trades before a symbol is trusted with real capital
+    max_symbols: 5                  # Spread capital across at most this many symbols
+
   costs:
-    brokerage_per_order: 20         # Zerodha flat ₹20 per order
+    brokerage_per_order: 20         # Zerodha intraday cap: ₹20 per order...
+    brokerage_pct_cap: 0.0003       # ...or 0.03% of turnover, WHICHEVER IS LOWER (the percentage side applies at this account's position sizes)
     stt_pct: 0.001                  # 0.1% on sell side (intraday)
     stt_delivery_pct: 0.001         # 0.1% both sides (delivery)
     gst_pct: 0.18                   # 18% on brokerage + transaction charges
-    transaction_charges_pct: 0.00345 # NSE transaction charges
+    transaction_charges_pct: 0.0000345 # 0.00345% NSE transaction charges (was stored as 0.00345 = 0.345%, a 100x overstatement vs. every other cost line here following "decimal fraction = commented percent / 100")
     sebi_charges_pct: 0.000001      # ₹10 per crore (10 / 1,00,00,000)
     stamp_duty_pct: 0.00015         # 0.015% on buy side (Maharashtra)
     slippage_pct: 0.0005            # 0.05% estimated slippage

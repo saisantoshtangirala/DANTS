@@ -42,11 +42,16 @@ class TradingEngine:
         avg_loss_pct: float = 0.008,
         strategy: str = "momentum_breakout",
         sub_model_probabilities: Optional[Dict[str, np.ndarray]] = None,
+        capital_cap: Optional[float] = None,
     ) -> Optional[TradeSignal]:
         """
         Run one full decision cycle for a symbol: detect the regime,
         generate a signal, size the position, and execute against the
         paper broker if risk checks pass.
+
+        capital_cap, when given, ceilings this symbol's position notional
+        (e.g. to its slice from PortfolioAllocator) independent of the
+        risk manager's pool-wide sizing.
         """
         regime = self.regime_detector.detect(indicators)
         regime_aligned = self.regime_detector.is_strategy_allowed(regime, strategy)
@@ -100,6 +105,14 @@ class TradingEngine:
             p.entry_price * p.quantity for p in self.broker.open_positions.values()
         )
         available_capital = max(0.0, self.risk_manager.state.current_capital - committed)
+        if capital_cap is not None:
+            # Cap this symbol's notional at what the portfolio allocator
+            # gave it (this symbol has no open position at this point - any
+            # prior one was just closed above), so a symbol the backtest
+            # found unprofitable, or simply wasn't allocated to, can't
+            # out-compete allocated symbols for the shared capital pool
+            # just by signaling first.
+            available_capital = min(available_capital, max(0.0, capital_cap))
         position_value = size_pct * available_capital
         quantity = int(position_value // price)
         if quantity <= 0:
