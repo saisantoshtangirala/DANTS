@@ -44,7 +44,7 @@ class VQCMarketClassifier:
     Uses a feature map + ansatz architecture optimized via classical gradient descent.
     """
 
-    NUM_CLASSES = 3  # loss, hold, profit
+    NUM_CLASSES = 2  # down, up
 
     def __init__(
         self,
@@ -94,7 +94,7 @@ class VQCMarketClassifier:
         self.is_quantum = False
         self.training_metrics = {}
         self.circuit_depth = 0
-        self.class_names = ["loss", "hold", "profit"]
+        self.class_names = ["down", "up"]
 
         if not QISKIT_AVAILABLE:
             self.is_quantum = False
@@ -167,9 +167,7 @@ class VQCMarketClassifier:
         Returns:
             Training metrics
         """
-        # Map labels: -1 -> 0, 0 -> 1, 1 -> 2
-        label_map = {-1: 0, 0: 1, 1: 2}
-        y_train_mapped = np.array([label_map.get(int(y), 1) for y in y_train])
+        y_train_mapped = y_train.astype(int)
 
         # Preprocess
         X_scaled = self.scaler.fit_transform(X_train)
@@ -193,7 +191,7 @@ class VQCMarketClassifier:
         X_val_normalized = None
         y_val_mapped = None
         if X_val is not None and y_val is not None:
-            y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
+            y_val_mapped = y_val.astype(int)
             X_val_scaled = self.scaler.transform(X_val)
             if self.use_pca and self.pca is not None:
                 X_val_pca = self.pca.transform(X_val_scaled)
@@ -413,7 +411,7 @@ class VQCMarketClassifier:
         if self.classical_mlp is not None:
             return self.classical_mlp.predict_proba(X_processed)
 
-        return np.ones((len(X), 3)) / 3.0
+        return np.ones((len(X), 2)) / 2.0
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -428,7 +426,7 @@ class VQCMarketClassifier:
         proba = self.predict_proba(X)
         class_indices = np.argmax(proba, axis=1)
 
-        label_map = {0: -1, 1: 0, 2: 1}
+        label_map = {0: -1, 1: 1}
         return np.array([label_map[i] for i in class_indices])
 
     def get_circuit_info(self) -> Dict[str, any]:

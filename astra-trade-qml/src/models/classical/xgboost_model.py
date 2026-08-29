@@ -33,7 +33,7 @@ class XGBoostMarketModel:
         reg_alpha: float = 0.1,
         reg_lambda: float = 1.0,
         objective: str = "multi:softprob",
-        num_class: int = 3,
+        num_class: int = 2,
         early_stopping_rounds: int = 20,
         eval_metric: str = "mlogloss",
         random_state: int = 42,
@@ -85,7 +85,7 @@ class XGBoostMarketModel:
         self.early_stopping_rounds = early_stopping_rounds
         self.model = None
         self.feature_names = None
-        self.class_names = ["loss", "hold", "profit"]
+        self.class_names = ["down", "up"]
         self.training_metrics = {}
 
     def fit(
@@ -109,23 +109,20 @@ class XGBoostMarketModel:
         Returns:
             Dictionary with training metrics
         """
-        # Map labels: -1 -> 0, 0 -> 1, 1 -> 2
-        label_map = {-1: 0, 0: 1, 1: 2}
-        y_train_mapped = np.array([label_map.get(int(y), 1) for y in y_train])
+        y_train_mapped = y_train.astype(int)
 
         if feature_names:
             self.feature_names = feature_names
 
-        # Compute per-sample weights to handle class imbalance
-        class_counts = np.bincount(y_train_mapped, minlength=3).astype(float)
+        class_counts = np.bincount(y_train_mapped, minlength=2).astype(float)
         class_counts = np.maximum(class_counts, 1.0)
-        weight_per_class = len(y_train_mapped) / (3.0 * class_counts)
+        weight_per_class = len(y_train_mapped) / (2.0 * class_counts)
         sample_weights = np.array([weight_per_class[c] for c in y_train_mapped])
 
         self.model = xgb.XGBClassifier(**self.params)
 
         if X_val is not None and y_val is not None:
-            y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
+            y_val_mapped = y_val.astype(int)
             self.model.fit(
                 X_train,
                 y_train_mapped,
@@ -192,8 +189,7 @@ class XGBoostMarketModel:
         proba = self.predict_proba(X)
         class_indices = np.argmax(proba, axis=1)
 
-        # Map back: 0->-1, 1->0, 2->1
-        label_map = {0: -1, 1: 0, 2: 1}
+        label_map = {0: -1, 1: 1}
         return np.array([label_map[i] for i in class_indices])
 
     def get_feature_importance(self) -> pd.DataFrame:
@@ -233,8 +229,7 @@ class XGBoostMarketModel:
         Returns:
             Cross-validation metrics
         """
-        label_map = {-1: 0, 0: 1, 1: 2}
-        y_mapped = np.array([label_map.get(int(yi), 1) for yi in y])
+        y_mapped = y.astype(int)
 
         tscv = TimeSeriesSplit(n_splits=n_splits)
 
@@ -301,10 +296,10 @@ class XGBoostMarketModel:
         self.params = metadata["params"]
         self.feature_names = metadata.get("feature_names")
         self.training_metrics = metadata.get("training_metrics", {})
-        self.class_names = metadata.get("class_names", ["loss", "hold", "profit"])
+        self.class_names = metadata.get("class_names", ["down", "up"])
 
         self.model = xgb.XGBClassifier(**self.params)
         self.model.load_model(str(load_path / "xgboost_model.json"))
         # Restore sklearn wrapper state so predict_proba works correctly
-        self.model.classes_ = np.array([0, 1, 2])
-        self.model.n_classes_ = 3
+        self.model.classes_ = np.array([0, 1])
+        self.model.n_classes_ = 2

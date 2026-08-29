@@ -29,8 +29,8 @@ class SignalGenerator:
     `signals` section.
     """
 
-    # HybridQMLModel's class order is [loss, hold, profit]
-    CLASS_TO_ACTION = {0: "SELL", 1: "HOLD", 2: "BUY"}
+    # HybridQMLModel's class order is [down, up]
+    CLASS_TO_ACTION = {0: "SELL", 1: "BUY"}
 
     def __init__(self, signals_config: Dict[str, Any]):
         confidence_cfg = signals_config.get("confidence", {})
@@ -118,9 +118,8 @@ class SignalGenerator:
             tier=tier,
             execution_action=execution_action if action != "HOLD" else "none",
             probabilities={
-                "loss": float(class_probabilities[0]),
-                "hold": float(class_probabilities[1]),
-                "profit": float(class_probabilities[2]),
+                "down": float(class_probabilities[0]),
+                "up": float(class_probabilities[1]) if len(class_probabilities) > 1 else 0.0,
             },
             metadata={
                 "model_probability": model_probability,

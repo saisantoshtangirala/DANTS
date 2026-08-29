@@ -36,7 +36,7 @@ data:
   timeframes:
     intraday: "5min"                # Primary intraday timeframe
     swing: "1d"                     # Daily timeframe
-    features_lookback: 60           # Bars for feature calculation (>= sma_50 + buffer)
+    features_lookback: 20           # LSTM sequence length (feature indicators handle their own lookback)
 
   sources:
     nse_bhavcopy_url: "https://archives.nseindia.com/content/historical/EQUITIES"
@@ -57,7 +57,7 @@ models:
       early_stopping_patience: 10
 
     xgboost:
-      max_depth: 6
+      max_depth: 4
       learning_rate: 0.05
       n_estimators: 200
       subsample: 0.8
@@ -90,6 +90,7 @@ models:
     cv_folds: 5
 
 signals:
+  noise_threshold: 0.003            # Dead zone: |return| < 0.3% excluded from training
   confidence:
     min_threshold: 0.60             # Minimum confidence to execute (matches medium tier)
     tiers:

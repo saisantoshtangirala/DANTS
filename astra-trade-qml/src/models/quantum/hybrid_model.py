@@ -297,7 +297,7 @@ class HybridQMLModel:
             y = y[idx]
             print(f"  Subsampled to {max_meta_samples} samples for meta-learner", flush=True)
 
-        uniform = np.ones((len(X), 3)) / 3.0
+        uniform = np.ones((len(X), 2)) / 2.0
         predictions = []
         model_names = []
 
@@ -327,10 +327,9 @@ class HybridQMLModel:
             return
 
         X_meta = np.hstack(predictions)
-        X_meta = np.where(np.isfinite(X_meta), X_meta, 1.0 / 3.0)
+        X_meta = np.where(np.isfinite(X_meta), X_meta, 0.5)
 
-        label_map = {-1: 0, 0: 1, 1: 2}
-        y_mapped = np.array([label_map.get(int(yi), 1) for yi in y])
+        y_mapped = y.astype(int)
 
         self.meta_learner.fit(X_meta, y_mapped)
         self._meta_model_names = model_names
@@ -362,10 +361,11 @@ class HybridQMLModel:
             Probabilities for [loss, hold, profit]
         """
         if not self.is_trained:
-            return np.ones((len(X), 3)) / 3.0
+            return np.ones((len(X), 2)) / 2.0
 
-        uniform = np.ones((len(X), 3)) / 3.0
+        uniform = np.ones((len(X), 2)) / 2.0
         predictions = {}
+        timed_out = set()
 
         models = [
             ("lstm", self.lstm_model, 60),
@@ -378,20 +378,34 @@ class HybridQMLModel:
             if model is None:
                 continue
             pred = self._predict_with_timeout(model, name, X, timeout_seconds=timeout)
-            predictions[name] = pred if pred is not None else uniform.copy()
+            if pred is not None:
+                predictions[name] = pred
+            else:
+                timed_out.add(name)
+
+        if not predictions:
+            return uniform
+
+        if timed_out and method == "meta_learner":
+            method = "weighted_average"
 
         if method == "meta_learner" and self.meta_learner is not None:
             meta_names = getattr(self, "_meta_model_names", list(predictions.keys()))
             X_meta = np.hstack([predictions.get(name, uniform.copy()) for name in meta_names])
-            X_meta = np.where(np.isfinite(X_meta), X_meta, 1.0 / 3.0)
+            X_meta = np.where(np.isfinite(X_meta), X_meta, 0.5)
             return self.meta_learner.predict_proba(X_meta)
 
         elif method == "weighted_average":
-            weights = self.sub_model_weights or {name: 1.0 / len(predictions) for name in predictions}
+            weights = {k: v for k, v in self.sub_model_weights.items()
+                       if k not in timed_out and k in predictions}
+            if not weights:
+                weights = {name: 1.0 / len(predictions) for name in predictions}
 
-            ensemble_proba = np.zeros((len(X), 3))
+            ensemble_proba = np.zeros((len(X), 2))
             total_weight = 0.0
             for name, pred in predictions.items():
+                if name in timed_out:
+                    continue
                 weight = weights.get(name, 1.0 / len(predictions))
                 ensemble_proba += weight * pred
                 total_weight += weight
@@ -402,8 +416,7 @@ class HybridQMLModel:
             return ensemble_proba
 
         elif method == "voting":
-            # Hard voting
-            votes = np.zeros((len(X), 3))
+            votes = np.zeros((len(X), 2))
             for pred in predictions.values():
                 class_idx = np.argmax(pred, axis=1)
                 for i, idx in enumerate(class_idx):
@@ -412,7 +425,6 @@ class HybridQMLModel:
             return votes / len(predictions)
 
         else:
-            # Default to simple average
             return np.mean(list(predictions.values()), axis=0)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
@@ -428,7 +440,7 @@ class HybridQMLModel:
         proba = self.predict_proba(X)
         class_indices = np.argmax(proba, axis=1)
 
-        label_map = {0: -1, 1: 0, 2: 1}
+        label_map = {0: -1, 1: 1}
         return np.array([label_map[i] for i in class_indices])
 
     def get_signal_confidence(self, X: np.ndarray) -> np.ndarray:

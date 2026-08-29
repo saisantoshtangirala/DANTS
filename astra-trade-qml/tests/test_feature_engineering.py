@@ -34,14 +34,14 @@ def test_generate_all_features_returns_input_when_too_short():
     assert len(result) == 5
 
 
-def test_generate_labels_classifies_profit_hold_loss():
+def test_generate_labels_classifies_up_down_deadzone():
     engineer = FeatureEngineer()
     df = pd.DataFrame({"close": [100.0, 90.0, 100.0, 100.0]})
-    labeled = engineer.generate_labels(df, forward_periods=1, profit_threshold=0.015, loss_threshold=-0.008)
+    labeled = engineer.generate_labels(df, forward_periods=1, noise_threshold=0.003)
 
-    assert labeled.loc[0, "label"] == -1  # 100 -> 90 is -10%, below loss threshold
-    assert labeled.loc[1, "label"] == 1  # 90 -> 100 is +11.1%, above profit threshold
-    assert labeled.loc[2, "label"] == 0  # 100 -> 100 is flat, hold
+    assert labeled.loc[0, "label"] == 0   # 100 -> 90 is -10%, DOWN
+    assert labeled.loc[1, "label"] == 1   # 90 -> 100 is +11.1%, UP
+    assert np.isnan(labeled.loc[2, "label"])  # 100 -> 100 is flat, dead zone
 
 
 def test_get_feature_columns_excludes_raw_price_data():

@@ -37,11 +37,7 @@ class LSTMDataset(Dataset):
         x_seq = self.X[idx:idx + self.sequence_length]
         y_label = self.y[idx + self.sequence_length - 1]
 
-        # Map labels: -1 -> 0 (loss), 0 -> 1 (hold), 1 -> 2 (profit)
-        label_map = {-1: 0, 0: 1, 1: 2}
-        y_mapped = label_map.get(int(y_label), 1)
-
-        return torch.FloatTensor(x_seq), torch.LongTensor([y_mapped])[0]
+        return torch.FloatTensor(x_seq), torch.LongTensor([int(y_label)])[0]
 
 
 class LSTMClassifier(nn.Module):
@@ -52,7 +48,7 @@ class LSTMClassifier(nn.Module):
         input_size: int,
         hidden_size: int = 128,
         num_layers: int = 2,
-        num_classes: int = 3,
+        num_classes: int = 2,
         dropout: float = 0.3,
         bidirectional: bool = False,
     ):
@@ -152,7 +148,7 @@ class LSTMModel:
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
-        self.class_names = ["loss", "hold", "profit"]
+        self.class_names = ["down", "up"]
         self.training_history = []
 
     def build_model(self) -> None:
@@ -196,13 +192,11 @@ class LSTMModel:
             val_dataset = LSTMDataset(X_val, y_val, self.sequence_length)
             val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
-        # Compute class weights from labels the DataLoader actually uses
-        # (LSTMDataset targets start at index sequence_length-1)
         windowed_labels = y_train[self.sequence_length - 1:]
-        mapped_labels = np.array([{-1: 0, 0: 1, 1: 2}.get(int(l), 1) for l in windowed_labels])
-        class_counts = np.bincount(mapped_labels, minlength=3).astype(float)
+        mapped_labels = windowed_labels.astype(int)
+        class_counts = np.bincount(mapped_labels, minlength=2).astype(float)
         class_counts = np.maximum(class_counts, 1.0)
-        class_weights = len(mapped_labels) / (3.0 * class_counts)
+        class_weights = len(mapped_labels) / (2.0 * class_counts)
         weight_tensor = torch.FloatTensor(class_weights).to(self.device)
 
         criterion = nn.CrossEntropyLoss(weight=weight_tensor)
@@ -323,7 +317,7 @@ class LSTMModel:
 
         n_sequences = len(X) - self.sequence_length
         if n_sequences <= 0:
-            return np.ones((len(X), 3)) / 3.0
+            return np.ones((len(X), 2)) / 2.0
 
         sequences = []
         for i in range(n_sequences):
@@ -343,7 +337,7 @@ class LSTMModel:
 
         probabilities = np.vstack(all_proba)
 
-        padding = np.ones((self.sequence_length, 3)) / 3.0
+        padding = np.ones((self.sequence_length, 2)) / 2.0
         probabilities = np.vstack([padding, probabilities])
 
         return probabilities
@@ -361,8 +355,7 @@ class LSTMModel:
         proba = self.predict_proba(X)
         class_indices = np.argmax(proba, axis=1)
 
-        # Map back: 0->-1, 1->0, 2->1
-        label_map = {0: -1, 1: 0, 2: 1}
+        label_map = {0: -1, 1: 1}
         return np.array([label_map[i] for i in class_indices])
 
     def save(self, path: str) -> None:

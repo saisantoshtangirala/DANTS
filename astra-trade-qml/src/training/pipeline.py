@@ -167,14 +167,13 @@ class TrainingPipeline:
 
     def feature_engineering(self) -> Dict[str, pd.DataFrame]:
         """Task: generate technical/microstructure features and labels per symbol."""
-        targets = self.config.get("signals", {}).get("targets", {}).get("intraday", {})
+        noise_threshold = self.config.get("signals", {}).get("noise_threshold", 0.003)
 
         for symbol, df in self.raw_data.items():
             featured = self.feature_engineer.generate_all_features(df)
             featured = self.feature_engineer.generate_labels(
                 featured,
-                profit_threshold=targets.get("profit_target_pct", 0.015),
-                loss_threshold=-targets.get("stop_loss_pct", 0.008),
+                noise_threshold=noise_threshold,
             )
             self.featured_data[symbol] = featured
 
@@ -192,10 +191,13 @@ class TrainingPipeline:
         if "date" in pooled.columns:
             pooled = pooled.sort_values("date").reset_index(drop=True)
 
+        # Drop dead-zone samples (NaN labels) before training
+        pooled = pooled.dropna(subset=["label"]).reset_index(drop=True)
+
         feature_cols = self.feature_engineer.get_feature_columns(pooled)
 
         X = pooled[feature_cols].to_numpy()
-        y = pooled["label"].to_numpy()
+        y = pooled["label"].to_numpy().astype(int)
 
         # Three-way split: train 0-80%, val 80-90%, OOS 90-100%.
         # Split by date so all rows from the same trading day stay together.

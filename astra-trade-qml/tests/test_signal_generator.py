@@ -33,7 +33,7 @@ def test_high_confidence_profit_signal_is_buy_with_full_execution():
     gen = make_generator()
     signal = gen.generate(
         symbol="RELIANCE",
-        class_probabilities=np.array([0.05, 0.05, 0.90]),
+        class_probabilities=np.array([0.10, 0.90]),
         regime="bull_trend",
         regime_aligned=True,
         historical_expectancy=1.0,
@@ -48,7 +48,7 @@ def test_low_confidence_signal_forced_to_hold():
     gen = make_generator()
     signal = gen.generate(
         symbol="TCS",
-        class_probabilities=np.array([0.20, 0.45, 0.35]),
+        class_probabilities=np.array([0.45, 0.55]),
         regime="sideways",
         regime_aligned=False,
         historical_expectancy=0.2,
@@ -62,7 +62,7 @@ def test_sell_signal_from_loss_class():
     gen = make_generator()
     signal = gen.generate(
         symbol="INFY",
-        class_probabilities=np.array([0.85, 0.10, 0.05]),
+        class_probabilities=np.array([0.90, 0.10]),
         regime="bear_trend",
         regime_aligned=True,
         historical_expectancy=1.0,
@@ -74,20 +74,20 @@ def test_sell_signal_from_loss_class():
 def test_ensemble_disagreement_lowers_confidence():
     gen = make_generator()
     agreeing = {
-        "lstm": np.array([0.05, 0.05, 0.90]),
-        "xgboost": np.array([0.05, 0.05, 0.90]),
+        "lstm": np.array([0.10, 0.90]),
+        "xgboost": np.array([0.10, 0.90]),
     }
     disagreeing = {
-        "lstm": np.array([0.90, 0.05, 0.05]),
-        "xgboost": np.array([0.90, 0.05, 0.05]),
+        "lstm": np.array([0.90, 0.10]),
+        "xgboost": np.array([0.90, 0.10]),
     }
 
     high_agreement = gen.generate(
-        "SBIN", np.array([0.05, 0.05, 0.90]), "bull_trend", True,
+        "SBIN", np.array([0.10, 0.90]), "bull_trend", True,
         sub_model_probabilities=agreeing,
     )
     low_agreement = gen.generate(
-        "SBIN", np.array([0.05, 0.05, 0.90]), "bull_trend", True,
+        "SBIN", np.array([0.10, 0.90]), "bull_trend", True,
         sub_model_probabilities=disagreeing,
     )
     assert high_agreement.confidence > low_agreement.confidence

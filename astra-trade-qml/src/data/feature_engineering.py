@@ -151,6 +151,10 @@ class FeatureEngineer:
         df["macd_histogram"] = df["macd"] - df["macd_signal"]
         df["macd_cross"] = (df["macd"] > df["macd_signal"]).astype(int).diff().fillna(0)
 
+        df["macd_norm"] = df["macd"] / df["close"]
+        df["macd_signal_norm"] = df["macd_signal"] / df["close"]
+        df["macd_hist_norm"] = df["macd_histogram"] / df["close"]
+
         return df
 
     def _add_bollinger_bands(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -216,6 +220,7 @@ class FeatureEngineer:
         direction = np.sign(df["close"].diff())
         df["obv"] = (direction * df["volume"]).fillna(0).cumsum()
         df["obv_slope"] = df["obv"].diff(5)
+        df["obv_roc"] = df["obv"].diff(5) / (df["volume"].rolling(5).sum() + 1)
 
         # Money Flow Index
         typical_price = (df["high"] + df["low"] + df["close"]) / 3
@@ -305,20 +310,21 @@ class FeatureEngineer:
         self,
         df: pd.DataFrame,
         forward_periods: int = 5,
-        profit_threshold: float = 0.015,
-        loss_threshold: float = -0.008,
+        noise_threshold: float = 0.003,
     ) -> pd.DataFrame:
         """
-        Generate classification labels for supervised learning.
+        Generate binary classification labels with dead-zone exclusion.
+
+        Samples with |future_return| <= noise_threshold are labeled NaN
+        (dead zone) and should be dropped before training.
 
         Args:
             df: DataFrame with features
             forward_periods: Number of periods to look ahead
-            profit_threshold: Minimum return for positive label
-            loss_threshold: Maximum return for negative label
+            noise_threshold: Returns inside [-threshold, +threshold] are dead zone
 
         Returns:
-            DataFrame with 'label' column (1=profit, 0=hold, -1=loss)
+            DataFrame with 'label' column (1=UP, 0=DOWN, NaN=dead zone)
         """
         df = df.copy()
 
@@ -326,13 +332,11 @@ class FeatureEngineer:
 
         df["future_return"] = future_return
 
-        # Rows where future_return is NaN (last forward_periods rows) have no
-        # ground truth — drop them so they don't bias training toward "hold".
         df = df.dropna(subset=["future_return"]).reset_index(drop=True)
 
-        df["label"] = 0  # Hold
-        df.loc[df["future_return"] > profit_threshold, "label"] = 1   # Buy/Profit
-        df.loc[df["future_return"] < loss_threshold, "label"] = -1    # Sell/Loss
+        df["label"] = np.nan
+        df.loc[df["future_return"] > noise_threshold, "label"] = 1    # UP
+        df.loc[df["future_return"] < -noise_threshold, "label"] = 0   # DOWN
 
         return df
 
@@ -346,5 +350,16 @@ class FeatureEngineer:
         Returns:
             List of feature column names
         """
-        exclude = ["date", "open", "high", "low", "close", "volume", "turnover", "symbol", "label", "future_return"]
+        exclude = {
+            "date", "open", "high", "low", "close", "volume", "turnover",
+            "symbol", "label", "future_return",
+            # Absolute-price features that leak symbol identity when pooling
+            "sma_5", "sma_10", "sma_20", "sma_50",
+            "ema_5", "ema_10", "ema_20", "ema_50",
+            "bb_upper", "bb_lower", "bb_middle",
+            "macd", "macd_signal", "macd_histogram",
+            "atr_14", "atr_stop_long", "atr_stop_short",
+            "volume_sma_20", "obv", "obv_slope",
+            "vwap",
+        }
         return [col for col in df.columns if col not in exclude]

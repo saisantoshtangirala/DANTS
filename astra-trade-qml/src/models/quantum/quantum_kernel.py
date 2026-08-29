@@ -121,9 +121,7 @@ class QuantumKernelClassifier:
         Returns:
             Training metrics
         """
-        # Map labels
-        label_map = {-1: 0, 0: 1, 1: 2}
-        y_train_mapped = np.array([label_map.get(int(y), 1) for y in y_train])
+        y_train_mapped = y_train.astype(int)
 
         # Preprocess: scale and optionally PCA
         X_scaled = self.scaler.fit_transform(X_train)
@@ -145,7 +143,7 @@ class QuantumKernelClassifier:
         X_val_processed = None
         y_val_mapped = None
         if X_val is not None and y_val is not None:
-            y_val_mapped = np.array([label_map.get(int(y), 1) for y in y_val])
+            y_val_mapped = y_val.astype(int)
             X_val_scaled = self.scaler.transform(X_val)
             if self.use_pca and self.pca is not None:
                 X_val_pca = self.pca.transform(X_val_scaled)
@@ -215,7 +213,7 @@ class QuantumKernelClassifier:
 
         # Subsample for quantum kernel (computationally expensive -
         # kernel matrix is O(n^2) quantum circuit evaluations)
-        max_samples = min(len(X), 300)
+        max_samples = min(len(X), 150)
         if len(X) > max_samples:
             rng = np.random.default_rng(42)
             indices = rng.choice(len(X), max_samples, replace=False)
@@ -298,21 +296,15 @@ class QuantumKernelClassifier:
             X_processed = X_scaled[:, :self.n_qubits]
 
         if self.is_quantum and hasattr(self, "qsvc"):
-            # Quantum SVM doesn't directly give probabilities, use decision function
             try:
                 decisions = self.qsvc.decision_function(X_processed)
                 if decisions.ndim == 1:
                     decisions = np.column_stack([-decisions, decisions])
-                # Softmax over decision values
                 exp_decisions = np.exp(decisions - np.max(decisions, axis=1, keepdims=True))
                 proba = exp_decisions / np.sum(exp_decisions, axis=1, keepdims=True)
-
-                # Ensure 3 classes — redistribute into 3 columns with
-                # hold getting a share rather than being locked at 0.0
-                if proba.shape[1] == 2:
-                    hold_prob = np.minimum(proba[:, 0], proba[:, 1])
-                    total = proba[:, 0] + hold_prob + proba[:, 1]
-                    proba = np.column_stack([proba[:, 0] / total, hold_prob / total, proba[:, 1] / total])
+                if proba.shape[1] > 2:
+                    proba = proba[:, :2]
+                    proba = proba / proba.sum(axis=1, keepdims=True)
                 return proba
             except Exception as e:
                 import warnings
@@ -321,7 +313,7 @@ class QuantumKernelClassifier:
         if self.classical_svm is not None:
             return self.classical_svm.predict_proba(X_processed)
 
-        return np.ones((len(X), 3)) / 3.0
+        return np.ones((len(X), 2)) / 2.0
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -336,7 +328,7 @@ class QuantumKernelClassifier:
         proba = self.predict_proba(X)
         class_indices = np.argmax(proba, axis=1)
 
-        label_map = {0: -1, 1: 0, 2: 1}
+        label_map = {0: -1, 1: 1}
         return np.array([label_map[i] for i in class_indices])
 
     def save(self, path: str) -> None:
