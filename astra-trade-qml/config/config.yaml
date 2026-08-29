@@ -111,8 +111,13 @@ models:
     cv_folds: 5
 
 signals:
-  noise_threshold: 0.0015           # Dead zone: |return| < 0.15% excluded from training (intraday 25-min horizon moves less than daily)
-  forward_periods: 5                # Bars ahead for the label (5 x 5-min bars = 25-minute forward horizon)
+  # Dead zone must exceed the real round-trip cost floor (~0.22% at this
+  # account's ~Rs.5,000 position size - see CostCalculator), or the model
+  # is trained to call directions on moves too small to ever be
+  # profitable even when predicted perfectly. 0.4% leaves real margin
+  # above that floor for an edge to actually be worth capturing.
+  noise_threshold: 0.004
+  forward_periods: 10               # Bars ahead for the label (10 x 5-min bars = 50-minute forward horizon - widened from 25min since large-cap moves that small are mostly microstructure noise, not signal)
 
   confidence:
     min_threshold: 0.60             # Minimum confidence to execute (matches medium tier)
@@ -163,7 +168,7 @@ trading:
   costs:
     brokerage_per_order: 20         # Zerodha intraday cap: ₹20 per order...
     brokerage_pct_cap: 0.0003       # ...or 0.03% of turnover, WHICHEVER IS LOWER (the percentage side applies at this account's position sizes)
-    stt_pct: 0.001                  # 0.1% on sell side (intraday)
+    stt_pct: 0.00025                # 0.025% on sell side (intraday) - was 0.001 (0.1%), the delivery rate wrongly applied to intraday: a 4x overstatement
     stt_delivery_pct: 0.001         # 0.1% both sides (delivery)
     gst_pct: 0.18                   # 18% on brokerage + transaction charges
     transaction_charges_pct: 0.0000345 # 0.00345% NSE transaction charges (was stored as 0.00345 = 0.345%, a 100x overstatement vs. every other cost line here following "decimal fraction = commented percent / 100")

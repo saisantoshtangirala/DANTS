@@ -5,7 +5,7 @@ from src.trading.costs import CostCalculator
 COSTS_CONFIG = {
     "brokerage_per_order": 20,
     "brokerage_pct_cap": 0.0003,
-    "stt_pct": 0.001,
+    "stt_pct": 0.00025,
     "stt_delivery_pct": 0.001,
     "gst_pct": 0.18,
     "transaction_charges_pct": 0.0000345,

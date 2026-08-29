@@ -292,7 +292,12 @@ class HybridQMLModel:
             X: Features
             y: Labels
         """
-        max_meta_samples = 300
+        # 1000, not 300: LSTM/XGBoost/VQC score this batch fast regardless
+        # of size, and qkernel's timeout fires on wall-clock time, not
+        # sample count, so this costs nothing extra - but a stacking
+        # LogisticRegression fit on only 300 points is a weak basis for
+        # calibrating how much to trust each sub-model.
+        max_meta_samples = 1000
         if len(X) > max_meta_samples:
             rng = np.random.default_rng(42)
             idx = rng.choice(len(X), size=max_meta_samples, replace=False)
@@ -309,7 +314,10 @@ class HybridQMLModel:
         models = [
             ("lstm", self.lstm_model, 60),
             ("xgboost", self.xgb_model, 60),
-            ("qkernel", self.qkernel_model, 180),
+            # See the matching comment in predict_proba() - qkernel has
+            # never finished scoring a batch this size within even 180s;
+            # 30s stops paying for a near-certain timeout.
+            ("qkernel", self.qkernel_model, 30),
             ("vqc", self.vqc_model, 180),
         ]
 
@@ -387,7 +395,17 @@ class HybridQMLModel:
         models = [
             ("lstm", self.lstm_model, 60),
             ("xgboost", self.xgb_model, 60),
-            ("qkernel", self.qkernel_model, 300),
+            # qkernel: StatevectorSampler-based exact simulation scoring
+            # costs ~1.4s/sample even at small scale (fit-time validation
+            # scoring of 150+150 samples took ~430s) - it has never once
+            # finished within even a 180s budget on a real OOS/inference
+            # batch across every run observed this session, and no
+            # timeout in the minutes range changes that. 30s isn't "give
+            # it less of a chance" - success probability is ~0 regardless
+            # at this per-sample cost, so this just stops burning ~40
+            # minutes/run (300s x up to 8 symbols) confirming a result
+            # that's already certain.
+            ("qkernel", self.qkernel_model, 30),
             ("vqc", self.vqc_model, 300),
         ]
 
