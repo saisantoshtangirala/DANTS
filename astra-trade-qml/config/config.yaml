@@ -48,18 +48,18 @@ data:
 models:
   classical:
     lstm:
-      hidden_size: 128
+      hidden_size: 64
       num_layers: 2
-      dropout: 0.3
-      learning_rate: 0.001
+      dropout: 0.4
+      learning_rate: 0.0003
       batch_size: 64
-      epochs: 50
-      early_stopping_patience: 10
+      epochs: 100
+      early_stopping_patience: 15
 
     xgboost:
-      max_depth: 4
-      learning_rate: 0.05
-      n_estimators: 200
+      max_depth: 5
+      learning_rate: 0.02
+      n_estimators: 500
       subsample: 0.8
       colsample_bytree: 0.8
       objective: "binary:logistic"
@@ -90,7 +90,7 @@ models:
     cv_folds: 5
 
 signals:
-  noise_threshold: 0.003            # Dead zone: |return| < 0.3% excluded from training
+  noise_threshold: 0.01             # Dead zone: |return| < 1% excluded from training
   confidence:
     min_threshold: 0.60             # Minimum confidence to execute (matches medium tier)
     tiers:

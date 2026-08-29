@@ -200,7 +200,7 @@ class LSTMModel:
         weight_tensor = torch.FloatTensor(class_weights).to(self.device)
 
         criterion = nn.CrossEntropyLoss(weight=weight_tensor)
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=1e-4)
         # verbose was removed from ReduceLROnPlateau in newer torch releases;
         # the training loop already prints loss/accuracy every 10 epochs below.
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
