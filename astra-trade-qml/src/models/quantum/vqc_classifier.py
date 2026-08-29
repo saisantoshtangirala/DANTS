@@ -390,7 +390,7 @@ class VQCMarketClassifier:
         if hasattr(self, "_minmax_scaler") and self._minmax_scaler is not None:
             X_normalized = self._minmax_scaler.transform(X_processed)
         else:
-            X_normalized = MinMaxScaler().fit_transform(X_processed)
+            X_normalized = np.clip(X_processed, 0, 1)
 
         if self.is_quantum and self.vqc is not None:
             try:

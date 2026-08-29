@@ -156,13 +156,14 @@ class FeatureEngineer:
     def _add_bollinger_bands(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add Bollinger Bands features."""
         sma = df["close"].rolling(self.config.bb_period).mean()
-        std = df["close"].rolling(self.config.bb_period).std()
+        std = df["close"].rolling(self.config.bb_period).std(ddof=0)
 
         df["bb_upper"] = sma + (self.config.bb_std * std)
         df["bb_lower"] = sma - (self.config.bb_std * std)
         df["bb_middle"] = sma
         df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / sma
-        df["bb_position"] = (df["close"] - df["bb_lower"]) / (df["bb_upper"] - df["bb_lower"])
+        bb_range = df["bb_upper"] - df["bb_lower"]
+        df["bb_position"] = (df["close"] - df["bb_lower"]) / bb_range.replace(0, np.nan)
         df["bb_squeeze"] = (df["bb_width"] < df["bb_width"].rolling(20).min() * 1.05).astype(int)
 
         return df
@@ -174,7 +175,7 @@ class FeatureEngineer:
         low_close = np.abs(df["low"] - df["close"].shift())
 
         tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        df["atr_14"] = tr.rolling(self.config.atr_period).mean()
+        df["atr_14"] = tr.ewm(alpha=1.0 / self.config.atr_period, adjust=False).mean()
         df["atr_pct"] = df["atr_14"] / df["close"]
 
         # ATR-based stop loss levels
@@ -196,7 +197,8 @@ class FeatureEngineer:
         plus_di = 100 * plus_dm.rolling(self.config.adx_period).mean() / atr
         minus_di = 100 * minus_dm.rolling(self.config.adx_period).mean() / atr
 
-        dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di)
+        di_sum = (plus_di + minus_di).replace(0, np.nan)
+        dx = 100 * np.abs(plus_di - minus_di) / di_sum
         df["adx"] = dx.rolling(self.config.adx_period).mean()
         df["plus_di"] = plus_di
         df["minus_di"] = minus_di
@@ -210,16 +212,9 @@ class FeatureEngineer:
         df["volume_ratio"] = df["volume"] / df["volume_sma_20"]
         df["volume_trend"] = df["volume"].rolling(5).mean() / df["volume"].rolling(20).mean()
 
-        # On-Balance Volume (OBV)
-        obv = [0]
-        for i in range(1, len(df)):
-            if df["close"].iloc[i] > df["close"].iloc[i-1]:
-                obv.append(obv[-1] + df["volume"].iloc[i])
-            elif df["close"].iloc[i] < df["close"].iloc[i-1]:
-                obv.append(obv[-1] - df["volume"].iloc[i])
-            else:
-                obv.append(obv[-1])
-        df["obv"] = obv
+        # On-Balance Volume (OBV) — vectorized
+        direction = np.sign(df["close"].diff())
+        df["obv"] = (direction * df["volume"]).fillna(0).cumsum()
         df["obv_slope"] = df["obv"].diff(5)
 
         # Money Flow Index
@@ -290,17 +285,19 @@ class FeatureEngineer:
         # Stochastic Oscillator
         lowest_low = df["low"].rolling(14).min()
         highest_high = df["high"].rolling(14).max()
-        df["stoch_k"] = 100 * (df["close"] - lowest_low) / (highest_high - lowest_low)
+        stoch_range = (highest_high - lowest_low).replace(0, np.nan)
+        df["stoch_k"] = 100 * (df["close"] - lowest_low) / stoch_range
         df["stoch_d"] = df["stoch_k"].rolling(3).mean()
 
         # Williams %R
-        df["williams_r"] = -100 * (highest_high - df["close"]) / (highest_high - lowest_low)
+        df["williams_r"] = -100 * (highest_high - df["close"]) / stoch_range
 
         # CCI (Commodity Channel Index)
         typical_price = (df["high"] + df["low"] + df["close"]) / 3
         tp_sma = typical_price.rolling(20).mean()
         tp_mad = typical_price.rolling(20).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
-        df["cci"] = (typical_price - tp_sma) / (0.015 * tp_mad)
+        cci_denom = (0.015 * tp_mad).replace(0, np.nan)
+        df["cci"] = (typical_price - tp_sma) / cci_denom
 
         return df
 

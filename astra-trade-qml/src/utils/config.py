@@ -11,7 +11,7 @@ _DEFAULT_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 def load_yaml(path: str) -> Dict[str, Any]:
     """Load a YAML file into a dictionary."""
     with open(path, "r") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f) or {}
 
 
 def load_config(path: Optional[str] = None) -> Dict[str, Any]:

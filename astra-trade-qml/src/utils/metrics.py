@@ -24,13 +24,17 @@ def calculate_sharpe_ratio(
     Returns:
         Annualized Sharpe ratio
     """
-    if returns.empty or len(returns) < 2 or returns.std() == 0:
+    if returns.empty or len(returns) < 2:
         return 0.0
 
     daily_rf = risk_free_rate / periods_per_year
     excess_returns = returns - daily_rf
+    std = excess_returns.std()
 
-    return np.sqrt(periods_per_year) * (excess_returns.mean() / excess_returns.std())
+    if std == 0 or np.isnan(std):
+        return 0.0
+
+    return float(np.sqrt(periods_per_year) * (excess_returns.mean() / std))
 
 
 def calculate_max_drawdown(equity_curve: pd.Series) -> Tuple[float, pd.Timestamp, pd.Timestamp]:
@@ -141,7 +145,7 @@ def calculate_calmar_ratio(
     if returns.empty or equity_curve.empty:
         return 0.0
 
-    annualized_return = returns.mean() * periods_per_year
+    annualized_return = (1 + returns.mean()) ** periods_per_year - 1
     max_dd, _, _ = calculate_max_drawdown(equity_curve)
 
     if max_dd == 0:
@@ -235,7 +239,7 @@ def generate_performance_report(
 
     returns = equity_curve.pct_change().dropna()
 
-    wins = trades_df[trades_df["pnl"] > 0]
+    wins = trades_df[trades_df["pnl"] >= 0]
     losses = trades_df[trades_df["pnl"] < 0]
 
     win_rate = len(wins) / len(trades_df) if len(trades_df) > 0 else 0.0

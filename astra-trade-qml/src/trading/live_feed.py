@@ -8,14 +8,14 @@ nifty_vs_50dma, india_vix, atr_14_pct) from NIFTY 50 / India VIX index
 history.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 try:
     from zoneinfo import ZoneInfo
     _IST = ZoneInfo("Asia/Kolkata")
-except Exception:
-    _IST = None
+except ImportError:
+    _IST = timezone(timedelta(hours=5, minutes=30))
 
 import pandas as pd
 
@@ -55,7 +55,7 @@ class KiteLiveFeed:
         if token is None:
             return pd.DataFrame()
 
-        to_date = datetime.now(_IST) if _IST else datetime.now()
+        to_date = datetime.now(_IST)
         from_date = to_date - timedelta(days=days)
         return self.kite.get_historical_data(token, from_date, to_date, interval=interval)
 

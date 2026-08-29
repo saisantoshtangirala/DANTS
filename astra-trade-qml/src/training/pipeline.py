@@ -214,6 +214,13 @@ class TrainingPipeline:
         X[train_end:] = scaler.transform(X[train_end:])
         self._feature_scaler = scaler
 
+        # Store the OOS date cutoff so backtest_validation uses the same split
+        if "date" in pooled.columns:
+            self._oos_date_cutoff = val_date
+        else:
+            self._oos_date_cutoff = None
+        self._oos_row_start = val_end
+
         # Zero-variance features produce NaN after scaling; replace with 0
         np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
@@ -236,6 +243,8 @@ class TrainingPipeline:
             feature_names=feature_cols,
             sequence_length=min(sequence_length, max(1, len(X_train) - 1)),
         )
+
+        self.model._feature_scaler = self._feature_scaler
 
         for model_type, result in metrics.items():
             sub_metrics = result.get("metrics", {})
@@ -260,17 +269,18 @@ class TrainingPipeline:
                 continue
 
             feature_cols = self.feature_engineer.get_feature_columns(df)
-            # Train uses 0-80%, val uses 80-90%, OOS backtest uses 90-100%
-            oos_start = int(len(df) * 0.9)
-            oos = df.iloc[oos_start:].reset_index(drop=True)
+
+            # Use the same date-based cutoff as the pooled training split
+            if hasattr(self, "_oos_date_cutoff") and self._oos_date_cutoff is not None and "date" in df.columns:
+                oos = df[df["date"] >= self._oos_date_cutoff].reset_index(drop=True)
+            else:
+                oos_start = int(len(df) * 0.9)
+                oos = df.iloc[oos_start:].reset_index(drop=True)
             if oos.empty:
                 continue
 
             X_oos = oos[feature_cols].to_numpy()
-
-            if hasattr(self, "_feature_scaler") and self._feature_scaler is not None:
-                X_oos = self._feature_scaler.transform(X_oos)
-                np.nan_to_num(X_oos, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+            X_oos = self.model.transform_features(X_oos)
 
             predicted_labels = self.model.predict(X_oos)
             confidence = self.model.get_signal_confidence(X_oos)

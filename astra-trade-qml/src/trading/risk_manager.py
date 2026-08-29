@@ -99,8 +99,8 @@ class RiskManager:
             else 0.0
         )
         daily_loss_pct = (
-            -self.state.daily_pnl / self.state.current_capital
-            if self.state.current_capital > 0
+            -self.state.daily_pnl / self.state.starting_capital
+            if self.state.starting_capital > 0
             else 0.0
         )
 
@@ -142,6 +142,7 @@ class RiskManager:
         self.state.daily_pnl = 0.0
         self.state.halted = False
         self.state.halt_reason = None
+        self.state.consecutive_losses = 0
 
     def open_position(self) -> None:
         self.state.open_positions += 1

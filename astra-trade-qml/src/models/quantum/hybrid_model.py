@@ -70,6 +70,7 @@ class HybridQMLModel:
         self.training_timestamp = None
         self.sub_model_weights = {}
         self.performance_history = []
+        self._feature_scaler = None
 
     def _generate_version(self) -> str:
         """Generate unique model version hash."""
@@ -464,6 +465,13 @@ class HybridQMLModel:
 
         return metrics
 
+    def transform_features(self, X: np.ndarray) -> np.ndarray:
+        """Apply the pipeline-level feature scaler that was fitted during training."""
+        if self._feature_scaler is not None:
+            X = self._feature_scaler.transform(X)
+            np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+        return X
+
     def save(self, path: str) -> None:
         """
         Save entire ensemble to disk.
@@ -488,10 +496,13 @@ class HybridQMLModel:
         with open(save_path / "hybrid_metadata.json", "w") as f:
             json.dump(metadata, f, indent=2)
 
-        # Save meta-learner
+        # Save meta-learner and pipeline scaler
         import joblib
         if self.meta_learner is not None:
             joblib.dump(self.meta_learner, save_path / "meta_learner.pkl")
+
+        if self._feature_scaler is not None:
+            joblib.dump(self._feature_scaler, save_path / "feature_scaler.pkl")
 
         # Save sub-models
         if self.lstm_model is not None:
@@ -528,10 +539,13 @@ class HybridQMLModel:
         self.performance_history = metadata.get("performance_history", [])
         self._meta_model_names = metadata.get("_meta_model_names")
 
-        # Load meta-learner
+        # Load meta-learner and pipeline scaler
         import joblib
         if (load_path / "meta_learner.pkl").exists():
             self.meta_learner = joblib.load(load_path / "meta_learner.pkl")
+
+        if (load_path / "feature_scaler.pkl").exists():
+            self._feature_scaler = joblib.load(load_path / "feature_scaler.pkl")
 
         # LSTM saves its own input_size in lstm_config.json; read it to
         # build all sub-models at the correct width before loading weights.

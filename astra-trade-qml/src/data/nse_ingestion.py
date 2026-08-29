@@ -324,7 +324,8 @@ class YFinanceDataProvider:
             "Close": "close",
             "Volume": "volume",
         })
-        history["date"] = pd.to_datetime(history["date"]).dt.tz_localize(None)
+        dates = pd.to_datetime(history["date"])
+        history["date"] = dates.dt.tz_convert(None) if dates.dt.tz is not None else dates
         history["symbol"] = symbol
         history["turnover"] = history["close"] * history["volume"]
 

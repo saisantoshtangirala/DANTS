@@ -22,7 +22,8 @@ class RegimeDetector:
         self.regimes = regimes_config.get("regimes", {})
         self.transitions = regimes_config.get("transitions", {})
         self._current_regime: Optional[str] = None
-        self._bars_in_regime = 0
+        self._pending_regime: Optional[str] = None
+        self._pending_count = 0
 
     def _conditions_met(self, conditions: List[Dict[str, Any]], indicators: Dict[str, float]) -> bool:
         for cond in conditions:
@@ -52,20 +53,27 @@ class RegimeDetector:
 
         if self._current_regime is None:
             self._current_regime = candidate
-            self._bars_in_regime = 0
+            self._pending_regime = None
+            self._pending_count = 0
             return candidate
 
         if candidate == self._current_regime:
-            self._bars_in_regime += 1
+            self._pending_regime = None
+            self._pending_count = 0
             return candidate
 
-        # Candidate differs from the current regime: only switch once the
-        # cooldown window has elapsed, to avoid regime flickering.
-        if self._bars_in_regime >= cooldown:
-            self._current_regime = candidate
-            self._bars_in_regime = 0
+        # Candidate differs: only switch when it has been consistently
+        # different for `cooldown` consecutive bars, to avoid flickering.
+        if candidate == self._pending_regime:
+            self._pending_count += 1
         else:
-            self._bars_in_regime += 1
+            self._pending_regime = candidate
+            self._pending_count = 1
+
+        if self._pending_count >= max(cooldown, 1):
+            self._current_regime = candidate
+            self._pending_regime = None
+            self._pending_count = 0
 
         return self._current_regime
 
@@ -85,4 +93,5 @@ class RegimeDetector:
     def reset(self) -> None:
         """Clear hysteresis state, e.g. at the start of a new trading day."""
         self._current_regime = None
-        self._bars_in_regime = 0
+        self._pending_regime = None
+        self._pending_count = 0

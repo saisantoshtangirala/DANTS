@@ -75,12 +75,12 @@ class TradingEngine:
         if signal.action == "HOLD" or signal.execution_action in ("none", "queue_review"):
             return signal
 
-        if not self.risk_manager.can_open_position():
-            return signal
-
-        # Close any existing position for this symbol before opening a new one
+        # Close any existing position for this symbol before checking capacity
         if symbol in self.broker.open_positions:
             self.close_symbol(symbol, price)
+
+        if not self.risk_manager.can_open_position():
+            return signal
 
         regime_multiplier = self.regime_detector.position_size_multiplier(regime)
         size_pct = self.risk_manager.position_size(
@@ -96,7 +96,11 @@ class TradingEngine:
         if size_pct <= 0 or price <= 0:
             return signal
 
-        position_value = size_pct * self.risk_manager.state.current_capital
+        committed = sum(
+            p.entry_price * p.quantity for p in self.broker.open_positions.values()
+        )
+        available_capital = max(0.0, self.risk_manager.state.current_capital - committed)
+        position_value = size_pct * available_capital
         quantity = int(position_value // price)
         if quantity <= 0:
             return signal
@@ -159,7 +163,13 @@ class TradingEngine:
         india_vix: Optional[float] = None,
     ) -> None:
         """Check stop-loss and take-profit for all open positions, closing any that hit."""
-        self.risk_manager.check_circuit_breakers(india_vix=india_vix)
+        halt_reason = self.risk_manager.check_circuit_breakers(india_vix=india_vix)
+
+        if halt_reason and self.broker.open_positions:
+            if self.logger:
+                self.logger.info("circuit_breaker_closing_all", reason=halt_reason)
+            self.close_all_positions(prices)
+            return
 
         for symbol in list(self.broker.open_positions.keys()):
             pos = self.broker.open_positions[symbol]

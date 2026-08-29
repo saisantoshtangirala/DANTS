@@ -221,8 +221,14 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
         return
 
     feature_cols = feature_engineer.get_feature_columns(featured)
-    X = featured[feature_cols].to_numpy()[-1:]
-    class_probabilities = model.predict_proba(X)[0]
+
+    # Pass enough rows for LSTM to form at least one sequence
+    seq_len = model.lstm_model.sequence_length if model.lstm_model else 0
+    n_rows = max(seq_len + 1, 1)
+    X = featured[feature_cols].to_numpy()[-n_rows:]
+
+    X = model.transform_features(X)
+    class_probabilities = model.predict_proba(X)[-1]
     price = float(ohlcv["close"].iloc[-1])
 
     sub_model_probs = {}
@@ -234,7 +240,7 @@ def _process_symbol_cycle(symbol, live_feed, feature_engineer, model, engine, in
     ]:
         if sub_model is not None:
             try:
-                sub_model_probs[name] = sub_model.predict_proba(X)[0]
+                sub_model_probs[name] = sub_model.predict_proba(X)[-1]
             except Exception:
                 pass
 

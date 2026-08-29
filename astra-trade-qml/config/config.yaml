@@ -91,7 +91,7 @@ models:
 
 signals:
   confidence:
-    min_threshold: 0.70             # Minimum confidence to execute
+    min_threshold: 0.60             # Minimum confidence to execute (matches medium tier)
     tiers:
       high: { min: 0.75, action: "execute_full" }
       medium: { min: 0.60, action: "execute_half" }
@@ -133,7 +133,7 @@ trading:
     stt_delivery_pct: 0.001         # 0.1% both sides (delivery)
     gst_pct: 0.18                   # 18% on brokerage + transaction charges
     transaction_charges_pct: 0.00345 # NSE transaction charges
-    sebi_charges_pct: 0.0001        # ₹10 per crore
+    sebi_charges_pct: 0.000001      # ₹10 per crore (10 / 1,00,00,000)
     stamp_duty_pct: 0.00015         # 0.015% on buy side (Maharashtra)
     slippage_pct: 0.0005            # 0.05% estimated slippage
 

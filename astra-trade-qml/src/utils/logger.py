@@ -46,8 +46,9 @@ def setup_logging(
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper()))
-    root_logger.addHandler(handler)
-    root_logger.addHandler(console_handler)
+    if not root_logger.handlers:
+        root_logger.addHandler(handler)
+        root_logger.addHandler(console_handler)
 
     # Structlog configuration
     structlog.configure(
