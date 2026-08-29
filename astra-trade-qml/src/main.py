@@ -2,9 +2,10 @@
 CLI entrypoint for Astra-Trade QML.
 
 Usage:
-    python3 -m src.main --mode train      # run the nightly training pipeline once
-    python3 -m src.main --mode paper      # run the paper trading service
-    python3 -m src.main --mode dashboard  # launch the Streamlit dashboard
+    python3 -m src.main --mode train         # run the nightly training pipeline once
+    python3 -m src.main --mode paper         # run the paper trading service
+    python3 -m src.main --mode dashboard     # launch the Streamlit dashboard
+    python3 -m src.main --mode stress-test   # stress-test risk management against historical crises
 """
 
 import argparse
@@ -306,6 +307,38 @@ def _process_symbol_cycle(
     )
 
 
+def run_stress_test(config: dict, logger) -> None:
+    """Stress-test the risk-management layer against historical crisis
+    scenarios (2008 GFC, 2013 taper tantrum, 2020 COVID crash) using real
+    daily OHLCV. See src/backtesting/stress_test.py for what this does
+    and does not validate."""
+    from src.backtesting.stress_test import CRISIS_SCENARIOS, StressTester
+    from src.data.nse_ingestion import YFinanceDataProvider
+
+    symbols = config["data"]["symbols"].get("equity_universe", config["data"]["symbols"]["focus_universe"])
+    provider = YFinanceDataProvider()
+    tester = StressTester(config["trading"])
+
+    logger.info("stress_test_started", symbols=symbols, scenarios=[s["name"] for s in CRISIS_SCENARIOS])
+    report = tester.run(symbols, provider)
+
+    for result in report.results:
+        logger.info(
+            "stress_test_result",
+            symbol=result.symbol,
+            scenario=result.scenario,
+            data_available=result.data_available,
+            worst_day_return_pct=round(result.worst_day_return_pct, 4),
+            max_drawdown_pct=round(result.max_drawdown_pct, 4),
+            capital_at_risk=round(result.capital_at_risk, 2),
+            would_breach_daily_loss_limit=result.would_breach_daily_loss_limit,
+            would_breach_max_drawdown=result.would_breach_max_drawdown,
+        )
+
+    summary = report.worst_case_summary()
+    logger.info("stress_test_summary", **summary)
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -326,7 +359,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -345,6 +378,8 @@ def main() -> None:
         run_paper(config, logger)
     elif args.mode == "dashboard":
         run_dashboard(config, logger)
+    elif args.mode == "stress-test":
+        run_stress_test(config, logger)
 
 
 if __name__ == "__main__":

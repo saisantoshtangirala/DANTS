@@ -16,6 +16,8 @@ import numpy as np
 import pandas as pd
 import structlog
 
+from src.data.data_quality import ListingContinuityReport
+from src.data.data_quality import check_listing_continuity as check_symbol_continuity
 from src.data.feature_engineering import FeatureConfig, FeatureEngineer
 from src.data.nse_ingestion import KiteDataProvider, YFinanceDataProvider
 from src.models.quantum.hybrid_model import HybridQMLModel
@@ -265,6 +267,18 @@ class TrainingPipeline:
             liquidity[symbol] = float(daily_turnover.mean() / 1e7)  # INR -> crore (1 crore = 1e7)
         return liquidity
 
+    def check_listing_continuity(self) -> Dict[str, ListingContinuityReport]:
+        """Flag any symbol whose ingested data suggests it wasn't
+        continuously tradable across the window (a halt, suspension, or
+        gap), so the allocator doesn't silently trust a backtest run on
+        broken data. See src/data/data_quality.py for why this - not
+        full point-in-time index membership - is the safeguard that
+        actually matters for this system's fixed universe."""
+        return {
+            symbol: check_symbol_continuity(symbol, df)
+            for symbol, df in self.raw_data.items()
+        }
+
     def _pooled_training_matrix(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list]:
         """Pool feature matrices from all symbols into one date-sorted, normalized training set."""
         frames = [df for df in self.featured_data.values() if not df.empty]
@@ -462,8 +476,10 @@ class TrainingPipeline:
         """Task: rank the tradable equity universe by cost-adjusted backtest
         performance and split the configured trading capital across the
         symbols that actually earned it - excluding anything with too few
-        trades to trust, non-positive expectancy after costs, or too little
-        liquidity to trade the resulting size."""
+        trades to trust, non-positive expectancy after costs, too little
+        liquidity to trade the resulting size, or a listing-continuity
+        problem (halt/suspension/gap) suggesting the backtest can't be
+        trusted for that symbol."""
         if backtest_results is None:
             backtest_results = self.backtest_validation()
 
@@ -474,6 +490,12 @@ class TrainingPipeline:
             "equity_universe", list(self.featured_data.keys())
         )
 
+        continuity_reports = self.check_listing_continuity()
+        continuity_ok = [
+            s for s in tradable_symbols
+            if continuity_reports.get(s) is None or continuity_reports[s].is_continuous
+        ]
+
         allocator = PortfolioAllocator(
             total_capital=capital_cfg["initial"],
             min_trades=allocator_cfg.get("min_backtest_trades", 20),
@@ -481,11 +503,18 @@ class TrainingPipeline:
             max_symbols=allocator_cfg.get("max_symbols", 5),
         )
 
-        return allocator.allocate(
+        result = allocator.allocate(
             backtest_results=backtest_results,
             liquidity=self.compute_liquidity(),
-            tradable_symbols=tradable_symbols,
+            tradable_symbols=continuity_ok,
         )
+
+        for symbol in tradable_symbols:
+            report = continuity_reports.get(symbol)
+            if report is not None and not report.is_continuous:
+                result.excluded[symbol] = f"listing continuity: {report.reason}"
+
+        return result
 
     def model_deployment(
         self, model_dir: str = "models/latest", allocation: Optional[AllocationResult] = None

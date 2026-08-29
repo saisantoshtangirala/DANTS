@@ -200,3 +200,43 @@ def test_backtest_validation_applies_costs_and_confidence_gating(config):
         for close in (100.0, 101.0)
     )
     assert report["total_pnl"] < gross_pnl
+
+
+def test_capital_allocation_excludes_symbol_with_listing_continuity_failure(config):
+    """
+    Regression test for the survivorship-bias safeguard: a symbol whose
+    ingested data has no rows at all (e.g. a halt/suspension/delisting
+    during the window) must be excluded from capital allocation with a
+    clear reason, not silently skipped over or, worse, allocated capital
+    based on a backtest that ran on broken data.
+    """
+    test_config = {
+        **config,
+        "data": {
+            **config["data"],
+            "symbols": {**config["data"]["symbols"], "equity_universe": ["GOOD", "HALTED"]},
+        },
+    }
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(test_config, db=db)
+
+    good_dates = pd.bdate_range("2024-01-01", periods=30)
+    pipeline.raw_data = {
+        "GOOD": pd.DataFrame({
+            "date": good_dates,
+            "close": 100.0,
+            "volume": 2_000_000.0,  # well above the min_adtv_cr liquidity floor
+        }),
+        "HALTED": pd.DataFrame({"date": [], "close": [], "volume": []}),
+    }
+
+    backtest_results = {
+        "GOOD": {"total_trades": 30, "expectancy": 0.001, "sharpe_ratio": 1.0},
+        "HALTED": {"total_trades": 30, "expectancy": 0.001, "sharpe_ratio": 1.0},
+    }
+
+    result = pipeline.capital_allocation(backtest_results)
+
+    assert {a.symbol for a in result.allocations} == {"GOOD"}
+    assert "HALTED" in result.excluded
+    assert "listing continuity" in result.excluded["HALTED"]
