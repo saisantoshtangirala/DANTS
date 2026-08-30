@@ -613,6 +613,7 @@ def launch_and_wait(
     train_poll_timeout_seconds: int,
     max_launch_attempts: int = 3,
     cloud_type: str = "SECURE",
+    fallback_cloud_type: str = "COMMUNITY",
     ssh_key_path: str = "",
     repo: str = "",
     gh_token: str = "",
@@ -630,41 +631,57 @@ def launch_and_wait(
     completion against the model-artifacts branch instead of relying
     solely on the pod's own (unreliable - see check_fresh_completion_marker)
     self-termination.
+
+    If every attempt on cloud_type exhausts without a pod ever booting
+    (observed in practice as RunPod's SECURE cloud returning "no
+    instances currently available" on every retry - a capacity issue,
+    not something max_launch_attempts alone can work around since it's
+    still the same limited pool of hosts), the whole attempt loop is
+    retried once more on fallback_cloud_type before giving up entirely.
+    Pass fallback_cloud_type="" (or equal to cloud_type) to disable this.
     """
     global _active_pod
 
-    for attempt in range(1, max_launch_attempts + 1):
-        try:
-            pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud_type)
-        except RuntimeError as e:
-            print(f"Launch attempt {attempt}/{max_launch_attempts}: create_pod failed on {cloud_type} cloud ({e})")
-            continue
+    clouds_to_try = [cloud_type]
+    if fallback_cloud_type and fallback_cloud_type != cloud_type:
+        clouds_to_try.append(fallback_cloud_type)
 
-        pod_id = pod["id"]
-        _active_pod = {"api_key": api_key, "pod_id": pod_id}
-        launched_at = datetime.now(timezone.utc)
-        print(
-            f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} on {cloud_type} cloud "
-            f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
-        )
+    for cloud in clouds_to_try:
+        for attempt in range(1, max_launch_attempts + 1):
+            try:
+                pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud)
+            except RuntimeError as e:
+                print(f"Launch attempt {attempt}/{max_launch_attempts} on {cloud} cloud: create_pod failed ({e})")
+                continue
 
-        boot_info = wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds, ssh_key_path=ssh_key_path)
-        if boot_info is not None:
-            result = poll_until_terminated(
-                api_key, pod_id, timeout_seconds=train_poll_timeout_seconds,
-                ssh_key_path=ssh_key_path,
-                ssh_host=boot_info.get("host", ""),
-                ssh_port=boot_info.get("port", 0),
-                repo=repo, gh_token=gh_token, launched_at=launched_at,
+            pod_id = pod["id"]
+            _active_pod = {"api_key": api_key, "pod_id": pod_id}
+            launched_at = datetime.now(timezone.utc)
+            print(
+                f"Launch attempt {attempt}/{max_launch_attempts}: created pod {pod_id} on {cloud} cloud "
+                f"(gpu={pod.get('machine', {}).get('gpuTypeId')}, cost/hr={pod.get('costPerHr')})"
             )
+
+            boot_info = wait_for_pod_boot(api_key, pod_id, boot_timeout_seconds=boot_timeout_seconds, ssh_key_path=ssh_key_path)
+            if boot_info is not None:
+                result = poll_until_terminated(
+                    api_key, pod_id, timeout_seconds=train_poll_timeout_seconds,
+                    ssh_key_path=ssh_key_path,
+                    ssh_host=boot_info.get("host", ""),
+                    ssh_port=boot_info.get("port", 0),
+                    repo=repo, gh_token=gh_token, launched_at=launched_at,
+                )
+                _active_pod = None
+                return result
+
+            print(f"Pod {pod_id} failed to boot (likely a RunPod host-side issue) - terminating and retrying")
+            terminate_pod(api_key, pod_id)
             _active_pod = None
-            return result
 
-        print(f"Pod {pod_id} failed to boot (likely a RunPod host-side issue) - terminating and retrying")
-        terminate_pod(api_key, pod_id)
-        _active_pod = None
+        if cloud != clouds_to_try[-1]:
+            print(f"Gave up after {max_launch_attempts} launch attempts on {cloud} cloud - trying {clouds_to_try[clouds_to_try.index(cloud) + 1]} cloud next")
 
-    print(f"Gave up after {max_launch_attempts} launch attempts - pod never booted", file=sys.stderr)
+    print(f"Gave up after {max_launch_attempts} launch attempts per cloud ({', '.join(clouds_to_try)}) - pod never booted", file=sys.stderr)
     return False
 
 
@@ -759,6 +776,7 @@ def main() -> None:
     parser.add_argument("--gpu-ids-json", required=True, help='JSON array of GPU type IDs, e.g. select_gpu.py output')
     parser.add_argument("--container-disk-gb", type=int, default=40)
     parser.add_argument("--cloud-type", default="SECURE", choices=["SECURE", "COMMUNITY"], help="RunPod cloud type (SECURE = RunPod datacenters with pre-cached images, COMMUNITY = third-party hosts)")
+    parser.add_argument("--fallback-cloud-type", default="COMMUNITY", choices=["SECURE", "COMMUNITY", ""], help="If every launch attempt on --cloud-type exhausts (e.g. RunPod capacity errors), retry the same attempt budget on this cloud before giving up. Pass '' to disable.")
     parser.add_argument("--boot-timeout-seconds", type=int, default=1800, help="Max time to wait for the container to start (30m default - the ~15GB PyTorch image can take 15-25min to pull on cold hosts)")
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
@@ -843,6 +861,7 @@ def main() -> None:
             train_poll_timeout_seconds=args.poll_timeout_seconds,
             max_launch_attempts=args.max_launch_attempts,
             cloud_type=args.cloud_type,
+            fallback_cloud_type=args.fallback_cloud_type,
             ssh_key_path=ssh_key_path,
             repo=args.repo,
             gh_token=gh_token,
