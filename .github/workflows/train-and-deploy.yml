@@ -1,0 +1,128 @@
+name: Train on RunPod and Deploy to Hetzner
+
+# Trains astra-trade-qml's HybridQMLModel on a rented RunPod GPU and
+# deploys the resulting model to the Hetzner paper-trading host.
+#
+# No custom Docker image or registry: the pod boots from RunPod's public
+# runpod/pytorch image and clones the repo + installs dependencies at
+# startup (scripts/ci/launch_training_pod.py) - the same pattern already
+# validated end-to-end on real GPU hardware for the one-off smoke test
+# (scripts/runpod_smoke_test.py). A CI-built image was tried first for a
+# faster pod boot but broke twice in ways not worth the added moving
+# parts; a few minutes of install time per run is a fine trade for one
+# less thing that can fail.
+#
+# See scripts/hetzner_setup.sh for the one-time Hetzner setup this
+# depends on (systemd services + a KITE_* .env file, no Docker needed).
+#
+# NOTE: the schedule below runs this nightly on weekdays, which means
+# recurring RunPod GPU spend (typically well under $1/run - see the
+# pod's own train_timeout_seconds cap) every trading night. Remove the
+# `schedule:` block below (or disable the workflow) if you'd rather
+# trigger training manually via workflow_dispatch until you've watched
+# a few real runs.
+on:
+  workflow_dispatch:
+    inputs:
+      min_vram_gb:
+        description: "Minimum GPU VRAM (GB) to select"
+        required: false
+        default: "12"
+  schedule:
+    # 16:30 IST = 11:00 UTC, weekdays - matches config.yaml's training_window start.
+    - cron: "0 11 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    # launch_training_pod.py's own timeouts: up to 3 launch attempts x 30min
+    # boot check (worst case, all fail to boot) + the 190min poll-timeout
+    # once a pod does boot = up to 280min. Padded above that so the script's
+    # own clean failure/retry logic always gets to finish before GitHub's
+    # job timeout would hard-kill it mid-retry.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install script dependencies
+        run: pip install requests
+
+      - name: Select cheapest available GPU
+        id: gpu
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: |
+          GPU_IDS=$(python3 astra-trade-qml/scripts/ci/select_gpu.py \
+            --min-vram-gb "${{ github.event.inputs.min_vram_gb || '12' }}")
+          echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
+          echo "Selected GPUs: $GPU_IDS"
+
+      - name: Generate ephemeral SSH key for pod log streaming
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
+          chmod 600 /tmp/runpod_ssh_key
+
+      - name: Launch training pod and wait for completion
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        run: |
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
+            > >(tee /tmp/launch_training_pod.log) 2>&1
+
+      - name: Summarize training run
+        if: always()
+        run: |
+          {
+            echo "### Training run"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
+            echo
+            echo '```'
+            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+              /tmp/launch_training_pod.log || echo "(no matching status lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: train
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out scripts and source
+        uses: actions/checkout@v4
+
+      - name: Fetch trained model from model-artifacts branch
+        run: |
+          git fetch origin model-artifacts
+          git checkout origin/model-artifacts -- astra-trade-qml/models/latest
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/hetzner_deploy_key
+          chmod 600 ~/.ssh/hetzner_deploy_key
+
+      - name: Deploy model to Hetzner
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+          HETZNER_SSH_KEY_PATH: /home/runner/.ssh/hetzner_deploy_key
+          HETZNER_SSH_PORT: ${{ secrets.HETZNER_SSH_PORT }}
+        run: bash astra-trade-qml/scripts/deploy_to_hetzner.sh

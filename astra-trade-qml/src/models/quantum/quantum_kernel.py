@@ -1,0 +1,447 @@
+"""
+Quantum Kernel SVM for market regime classification.
+Uses Qiskit QuantumKernel to compute similarity in quantum feature space.
+"""
+
+import numpy as np
+import pandas as pd
+from typing import Optional, List, Dict, Tuple
+from pathlib import Path
+import json
+import warnings
+
+# Qiskit imports
+try:
+    from qiskit import QuantumCircuit
+    from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
+    from qiskit.primitives import StatevectorSampler
+    QISKIT_AVAILABLE = True
+
+    # qiskit_machine_learning 0.7.x's kernels/__init__.py transitively imports
+    # evolved_operator_ansatz, which only exists in qiskit >= 1.3 (we pin 1.2.x).
+    # Provide a stub so the import chain succeeds; we never call this function.
+    import qiskit.circuit.library as _qcl
+    if not hasattr(_qcl, 'evolved_operator_ansatz'):
+        def _evolved_operator_ansatz_stub(*args, **kwargs):
+            raise NotImplementedError("evolved_operator_ansatz requires qiskit >= 1.3")
+        _qcl.evolved_operator_ansatz = _evolved_operator_ansatz_stub
+except ImportError as e:
+    QISKIT_AVAILABLE = False
+    warnings.warn(f"Qiskit import failed ({e}). Quantum kernel will fallback to classical.")
+
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+
+class QuantumKernelClassifier:
+    """
+    Quantum-enhanced SVM using quantum feature maps.
+    Falls back to classical RBF kernel if quantum simulation fails.
+    """
+
+    def __init__(
+        self,
+        n_qubits: int = 4,
+        feature_map_type: str = "ZZFeatureMap",
+        feature_map_reps: int = 2,
+        shots: int = 1024,
+        backend_name: str = "aer_simulator",
+        use_pca: bool = True,
+        pca_components: int = 4,
+        fallback_to_classical: bool = True,
+        quantum_depth_adaptation: bool = False,
+    ):
+        """
+        Initialize Quantum Kernel classifier.
+
+        Args:
+            n_qubits: Number of qubits (limited by classical simulation)
+            feature_map_type: "ZZFeatureMap" or "PauliFeatureMap"
+            feature_map_reps: Repetitions of feature map entangling layers
+            shots: Number of measurement shots
+            backend_name: Qiskit backend name
+            use_pca: Whether to reduce dimensionality before quantum encoding
+            pca_components: Number of PCA components (must equal n_qubits)
+            fallback_to_classical: Use classical SVM if quantum fails
+            quantum_depth_adaptation: After the initial fit, sweep
+                feature_map_reps over {1, 2, 3} and keep whichever gives
+                the best validation accuracy (requires X_val/y_val)
+        """
+        self.n_qubits = n_qubits
+        self.feature_map_type = feature_map_type
+        self.feature_map_reps = feature_map_reps
+        self.shots = shots
+        self.backend_name = backend_name
+        self.use_pca = use_pca
+        self.pca_components = min(pca_components, n_qubits)
+        self.fallback_to_classical = fallback_to_classical
+        self.quantum_depth_adaptation = quantum_depth_adaptation
+
+        self.feature_map = None
+        self.quantum_kernel = None
+        self.classical_svm = None
+        self.scaler = StandardScaler()
+        self.pca = PCA(n_components=self.pca_components) if use_pca else None
+        self.is_quantum = False
+        self.training_metrics = {}
+
+        if not QISKIT_AVAILABLE:
+            self.is_quantum = False
+
+    def _build_feature_map(self) -> QuantumCircuit:
+        """Build quantum feature map circuit."""
+        if self.feature_map_type == "ZZFeatureMap":
+            return ZZFeatureMap(
+                feature_dimension=self.n_qubits,
+                reps=self.feature_map_reps,
+                entanglement="linear",
+            )
+        elif self.feature_map_type == "PauliFeatureMap":
+            return PauliFeatureMap(
+                feature_dimension=self.n_qubits,
+                reps=self.feature_map_reps,
+                paulis=["Z", "ZZ"],
+                entanglement="linear",
+            )
+        else:
+            raise ValueError(f"Unknown feature map: {self.feature_map_type}")
+
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+    ) -> Dict[str, float]:
+        """
+        Train the quantum kernel SVM.
+
+        Args:
+            X_train: Training features
+            y_train: Training labels (mapped to 0, 1, 2)
+            X_val: Validation features
+            y_val: Validation labels
+
+        Returns:
+            Training metrics
+        """
+        y_train_mapped = y_train.astype(int)
+
+        # Preprocess: scale and optionally PCA
+        X_scaled = self.scaler.fit_transform(X_train)
+
+        if self.use_pca and self.pca is not None:
+            X_processed = self.pca.fit_transform(X_scaled)
+            # Ensure we have exactly n_qubits features
+            if X_processed.shape[1] > self.n_qubits:
+                X_processed = X_processed[:, :self.n_qubits]
+            elif X_processed.shape[1] < self.n_qubits:
+                # Pad with zeros
+                padding = np.zeros((X_processed.shape[0], self.n_qubits - X_processed.shape[1]))
+                X_processed = np.hstack([X_processed, padding])
+            pca_diagnostics = {
+                "explained_variance_ratio": [float(v) for v in self.pca.explained_variance_ratio_],
+                "cumulative_explained_variance": float(np.sum(self.pca.explained_variance_ratio_)),
+            }
+        else:
+            # Take first n_qubits features
+            X_processed = X_scaled[:, :self.n_qubits]
+            pca_diagnostics = None
+
+        # Preprocess validation data the same way (transform, not fit)
+        X_val_processed = None
+        y_val_mapped = None
+        if X_val is not None and y_val is not None:
+            y_val_mapped = y_val.astype(int)
+            X_val_scaled = self.scaler.transform(X_val)
+            if self.use_pca and self.pca is not None:
+                X_val_pca = self.pca.transform(X_val_scaled)
+                if X_val_pca.shape[1] > self.n_qubits:
+                    X_val_processed = X_val_pca[:, :self.n_qubits]
+                elif X_val_pca.shape[1] < self.n_qubits:
+                    padding = np.zeros((X_val_pca.shape[0], self.n_qubits - X_val_pca.shape[1]))
+                    X_val_processed = np.hstack([X_val_pca, padding])
+                else:
+                    X_val_processed = X_val_pca
+            else:
+                X_val_processed = X_val_scaled[:, :self.n_qubits]
+
+        # Try quantum approach; fall back to classical only on failure
+        if QISKIT_AVAILABLE:
+            try:
+                self._fit_quantum(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
+                self.is_quantum = True
+                if self.quantum_depth_adaptation and X_val_processed is not None and y_val_mapped is not None:
+                    self._adapt_circuit_depth(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
+            except Exception as e:
+                if self.fallback_to_classical:
+                    print(f"Quantum training failed: {e}. Falling back to classical SVM.", flush=True)
+                    self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
+                    self.is_quantum = False
+                else:
+                    raise
+        else:
+            self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
+            self.is_quantum = False
+
+        if pca_diagnostics is not None:
+            self.training_metrics["pca_diagnostics"] = pca_diagnostics
+
+        return self.training_metrics
+
+    def _adapt_circuit_depth(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+    ) -> None:
+        """Sweep feature_map_reps over {1, 2, 3}, keeping whichever depth
+        gives the best validation accuracy. Reuses the already-fit
+        scaler/PCA - only the feature map (and thus circuit depth) changes."""
+        best_reps = self.feature_map_reps
+        best_val_acc = self.training_metrics.get("val_accuracy", -1.0)
+        best_state = (self.feature_map, self.quantum_kernel, self.qsvc, dict(self.training_metrics))
+        original_reps = self.feature_map_reps
+
+        for candidate_reps in (1, 2, 3):
+            if candidate_reps == original_reps:
+                continue
+            self.feature_map_reps = candidate_reps
+            try:
+                self._fit_quantum(X, y, X_val, y_val)
+                candidate_val_acc = self.training_metrics.get("val_accuracy", -1.0)
+                if candidate_val_acc > best_val_acc:
+                    best_val_acc = candidate_val_acc
+                    best_reps = candidate_reps
+                    best_state = (self.feature_map, self.quantum_kernel, self.qsvc, dict(self.training_metrics))
+            except Exception as e:
+                print(f"  Quantum depth adaptation: reps={candidate_reps} failed: {e}", flush=True)
+
+        self.feature_map_reps = best_reps
+        self.feature_map, self.quantum_kernel, self.qsvc, self.training_metrics = best_state
+        self.training_metrics["adapted_from_reps"] = original_reps
+        self.training_metrics["adapted_reps"] = best_reps
+        print(f"  Quantum depth adaptation: chose reps={best_reps} (val_acc={best_val_acc:.4f})", flush=True)
+
+    @staticmethod
+    def _make_sampler():
+        """Create a V2 StatevectorSampler for quantum kernel fidelity computation.
+
+        ComputeUncompute (qiskit-algorithms 0.3.x) requires BaseSamplerV2.
+        StatevectorSampler is the V2 primitive that provides exact statevector
+        simulation and satisfies the BaseSamplerV2 interface.
+        """
+        print("Quantum Kernel: using StatevectorSampler (V2, exact simulation)", flush=True)
+        return StatevectorSampler()
+
+    def _fit_quantum(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+    ) -> None:
+        """Train using quantum kernel SVM."""
+        from qiskit_algorithms.state_fidelities import ComputeUncompute
+        from qiskit_machine_learning.kernels.fidelity_quantum_kernel import FidelityQuantumKernel
+        from qiskit_machine_learning.algorithms.classifiers.qsvc import QSVC
+
+        self.feature_map = self._build_feature_map()
+
+        sampler = self._make_sampler()
+        fidelity = ComputeUncompute(sampler=sampler)
+        self.quantum_kernel = FidelityQuantumKernel(
+            feature_map=self.feature_map,
+            fidelity=fidelity,
+            enforce_psd=True,
+        )
+
+        # Train QSVC
+        self.qsvc = QSVC(quantum_kernel=self.quantum_kernel)
+
+        # Subsample for quantum kernel (computationally expensive -
+        # kernel matrix is O(n^2) quantum circuit evaluations)
+        max_samples = min(len(X), 150)
+        if len(X) > max_samples:
+            rng = np.random.default_rng(42)
+            indices = rng.choice(len(X), max_samples, replace=False)
+            X_sub = X[indices]
+            y_sub = y[indices]
+        else:
+            X_sub = X
+            y_sub = y
+
+        import time as _time
+        print(f"  Quantum Kernel: fitting QSVC on {len(X_sub)} samples ({len(X_sub)}x{len(X_sub)} kernel matrix)...", flush=True)
+        t0 = _time.monotonic()
+        self.qsvc.fit(X_sub, y_sub)
+        print(f"  Quantum Kernel: QSVC fit completed in {_time.monotonic() - t0:.1f}s", flush=True)
+
+        # Kernel concentration diagnostic: as qubit count grows, quantum
+        # kernels tend toward the identity matrix (all off-diagonal entries
+        # near 0), which kills class separability. Off-diagonal mean close
+        # to 0 / std close to 0 is a red flag worth surfacing before deploy.
+        try:
+            kernel_matrix = self.quantum_kernel.evaluate(X_sub)
+            off_diag_mask = ~np.eye(kernel_matrix.shape[0], dtype=bool)
+            off_diag_values = kernel_matrix[off_diag_mask]
+            kernel_diagnostics = {
+                "off_diagonal_mean": float(np.mean(off_diag_values)),
+                "off_diagonal_std": float(np.std(off_diag_values)),
+            }
+        except Exception as e:
+            print(f"  Quantum Kernel: diagnostic kernel evaluation failed: {e}", flush=True)
+            kernel_diagnostics = None
+
+        # Metrics
+        train_pred = self.qsvc.predict(X_sub)
+        self.training_metrics = {
+            "train_accuracy": float(np.mean(train_pred == y_sub)),
+            "is_quantum": True,
+            "n_qubits": self.n_qubits,
+            "feature_map": self.feature_map_type,
+            "circuit_depth": len(self.feature_map.data),
+            "training_samples": len(X_sub),
+        }
+        if kernel_diagnostics is not None:
+            self.training_metrics["kernel_diagnostics"] = kernel_diagnostics
+
+        if X_val is not None and y_val is not None:
+            val_pred = self.qsvc.predict(X_val)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
+
+    def _fit_classical(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+    ) -> None:
+        """Train using classical RBF SVM fallback."""
+        self.classical_svm = SVC(
+            kernel="rbf",
+            C=1.0,
+            gamma="scale",
+            probability=True,
+            decision_function_shape="ovr",
+        )
+        self.classical_svm.fit(X, y)
+
+        train_pred = self.classical_svm.predict(X)
+        self.training_metrics = {
+            "train_accuracy": float(np.mean(train_pred == y)),
+            "is_quantum": False,
+            "fallback_reason": "classical_mode",
+        }
+
+        if X_val is not None and y_val is not None:
+            val_pred = self.classical_svm.predict(X_val)
+            self.training_metrics["val_accuracy"] = float(np.mean(val_pred == y_val))
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities.
+
+        Args:
+            X: Feature array
+
+        Returns:
+            Probabilities for [down, up]
+        """
+        # Preprocess
+        X_scaled = self.scaler.transform(X)
+
+        if self.use_pca and self.pca is not None:
+            X_processed = self.pca.transform(X_scaled)
+            if X_processed.shape[1] > self.n_qubits:
+                X_processed = X_processed[:, :self.n_qubits]
+            elif X_processed.shape[1] < self.n_qubits:
+                padding = np.zeros((X_processed.shape[0], self.n_qubits - X_processed.shape[1]))
+                X_processed = np.hstack([X_processed, padding])
+        else:
+            X_processed = X_scaled[:, :self.n_qubits]
+
+        if self.is_quantum and hasattr(self, "qsvc"):
+            try:
+                decisions = self.qsvc.decision_function(X_processed)
+                if decisions.ndim == 1:
+                    decisions = np.column_stack([-decisions, decisions])
+                exp_decisions = np.exp(decisions - np.max(decisions, axis=1, keepdims=True))
+                proba = exp_decisions / np.sum(exp_decisions, axis=1, keepdims=True)
+                if proba.shape[1] > 2:
+                    proba = proba[:, :2]
+                    proba = proba / proba.sum(axis=1, keepdims=True)
+                return proba
+            except Exception as e:
+                import warnings
+                warnings.warn(f"Quantum kernel predict_proba failed: {e}. Falling back to classical.")
+
+        if self.classical_svm is not None:
+            return self.classical_svm.predict_proba(X_processed)
+
+        return np.ones((len(X), 2)) / 2.0
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels.
+
+        Args:
+            X: Feature array
+
+        Returns:
+            Labels (-1=down, 1=up)
+        """
+        proba = self.predict_proba(X)
+        class_indices = np.argmax(proba, axis=1)
+
+        label_map = {0: -1, 1: 1}
+        return np.array([label_map[i] for i in class_indices])
+
+    def save(self, path: str) -> None:
+        """Save model."""
+        save_path = Path(path)
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        metadata = {
+            "n_qubits": self.n_qubits,
+            "feature_map_type": self.feature_map_type,
+            "is_quantum": self.is_quantum,
+            "training_metrics": self.training_metrics,
+            "pca_components": self.pca_components if self.pca else None,
+        }
+
+        with open(save_path / "qkernel_metadata.json", "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        # Save scaler and PCA
+        import pickle
+        with open(save_path / "preprocessor.pkl", "wb") as f:
+            pickle.dump({"scaler": self.scaler, "pca": self.pca}, f)
+
+        if self.classical_svm is not None:
+            import joblib
+            joblib.dump(self.classical_svm, save_path / "classical_svm.pkl")
+
+    def load(self, path: str) -> None:
+        """Load model."""
+        load_path = Path(path)
+
+        with open(load_path / "qkernel_metadata.json", "r") as f:
+            metadata = json.load(f)
+
+        self.n_qubits = metadata["n_qubits"]
+        self.feature_map_type = metadata["feature_map_type"]
+        self.is_quantum = metadata["is_quantum"]
+        self.training_metrics = metadata.get("training_metrics", {})
+
+        import pickle
+        with open(load_path / "preprocessor.pkl", "rb") as f:
+            preproc = pickle.load(f)
+            self.scaler = preproc["scaler"]
+            self.pca = preproc.get("pca")
+
+        if not self.is_quantum:
+            import joblib
+            self.classical_svm = joblib.load(load_path / "classical_svm.pkl")

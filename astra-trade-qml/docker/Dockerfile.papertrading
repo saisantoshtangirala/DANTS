@@ -1,0 +1,42 @@
+# Astra-Trade QML - Paper Trading Docker (Hetzner VPS)
+FROM python:3.10-slim-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    gcc g++ libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set workdir
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements/requirements-paper.txt .
+RUN pip install --no-cache-dir -r requirements-paper.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY config/ ./config/
+COPY scripts/ ./scripts/
+
+# Create necessary directories
+RUN mkdir -p logs models data
+
+# Environment variables for Hetzner + Zerodha. Real values are supplied
+# at `docker compose up` time via the host's .env file (see
+# docker/docker-compose.yml) - never baked into the image.
+ENV KITE_API_KEY=""
+ENV KITE_API_SECRET=""
+ENV KITE_USER_ID=""
+ENV KITE_PASSWORD=""
+ENV KITE_TOTP_SECRET=""
+ENV DATABASE_URL="sqlite:///logs/astra_trade.db"
+
+# Expose dashboard port
+EXPOSE 8501
+
+# Paper trading entrypoint
+CMD ["python3", "-m", "src.main", "--mode", "paper"]

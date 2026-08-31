@@ -1,0 +1,446 @@
+"""
+LSTM-based sequence model for time-series prediction.
+Handles feature sequences and outputs probability distributions over actions.
+"""
+
+import copy
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from typing import List, Dict, Optional, Tuple
+from pathlib import Path
+import json
+
+
+class LSTMDataset(Dataset):
+    """PyTorch Dataset for LSTM training.
+
+    When `groups` is provided (one symbol id per row of X), a window
+    starting at index i is only valid if every row in
+    X[i:i+sequence_length] belongs to the same symbol - this prevents
+    sequences from splicing together rows from different stocks when X
+    is a pooled, per-symbol-contiguous matrix built from multiple symbols.
+    """
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        sequence_length: int = 60,
+        groups: Optional[np.ndarray] = None,
+    ):
+        """
+        Initialize dataset.
+
+        Args:
+            X: Feature array (n_samples, n_features)
+            y: Label array (n_samples,)
+            sequence_length: Number of timesteps in each sequence
+            groups: Optional symbol id per row; windows crossing a
+                symbol boundary are excluded when provided
+        """
+        self.X = X
+        self.y = y
+        self.sequence_length = sequence_length
+
+        n_windows = len(X) - sequence_length
+        if groups is None or n_windows <= 0:
+            self.valid_starts = np.arange(max(n_windows, 0))
+        else:
+            starts = np.arange(n_windows)
+            end_group = groups[starts + sequence_length - 1]
+            start_group = groups[starts]
+            self.valid_starts = starts[start_group == end_group]
+
+    def __len__(self) -> int:
+        return len(self.valid_starts)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        start = self.valid_starts[idx]
+        x_seq = self.X[start:start + self.sequence_length]
+        y_label = self.y[start + self.sequence_length - 1]
+
+        return torch.FloatTensor(x_seq), torch.LongTensor([int(y_label)])[0]
+
+
+class LSTMClassifier(nn.Module):
+    """LSTM neural network for market regime/action classification."""
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int = 128,
+        num_layers: int = 2,
+        num_classes: int = 2,
+        dropout: float = 0.3,
+        bidirectional: bool = False,
+    ):
+        """
+        Initialize LSTM classifier.
+
+        Args:
+            input_size: Number of input features
+            hidden_size: LSTM hidden dimension
+            num_layers: Number of LSTM layers
+            num_classes: Number of output classes (2: down, up)
+            dropout: Dropout probability
+            bidirectional: Whether to use bidirectional LSTM
+        """
+        super(LSTMClassifier, self).__init__()
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
+
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=bidirectional,
+        )
+
+        self.dropout = nn.Dropout(dropout)
+        self.fc1 = nn.Linear(hidden_size * self.num_directions, hidden_size // 2)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size // 2, num_classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h0 = torch.zeros(self.num_layers * self.num_directions, x.size(0), self.hidden_size).to(x.device)
+        c0 = torch.zeros(self.num_layers * self.num_directions, x.size(0), self.hidden_size).to(x.device)
+
+        out, _ = self.lstm(x, (h0, c0))
+
+        out = out[:, -1, :]
+        out = self.dropout(out)
+        out = self.fc1(out)
+        out = self.relu(out)
+        out = self.fc2(out)
+        # Raw logits — CrossEntropyLoss applies log-softmax internally
+        return out
+
+    def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
+        """Softmax over logits for inference-time probability estimates."""
+        return torch.softmax(self.forward(x), dim=1)
+
+
+class LSTMModel:
+    """
+    High-level LSTM model wrapper with training, inference, and persistence.
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int = 128,
+        num_layers: int = 2,
+        dropout: float = 0.3,
+        learning_rate: float = 0.001,
+        weight_decay: float = 0.0,
+        batch_size: int = 64,
+        epochs: int = 50,
+        sequence_length: int = 60,
+        early_stopping_patience: int = 10,
+        device: Optional[str] = None,
+    ):
+        """
+        Initialize LSTM model.
+
+        Args:
+            input_size: Number of input features
+            hidden_size: LSTM hidden dimension
+            num_layers: Number of LSTM layers
+            dropout: Dropout rate
+            learning_rate: Adam learning rate
+            weight_decay: Adam L2 weight decay (regularization for small datasets)
+            batch_size: Training batch size
+            epochs: Maximum training epochs
+            sequence_length: Lookback window size
+            early_stopping_patience: Epochs to wait before stopping
+            device: 'cuda' or 'cpu'
+        """
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.sequence_length = sequence_length
+        self.early_stopping_patience = early_stopping_patience
+
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = None
+        self.class_names = ["down", "up"]
+        self.training_history = []
+
+    def build_model(self) -> None:
+        """Build the PyTorch model."""
+        self.model = LSTMClassifier(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            num_classes=2,
+            dropout=self.dropout,
+        ).to(self.device)
+
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+        groups_train: Optional[np.ndarray] = None,
+        groups_val: Optional[np.ndarray] = None,
+    ) -> Dict[str, List[float]]:
+        """
+        Train the LSTM model.
+
+        Args:
+            X_train: Training features (n_samples, n_features)
+            y_train: Training labels (n_samples,)
+            X_val: Validation features
+            y_val: Validation labels
+            groups_train: Optional symbol id per X_train row; when given,
+                windows spanning two different symbols are excluded
+            groups_val: Optional symbol id per X_val row
+
+        Returns:
+            Training history dictionary
+        """
+        if self.model is None:
+            self.build_model()
+
+        # Create datasets
+        train_dataset = LSTMDataset(X_train, y_train, self.sequence_length, groups_train)
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+
+        val_loader = None
+        if X_val is not None and y_val is not None:
+            val_dataset = LSTMDataset(X_val, y_val, self.sequence_length, groups_val)
+            val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
+
+        windowed_labels = y_train[train_dataset.valid_starts + self.sequence_length - 1]
+        mapped_labels = windowed_labels.astype(int)
+        class_counts = np.bincount(mapped_labels, minlength=2).astype(float)
+        class_counts = np.maximum(class_counts, 1.0)
+        class_weights = len(mapped_labels) / (2.0 * class_counts)
+        weight_tensor = torch.FloatTensor(class_weights).to(self.device)
+
+        criterion = nn.CrossEntropyLoss(weight=weight_tensor)
+        optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
+        # verbose was removed from ReduceLROnPlateau in newer torch releases;
+        # the training loop already prints loss/accuracy every 10 epochs below.
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", factor=0.5, patience=5
+        )
+
+        history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
+        best_val_loss = float("inf")
+        patience_counter = 0
+
+        for epoch in range(self.epochs):
+            # Training
+            self.model.train()
+            train_loss = 0.0
+            train_correct = 0
+            train_total = 0
+
+            for batch_x, batch_y in train_loader:
+                batch_x = batch_x.to(self.device)
+                batch_y = batch_y.to(self.device)
+
+                optimizer.zero_grad()
+                outputs = self.model(batch_x)
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+
+                # Gradient clipping
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+
+                optimizer.step()
+
+                train_loss += loss.item()
+                _, predicted = torch.max(outputs, 1)
+                train_total += batch_y.size(0)
+                train_correct += (predicted == batch_y).sum().item()
+
+            avg_train_loss = train_loss / len(train_loader)
+            train_acc = train_correct / train_total
+
+            history["train_loss"].append(avg_train_loss)
+            history["train_acc"].append(train_acc)
+
+            # Validation
+            if val_loader is not None:
+                self.model.eval()
+                val_loss = 0.0
+                val_correct = 0
+                val_total = 0
+
+                with torch.no_grad():
+                    for batch_x, batch_y in val_loader:
+                        batch_x = batch_x.to(self.device)
+                        batch_y = batch_y.to(self.device)
+
+                        outputs = self.model(batch_x)
+                        loss = criterion(outputs, batch_y)
+
+                        val_loss += loss.item()
+                        _, predicted = torch.max(outputs, 1)
+                        val_total += batch_y.size(0)
+                        val_correct += (predicted == batch_y).sum().item()
+
+                avg_val_loss = val_loss / len(val_loader)
+                val_acc = val_correct / val_total
+
+                history["val_loss"].append(avg_val_loss)
+                history["val_acc"].append(val_acc)
+
+                scheduler.step(avg_val_loss)
+
+                # Early stopping
+                if avg_val_loss < best_val_loss:
+                    best_val_loss = avg_val_loss
+                    patience_counter = 0
+                    # Save best model
+                    self.best_state = copy.deepcopy(self.model.state_dict())
+                else:
+                    patience_counter += 1
+
+                if patience_counter >= self.early_stopping_patience:
+                    print(f"Early stopping at epoch {epoch + 1}", flush=True)
+                    if hasattr(self, "best_state"):
+                        self.model.load_state_dict(self.best_state)
+                    break
+
+                if (epoch + 1) % 10 == 0:
+                    print(f"Epoch {epoch+1}/{self.epochs} | "
+                          f"Train Loss: {avg_train_loss:.4f} | "
+                          f"Val Loss: {avg_val_loss:.4f} | "
+                          f"Val Acc: {val_acc:.4f}", flush=True)
+            else:
+                if (epoch + 1) % 10 == 0:
+                    print(f"Epoch {epoch+1}/{self.epochs} | "
+                          f"Train Loss: {avg_train_loss:.4f} | "
+                          f"Train Acc: {train_acc:.4f}", flush=True)
+
+        self.training_history = history
+        return history
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class probabilities.
+
+        Args:
+            X: Feature array (n_samples, n_features)
+
+        Returns:
+            Probability array (n_samples, 2) for [down, up]
+        """
+        if self.model is None:
+            raise ValueError("Model not trained. Call fit() first.")
+
+        self.model.eval()
+
+        n_sequences = len(X) - self.sequence_length
+        if n_sequences <= 0:
+            return np.ones((len(X), 2)) / 2.0
+
+        sequences = []
+        for i in range(n_sequences):
+            sequences.append(X[i:i + self.sequence_length])
+
+        X_seq = torch.FloatTensor(np.array(sequences))
+
+        # Predict in batches to avoid GPU OOM
+        batch_size = self.batch_size
+        all_proba = []
+        with torch.no_grad():
+            for start in range(0, len(X_seq), batch_size):
+                batch = X_seq[start:start + batch_size].to(self.device)
+                logits = self.model(batch)
+                proba = torch.softmax(logits, dim=1).cpu().numpy()
+                all_proba.append(proba)
+
+        probabilities = np.vstack(all_proba)
+
+        padding = np.ones((self.sequence_length, 2)) / 2.0
+        probabilities = np.vstack([padding, probabilities])
+
+        return probabilities
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predict class labels.
+
+        Args:
+            X: Feature array
+
+        Returns:
+            Label array (-1=down, 1=up)
+        """
+        proba = self.predict_proba(X)
+        class_indices = np.argmax(proba, axis=1)
+
+        label_map = {0: -1, 1: 1}
+        return np.array([label_map[i] for i in class_indices])
+
+    def save(self, path: str) -> None:
+        """
+        Save model to disk.
+
+        Args:
+            path: Save path (directory or file)
+        """
+        save_path = Path(path)
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        # Save model weights
+        torch.save(self.model.state_dict(), save_path / "lstm_weights.pt")
+
+        # Save config
+        config = {
+            "input_size": self.input_size,
+            "hidden_size": self.hidden_size,
+            "num_layers": self.num_layers,
+            "dropout": self.dropout,
+            "learning_rate": self.learning_rate,
+            "batch_size": self.batch_size,
+            "sequence_length": self.sequence_length,
+            "training_history": self.training_history,
+        }
+        with open(save_path / "lstm_config.json", "w") as f:
+            json.dump(config, f, indent=2)
+
+    def load(self, path: str) -> None:
+        """
+        Load model from disk.
+
+        Args:
+            path: Load path (directory)
+        """
+        load_path = Path(path)
+
+        # Load config
+        with open(load_path / "lstm_config.json", "r") as f:
+            config = json.load(f)
+
+        self.input_size = config["input_size"]
+        self.hidden_size = config["hidden_size"]
+        self.num_layers = config["num_layers"]
+        self.dropout = config["dropout"]
+        self.sequence_length = config["sequence_length"]
+        self.training_history = config.get("training_history", [])
+
+        # Build and load weights
+        self.build_model()
+        self.model.load_state_dict(torch.load(load_path / "lstm_weights.pt", map_location=self.device))
+        self.model.eval()

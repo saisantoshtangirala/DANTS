@@ -1,0 +1,71 @@
+# Astra-Trade QML - Training Environment (RunPod GPU)
+# Install: pip install -r requirements-training.txt
+#
+# Trimmed to what src/ and tests/ actually import (verified via
+# `grep -rhoE "^\s*(import|from)\s+\S+" src/`). The original list carried
+# nsepy, beautifulsoup4, lxml, pandas-ta, TA-Lib, tsfresh, lightgbm,
+# optuna, gplearn, deap, pymoo, alembic, psycopg2-binary, mlflow, dvc,
+# and pennylane/pennylane-qiskit - none of which are imported anywhere
+# in the codebase. TA-Lib in particular would have failed to build in
+# CI (it needs a system C library the Dockerfile never installs).
+# yfinance was also trimmed originally for the same reason, then
+# re-added once it became a real Yahoo Finance fallback data source in
+# nse_ingestion.py (NSE's archive is Akamai bot-blocked from CI IPs).
+# Re-add any of the others if a feature that needs them actually gets
+# implemented.
+#
+# Versions below are pinned to what was verified end-to-end (including a
+# real RunPod GPU run) against the actual code, not the versions
+# originally assumed by the unrun scaffold - see the git history on
+# src/models/ for the specific incompatibilities that forced this.
+
+# Core
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+pyyaml>=6.0
+python-dotenv>=1.0
+python-dateutil>=2.8
+pytz>=2023.3
+
+# Data & Features
+requests>=2.31
+yfinance>=0.2.40
+
+# ML / Classical
+scikit-learn>=1.5
+xgboost>=2.0
+
+# Deep Learning (GPU)
+torch>=2.4
+torchvision>=0.19
+torchaudio>=2.4
+--index-url https://download.pytorch.org/whl/cu124
+--extra-index-url https://pypi.org/simple
+
+# Quantum ML
+qiskit>=1.0
+qiskit-machine-learning>=0.7
+qiskit-aer>=0.14
+qiskit-algorithms>=0.3
+
+# Database & Logging
+SQLAlchemy>=2.0
+structlog>=23.1
+
+# API & Execution (Zerodha Kite)
+kiteconnect>=4.2
+websocket-client>=1.6
+pyotp>=2.9
+
+# Scheduler (nightly training pipeline)
+APScheduler>=3.10
+
+# Testing
+pytest>=7.4
+pytest-cov>=4.1
+hypothesis>=6.82
+
+# Utils
+tqdm>=4.66
+joblib>=1.3
