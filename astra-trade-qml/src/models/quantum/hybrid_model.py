@@ -120,6 +120,10 @@ class HybridQMLModel:
         y_val: Optional[np.ndarray] = None,
         feature_names: Optional[List[str]] = None,
         sequence_length: int = 60,
+        groups_train: Optional[np.ndarray] = None,
+        groups_val: Optional[np.ndarray] = None,
+        X_meta: Optional[np.ndarray] = None,
+        y_meta: Optional[np.ndarray] = None,
     ) -> Dict[str, Any]:
         """
         Train all sub-models and ensemble.
@@ -127,10 +131,17 @@ class HybridQMLModel:
         Args:
             X_train: Training features
             y_train: Training labels
-            X_val: Validation features
-            y_val: Validation labels
+            X_val: Validation features (used for base-model early stopping)
+            y_val: Validation labels (used for base-model early stopping)
             feature_names: Feature names for XGBoost
             sequence_length: LSTM sequence length
+            groups_train: Per-row symbol id for X_train, so the LSTM only
+                builds sequences within one symbol's contiguous rows
+            groups_val: Per-row symbol id for X_val, same purpose
+            X_meta: Separate validation slice for meta-learner training only
+                (falls back to X_val/X_train if not given, but that double-dips
+                the early-stopping validation set)
+            y_meta: Labels for X_meta
 
         Returns:
             Training metrics for all models
@@ -150,7 +161,10 @@ class HybridQMLModel:
         t0 = _time.monotonic()
         print("\n[1/4] Training LSTM Sequence Model...", flush=True)
         try:
-            lstm_history = self.lstm_model.fit(X_train, y_train, X_val, y_val)
+            lstm_history = self.lstm_model.fit(
+                X_train, y_train, X_val, y_val,
+                groups_train=groups_train, groups_val=groups_val,
+            )
             metrics["lstm"] = {
                 "status": "trained",
                 "history": lstm_history,
@@ -218,8 +232,12 @@ class HybridQMLModel:
         # 5. Train Meta-Learner (Stacking)
         t0 = _time.monotonic()
         print("\n[5/5] Training Meta-Learner Ensemble...", flush=True)
-        self._train_meta_learner(X_val if X_val is not None else X_train,
-                                 y_val if y_val is not None else y_train)
+        if X_meta is not None and y_meta is not None:
+            meta_X, meta_y = X_meta, y_meta
+        else:
+            meta_X = X_val if X_val is not None else X_train
+            meta_y = y_val if y_val is not None else y_train
+        self._train_meta_learner(meta_X, meta_y)
         print(f"  Meta-learner trained in {_time.monotonic() - t0:.1f}s", flush=True)
 
         self.is_trained = True
@@ -367,6 +385,18 @@ class HybridQMLModel:
         total_weight = sum(self.sub_model_weights.values())
         if total_weight > 0:
             self.sub_model_weights = {k: v / total_weight for k, v in self.sub_model_weights.items()}
+
+        # Rescale within groups so classical/quantum totals match the
+        # configured classical_weight/quantum_weight, preserving each
+        # sub-model's relative accuracy-based ranking inside its group.
+        classical_names = [n for n in self.sub_model_weights if n in ("lstm", "xgboost")]
+        quantum_names = [n for n in self.sub_model_weights if n in ("qkernel", "vqc")]
+        classical_sum = sum(self.sub_model_weights[n] for n in classical_names) or 1.0
+        quantum_sum = sum(self.sub_model_weights[n] for n in quantum_names) or 1.0
+        for n in classical_names:
+            self.sub_model_weights[n] = self.sub_model_weights[n] / classical_sum * self.classical_weight
+        for n in quantum_names:
+            self.sub_model_weights[n] = self.sub_model_weights[n] / quantum_sum * self.quantum_weight
 
         print(f"  Meta-learner trained with weights: {self.sub_model_weights}", flush=True)
 

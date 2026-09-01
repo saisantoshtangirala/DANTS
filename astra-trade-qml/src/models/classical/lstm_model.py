@@ -15,9 +15,22 @@ import json
 
 
 class LSTMDataset(Dataset):
-    """PyTorch Dataset for LSTM training."""
+    """PyTorch Dataset for LSTM training.
 
-    def __init__(self, X: np.ndarray, y: np.ndarray, sequence_length: int = 60):
+    When `groups` is provided (one symbol id per row of X), a window
+    starting at index i is only valid if every row in
+    X[i:i+sequence_length] belongs to the same symbol - this prevents
+    sequences from splicing together rows from different stocks when X
+    is a pooled, per-symbol-contiguous matrix built from multiple symbols.
+    """
+
+    def __init__(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        sequence_length: int = 60,
+        groups: Optional[np.ndarray] = None,
+    ):
         """
         Initialize dataset.
 
@@ -25,17 +38,29 @@ class LSTMDataset(Dataset):
             X: Feature array (n_samples, n_features)
             y: Label array (n_samples,)
             sequence_length: Number of timesteps in each sequence
+            groups: Optional symbol id per row; windows crossing a
+                symbol boundary are excluded when provided
         """
         self.X = X
         self.y = y
         self.sequence_length = sequence_length
 
+        n_windows = len(X) - sequence_length
+        if groups is None or n_windows <= 0:
+            self.valid_starts = np.arange(max(n_windows, 0))
+        else:
+            starts = np.arange(n_windows)
+            end_group = groups[starts + sequence_length - 1]
+            start_group = groups[starts]
+            self.valid_starts = starts[start_group == end_group]
+
     def __len__(self) -> int:
-        return len(self.X) - self.sequence_length
+        return len(self.valid_starts)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        x_seq = self.X[idx:idx + self.sequence_length]
-        y_label = self.y[idx + self.sequence_length - 1]
+        start = self.valid_starts[idx]
+        x_seq = self.X[start:start + self.sequence_length]
+        y_label = self.y[start + self.sequence_length - 1]
 
         return torch.FloatTensor(x_seq), torch.LongTensor([int(y_label)])[0]
 
@@ -59,7 +84,7 @@ class LSTMClassifier(nn.Module):
             input_size: Number of input features
             hidden_size: LSTM hidden dimension
             num_layers: Number of LSTM layers
-            num_classes: Number of output classes (3: loss, hold, profit)
+            num_classes: Number of output classes (2: down, up)
             dropout: Dropout probability
             bidirectional: Whether to use bidirectional LSTM
         """
@@ -115,6 +140,7 @@ class LSTMModel:
         num_layers: int = 2,
         dropout: float = 0.3,
         learning_rate: float = 0.001,
+        weight_decay: float = 0.0,
         batch_size: int = 64,
         epochs: int = 50,
         sequence_length: int = 60,
@@ -130,6 +156,7 @@ class LSTMModel:
             num_layers: Number of LSTM layers
             dropout: Dropout rate
             learning_rate: Adam learning rate
+            weight_decay: Adam L2 weight decay (regularization for small datasets)
             batch_size: Training batch size
             epochs: Maximum training epochs
             sequence_length: Lookback window size
@@ -141,6 +168,7 @@ class LSTMModel:
         self.num_layers = num_layers
         self.dropout = dropout
         self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
         self.batch_size = batch_size
         self.epochs = epochs
         self.sequence_length = sequence_length
@@ -167,6 +195,8 @@ class LSTMModel:
         y_train: np.ndarray,
         X_val: Optional[np.ndarray] = None,
         y_val: Optional[np.ndarray] = None,
+        groups_train: Optional[np.ndarray] = None,
+        groups_val: Optional[np.ndarray] = None,
     ) -> Dict[str, List[float]]:
         """
         Train the LSTM model.
@@ -176,6 +206,9 @@ class LSTMModel:
             y_train: Training labels (n_samples,)
             X_val: Validation features
             y_val: Validation labels
+            groups_train: Optional symbol id per X_train row; when given,
+                windows spanning two different symbols are excluded
+            groups_val: Optional symbol id per X_val row
 
         Returns:
             Training history dictionary
@@ -184,15 +217,15 @@ class LSTMModel:
             self.build_model()
 
         # Create datasets
-        train_dataset = LSTMDataset(X_train, y_train, self.sequence_length)
+        train_dataset = LSTMDataset(X_train, y_train, self.sequence_length, groups_train)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
 
         val_loader = None
         if X_val is not None and y_val is not None:
-            val_dataset = LSTMDataset(X_val, y_val, self.sequence_length)
+            val_dataset = LSTMDataset(X_val, y_val, self.sequence_length, groups_val)
             val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
-        windowed_labels = y_train[self.sequence_length - 1:]
+        windowed_labels = y_train[train_dataset.valid_starts + self.sequence_length - 1]
         mapped_labels = windowed_labels.astype(int)
         class_counts = np.bincount(mapped_labels, minlength=2).astype(float)
         class_counts = np.maximum(class_counts, 1.0)
@@ -200,7 +233,9 @@ class LSTMModel:
         weight_tensor = torch.FloatTensor(class_weights).to(self.device)
 
         criterion = nn.CrossEntropyLoss(weight=weight_tensor)
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=1e-4)
+        optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
         # verbose was removed from ReduceLROnPlateau in newer torch releases;
         # the training loop already prints loss/accuracy every 10 epochs below.
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -308,7 +343,7 @@ class LSTMModel:
             X: Feature array (n_samples, n_features)
 
         Returns:
-            Probability array (n_samples, 3) for [loss, hold, profit]
+            Probability array (n_samples, 2) for [down, up]
         """
         if self.model is None:
             raise ValueError("Model not trained. Call fit() first.")
@@ -350,7 +385,7 @@ class LSTMModel:
             X: Feature array
 
         Returns:
-            Label array (-1=loss, 0=hold, 1=profit)
+            Label array (-1=down, 1=up)
         """
         proba = self.predict_proba(X)
         class_indices = np.argmax(proba, axis=1)

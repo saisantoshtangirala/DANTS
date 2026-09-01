@@ -51,7 +51,15 @@ data:
     midcap_watchlist: []
 
   timeframes:
-    intraday: "5min"                # Primary intraday timeframe
+    intraday: "5minute"              # Primary intraday timeframe - stored in Kite's native interval format
+                                      # (minute/3minute/5minute/...) since Kite is the primary data source and
+                                      # this value is passed to it directly with no translation; yfinance's
+                                      # differently-formatted interval strings ("5m") are translated at its call
+                                      # site instead (see TrainingPipeline.data_ingestion) - was "5min" (a pandas
+                                      # frequency alias, not a Kite interval), silently broken for two reasons:
+                                      # main.py's live-trading loop passed it straight to Kite's API (which
+                                      # needs "5minute") with no translation, and pipeline.py's yfinance fallback
+                                      # passed it straight to yfinance (which needs "5m") with no translation either.
     swing: "1d"                     # Daily timeframe
     features_lookback: 20           # LSTM sequence length (feature indicators handle their own lookback)
     intraday_lookback_days: 60      # History window for 5-min bar ingestion (Yahoo's intraday cap; Kite is chunked to the same window per request but can cover more calendar days total)
@@ -73,6 +81,9 @@ models:
       num_layers: 2
       dropout: 0.4
       learning_rate: 0.0003
+      weight_decay: 0.0001         # Adam L2 regularization - was hardcoded in the optimizer regardless of
+                                    # config; now a tunable constructor param, so this preserves that same
+                                    # effective value now that LSTMModel defaults to 0.0 if unset
       batch_size: 64
       epochs: 100
       early_stopping_patience: 15

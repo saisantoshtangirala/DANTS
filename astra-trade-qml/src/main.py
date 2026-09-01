@@ -92,6 +92,21 @@ def run_paper(config: dict, logger) -> None:
     model.load(str(model_dir))
     logger.info("model_loaded", version=model.model_version)
 
+    from src.training.regime_submodels import RegimeSubModelTrainer
+
+    regime_submodels = RegimeSubModelTrainer.load_all(str(model_dir))
+    if regime_submodels:
+        logger.info("regime_submodels_loaded", regimes=list(regime_submodels.keys()))
+
+    evolved_genes = []
+    evolved_genes_path = model_dir / "evolved_features.json"
+    if evolved_genes_path.exists():
+        from src.training.feature_evolution import Gene
+
+        with open(evolved_genes_path, "r") as f:
+            evolved_genes = [Gene.from_dict(d) for d in json.load(f)]
+        logger.info("evolved_features_loaded", n_genes=len(evolved_genes))
+
     if not model.is_trained:
         logger.warning("paper_trading_idle_no_model")
         return
@@ -242,6 +257,7 @@ def run_paper(config: dict, logger) -> None:
                             _process_symbol_cycle(
                                 symbol, live_feed, feature_engineer, model, engine, interval, indicators,
                                 trade_stats, capital_cap=capital_cap_map.get(symbol),
+                                regime_submodels=regime_submodels, evolved_genes=evolved_genes,
                             )
                         except Exception as e:
                             logger.error("symbol_processing_failed", symbol=symbol, error=str(e))
@@ -256,7 +272,8 @@ def run_paper(config: dict, logger) -> None:
 
 
 def _process_symbol_cycle(
-    symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats=None, capital_cap=None
+    symbol, live_feed, feature_engineer, model, engine, interval, indicators, trade_stats=None, capital_cap=None,
+    regime_submodels=None, evolved_genes=None,
 ) -> None:
     """One signal-generation cycle for a single symbol, given the current regime indicators."""
     import numpy as np
@@ -268,6 +285,11 @@ def _process_symbol_cycle(
     featured = feature_engineer.generate_all_features(ohlcv)
     if featured.empty:
         return
+
+    if evolved_genes:
+        from src.training.feature_evolution import FeatureEvolver
+
+        featured = FeatureEvolver.apply_genes(featured, evolved_genes)
 
     # Must match the columns the model was actually trained on - not
     # recomputed from this symbol's own live-fetched data, which can
@@ -305,6 +327,13 @@ def _process_symbol_cycle(
             except Exception:
                 pass
 
+    regime_submodel_probabilities_by_regime = {}
+    for regime_name, sub_model in (regime_submodels or {}).items():
+        try:
+            regime_submodel_probabilities_by_regime[regime_name] = sub_model.predict_proba(X)[-1]
+        except Exception:
+            pass
+
     stats = trade_stats or {}
     engine.process_symbol(
         symbol=symbol,
@@ -318,6 +347,9 @@ def _process_symbol_cycle(
         avg_loss_pct=stats.get("avg_loss_pct", 0.008),
         sub_model_probabilities=sub_model_probs if sub_model_probs else None,
         capital_cap=capital_cap,
+        regime_submodel_probabilities_by_regime=(
+            regime_submodel_probabilities_by_regime if regime_submodel_probabilities_by_regime else None
+        ),
     )
 
 

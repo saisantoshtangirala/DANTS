@@ -10,7 +10,7 @@ model_deployment.
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,10 @@ from src.trading.costs import CostCalculator
 from src.trading.live_feed import KiteLiveFeed
 from src.trading.market_rules import CircuitCheck, round_to_tick
 from src.trading.portfolio_allocator import AllocationResult, PortfolioAllocator
+from src.training.feature_evolution import FeatureEvolver
+from src.training.lstm_nas import is_nas_due, load_nas_state, run_lstm_nas, save_nas_state
+from src.training.regime_submodels import RegimeSubModelTrainer, label_regime_proxy
+from src.training.walk_forward import WalkForwardValidator
 from src.utils.database import DatabaseManager
 from src.utils.metrics import generate_performance_report
 
@@ -42,6 +46,8 @@ def build_hybrid_model_config(config: Dict[str, Any]) -> Dict[str, Any]:
     ensemble = models_cfg.get("ensemble", {})
 
     n_qubits = quantum.get("max_qubits", 8)
+    evolution = config.get("training", {}).get("evolution", {})
+    depth_adaptation = bool(evolution.get("enabled", False)) and bool(evolution.get("quantum_depth_adaptation", False))
     quantum_shared = {
         "n_qubits": n_qubits,
         "feature_map_type": quantum.get("feature_map", "ZZFeatureMap"),
@@ -57,6 +63,7 @@ def build_hybrid_model_config(config: Dict[str, Any]) -> Dict[str, Any]:
             **quantum_shared,
             "feature_map_reps": quantum.get("reps", 2),
             "backend_name": quantum.get("simulator", "aer_simulator"),
+            "quantum_depth_adaptation": depth_adaptation,
         },
         "vqc": {
             **quantum_shared,
@@ -64,6 +71,7 @@ def build_hybrid_model_config(config: Dict[str, Any]) -> Dict[str, Any]:
             "reps": quantum.get("reps", 2),
             "optimizer": quantum.get("optimizer", "SPSA"),
             "max_iter": quantum.get("max_iter", 100),
+            "quantum_depth_adaptation": depth_adaptation,
         },
         "ensemble_method": ensemble.get("method", "weighted_average"),
         "classical_weight": quantum.get("classical_weight", 0.7),
@@ -104,6 +112,8 @@ class TrainingPipeline:
         self.raw_data: Dict[str, pd.DataFrame] = {}
         self.featured_data: Dict[str, pd.DataFrame] = {}
         self.used_synthetic_data = False
+        self.evolved_genes: list = []
+        self.regime_submodel_trainer: Optional[RegimeSubModelTrainer] = None
 
     def data_ingestion(self, lookback_days: Optional[int] = None) -> Dict[str, pd.DataFrame]:
         """Task: download historical 5-min intraday OHLCV for the focus universe
@@ -117,8 +127,12 @@ class TrainingPipeline:
         timeframes_cfg = self.data_cfg.get("timeframes", {})
         if lookback_days is None:
             lookback_days = timeframes_cfg.get("intraday_lookback_days", 60)
-        interval = timeframes_cfg.get("intraday", "5min")
-        kite_interval = "5minute" if interval == "5min" else interval
+        # Stored in Kite's native interval format (e.g. "5minute") - passed
+        # straight through to Kite with no translation. yfinance uses a
+        # differently-formatted interval string ("5m"), translated here at
+        # its call site instead.
+        interval = timeframes_cfg.get("intraday", "5minute")
+        yf_interval = "5m" if interval == "5minute" else interval
 
         for i, symbol in enumerate(symbols, 1):
             logger.info("data_ingestion_symbol", symbol=symbol, progress=f"{i}/{len(symbols)}")
@@ -126,13 +140,13 @@ class TrainingPipeline:
 
             if self.kite_feed is not None:
                 try:
-                    df = self._fetch_kite_intraday_chunked(symbol, kite_interval, lookback_days)
+                    df = self._fetch_kite_intraday_chunked(symbol, interval, lookback_days)
                 except Exception:
                     df = pd.DataFrame()
 
             if df.empty:
                 logger.info("trying_yfinance_intraday_fallback", symbol=symbol)
-                df = self.yfinance_ingestion.download_intraday_range(symbol, interval=interval)
+                df = self.yfinance_ingestion.download_intraday_range(symbol, interval=yf_interval)
 
             if not df.empty:
                 logger.info("symbol_data_ready", symbol=symbol, rows=len(df))
@@ -279,20 +293,39 @@ class TrainingPipeline:
             for symbol, df in self.raw_data.items()
         }
 
-    def _pooled_training_matrix(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list]:
-        """Pool feature matrices from all symbols into one date-sorted, normalized training set."""
-        frames = [df for df in self.featured_data.values() if not df.empty]
-        if not frames:
+    def _pooled_training_matrix(self) -> Dict[str, Any]:
+        """
+        Pool feature matrices from all symbols into one normalized training
+        set, keeping each symbol's rows in their own contiguous,
+        chronologically-ordered block (never globally re-sorted by date) so
+        the LSTM's sliding-window sequences stay within one symbol - a
+        global date-sort would interleave symbols row-by-row and make
+        nearly every window span two different stocks, which the
+        group-aware LSTMDataset would then have to discard almost entirely.
+
+        Returns a dict with X/y for train, an early-stopping val slice, a
+        disjoint meta-learner val slice, per-row symbol ids for train/val,
+        a regime-proxy label Series for the training rows, and the fitted
+        feature columns/scaler bookkeeping.
+        """
+        symbols = [s for s, df in self.featured_data.items() if not df.empty]
+        if not symbols:
             raise ValueError("No featured data available. Run feature_engineering() first.")
 
+        frames = []
+        for symbol_id, symbol in enumerate(symbols):
+            df = self.featured_data[symbol].dropna(subset=["label"]).reset_index(drop=True)
+            df = df.copy()
+            df["_symbol_id"] = symbol_id
+            frames.append(df)
+
+        # Concatenate in per-symbol blocks (each internally date-sorted by
+        # feature_engineering already) - NOT globally sorted by date, so a
+        # symbol's rows stay contiguous and its sequences remain valid.
         pooled = pd.concat(frames, ignore_index=True)
 
-        # Sort by date to prevent temporal leakage in the train/val split
-        if "date" in pooled.columns:
-            pooled = pooled.sort_values("date").reset_index(drop=True)
-
-        # Drop dead-zone samples (NaN labels) before training
-        pooled = pooled.dropna(subset=["label"]).reset_index(drop=True)
+        if self.evolved_genes:
+            pooled = FeatureEvolver.apply_genes(pooled, self.evolved_genes)
 
         feature_cols = self.feature_engineer.get_feature_columns(pooled)
         # backtest_validation() must score each symbol against the exact
@@ -306,35 +339,104 @@ class TrainingPipeline:
 
         X = pooled[feature_cols].to_numpy()
         y = pooled["label"].to_numpy().astype(int)
+        symbol_ids = pooled["_symbol_id"].to_numpy()
 
-        # Three-way split: train 0-80%, val 80-90%, OOS 90-100%.
-        # Split by date so all rows from the same trading day stay together.
+        # Three-way split by date: train 0-80%, val 80-90%, OOS 90-100%.
+        # Selection uses boolean date masks (not positional slicing) so
+        # each symbol's contiguous block is split internally rather than
+        # torn apart by pooled row position.
         from sklearn.preprocessing import StandardScaler
         if "date" in pooled.columns:
-            unique_dates = pooled["date"].unique()
+            unique_dates = np.sort(pooled["date"].unique())
             train_date = unique_dates[int(len(unique_dates) * 0.8)]
             val_date = unique_dates[int(len(unique_dates) * 0.9)]
-            train_end = int((pooled["date"] < train_date).sum())
-            val_end = int((pooled["date"] < val_date).sum())
+            train_mask = (pooled["date"] < train_date).to_numpy()
+            val_mask = ((pooled["date"] >= train_date) & (pooled["date"] < val_date)).to_numpy()
+            oos_mask = (pooled["date"] >= val_date).to_numpy()
         else:
+            order = np.arange(len(X))
             train_end = int(len(X) * 0.8)
             val_end = int(len(X) * 0.9)
+            train_mask = order < train_end
+            val_mask = (order >= train_end) & (order < val_end)
+            oos_mask = order >= val_end
+            val_date = None
+
         scaler = StandardScaler()
-        X[:train_end] = scaler.fit_transform(X[:train_end])
-        X[train_end:] = scaler.transform(X[train_end:])
+        X[train_mask] = scaler.fit_transform(X[train_mask])
+        non_train = ~train_mask
+        if non_train.any():
+            X[non_train] = scaler.transform(X[non_train])
         self._feature_scaler = scaler
 
         # Store the OOS date cutoff so backtest_validation uses the same split
-        if "date" in pooled.columns:
-            self._oos_date_cutoff = val_date
-        else:
-            self._oos_date_cutoff = None
-        self._oos_row_start = val_end
+        self._oos_date_cutoff = val_date if "date" in pooled.columns else None
+        self._oos_row_start = int(oos_mask.argmax()) if oos_mask.any() else len(X)
 
         # Zero-variance features produce NaN after scaling; replace with 0
         np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
-        return X[:train_end], y[:train_end], X[train_end:val_end], y[train_end:val_end], feature_cols
+        # Split the validation slice into two disjoint halves: one for
+        # base-model early stopping, one for meta-learner training only.
+        # Reusing the same slice for both leaks early-stopping-tuned
+        # optimism into the stacking weights.
+        val_indices = np.flatnonzero(val_mask)
+        half = len(val_indices) // 2
+        es_indices = val_indices[:half]
+        meta_indices = val_indices[half:]
+
+        try:
+            regimes_train = label_regime_proxy(pooled[train_mask].reset_index(drop=True))
+        except ValueError:
+            regimes_train = None
+
+        return {
+            "X_train": X[train_mask],
+            "y_train": y[train_mask],
+            "groups_train": symbol_ids[train_mask],
+            "regimes_train": regimes_train,
+            "X_val_es": X[es_indices],
+            "y_val_es": y[es_indices],
+            "groups_val_es": symbol_ids[es_indices],
+            "X_val_meta": X[meta_indices],
+            "y_val_meta": y[meta_indices],
+            "feature_cols": feature_cols,
+        }
+
+    def _evolve_features(self) -> list:
+        """
+        Task: genetic feature evolution (training.evolution.feature_evolution).
+        Runs the GA on the training-date portion only (never the val/OOS
+        slices) so the winning genes aren't selected using data the model
+        will later be scored against, then returns the winning Gene list.
+        """
+        symbols = [s for s, df in self.featured_data.items() if not df.empty]
+        if not symbols:
+            return []
+
+        frames = []
+        for symbol_id, symbol in enumerate(symbols):
+            df = self.featured_data[symbol].dropna(subset=["label"]).reset_index(drop=True).copy()
+            df["_symbol_id"] = symbol_id
+            frames.append(df)
+        pooled = pd.concat(frames, ignore_index=True)
+
+        if "date" in pooled.columns:
+            unique_dates = np.sort(pooled["date"].unique())
+            train_date = unique_dates[int(len(unique_dates) * 0.8)]
+            train_slice = pooled[pooled["date"] < train_date]
+        else:
+            train_slice = pooled.iloc[: int(len(pooled) * 0.8)]
+
+        if train_slice.empty or "future_return" not in train_slice.columns:
+            return []
+
+        feature_cols = self.feature_engineer.get_feature_columns(pooled)
+        evolver = FeatureEvolver()
+        ranked = evolver.evolve(train_slice, feature_cols, label_col="future_return")
+        genes = [gene for gene, fitness in ranked if fitness > 0]
+        logger.info("feature_evolution_done", n_genes=len(genes), genes=[g.name() for g in genes])
+        return genes
 
     def classical_and_quantum_training(self) -> Dict[str, Any]:
         """
@@ -342,16 +444,33 @@ class TrainingPipeline:
         HybridQMLModel.fit() trains all four sub-models plus the meta-learner
         in one call, so these three daily_schedule entries map onto a single fit().
         """
-        X_train, y_train, X_val, y_val, feature_cols = self._pooled_training_matrix()
+        evolution_cfg = self.training_cfg.get("evolution", {})
+        if evolution_cfg.get("enabled", False) and evolution_cfg.get("feature_evolution", False):
+            self.evolved_genes = self._evolve_features()
+        else:
+            self.evolved_genes = []
+
+        pooled = self._pooled_training_matrix()
+        X_train, y_train = pooled["X_train"], pooled["y_train"]
+        X_val_es, y_val_es = pooled["X_val_es"], pooled["y_val_es"]
+        feature_cols = pooled["feature_cols"]
 
         sequence_length = self.data_cfg.get("timeframes", {}).get("features_lookback", 60)
+        sequence_length = min(sequence_length, max(1, len(X_train) - 1))
+
+        self._run_lstm_nas_if_due(evolution_cfg, X_train, y_train, X_val_es, y_val_es, pooled, sequence_length)
+
         metrics = self.model.fit(
             X_train,
             y_train,
-            X_val,
-            y_val,
+            X_val_es,
+            y_val_es,
             feature_names=feature_cols,
-            sequence_length=min(sequence_length, max(1, len(X_train) - 1)),
+            sequence_length=sequence_length,
+            groups_train=pooled["groups_train"],
+            groups_val=pooled["groups_val_es"],
+            X_meta=pooled["X_val_meta"] if len(pooled["X_val_meta"]) > 0 else None,
+            y_meta=pooled["y_val_meta"] if len(pooled["y_val_meta"]) > 0 else None,
         )
 
         self.model._feature_scaler = self._feature_scaler
@@ -367,34 +486,178 @@ class TrainingPipeline:
                 }
             )
 
+        if evolution_cfg.get("enabled", False) and evolution_cfg.get("regime_submodels", False):
+            regimes_train = pooled.get("regimes_train")
+            if regimes_train is not None:
+                self.regime_submodel_trainer = RegimeSubModelTrainer()
+                regime_metrics = self.regime_submodel_trainer.train(X_train, y_train, regimes_train, feature_cols)
+                metrics["regime_submodels"] = regime_metrics
+                logger.info("regime_submodels_done", **regime_metrics)
+            else:
+                self.regime_submodel_trainer = None
+
         return metrics
 
-    def backtest_validation(self) -> Dict[str, Any]:
+    def _run_lstm_nas_if_due(
+        self,
+        evolution_cfg: Dict[str, Any],
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val_es: np.ndarray,
+        y_val_es: np.ndarray,
+        pooled: Dict[str, Any],
+        sequence_length: int,
+        nas_state_path: str = "models/latest/lstm_nas_state.json",
+    ) -> None:
         """
-        Task: out-of-sample backtest on a held-out slice beyond the validation set.
+        Task: LSTM NAS, gated by nas_frequency_days. Runs the grid search
+        only when the last run is stale (or has never run), otherwise
+        reuses the persisted winning config - either way, applies whatever
+        config is current by rebuilding self.model before the day's real fit.
+        """
+        if not evolution_cfg.get("enabled", False):
+            return
 
-        Unlike a naive gross-return backtest, this simulates real intraday
-        round-trip trades: entry/exit prices are tick-rounded, every trade
-        pays the full Zerodha-style cost stack via CostCalculator
-        (delivery=False - the intraday STT/no-stamp-duty side), a trade is
-        skipped entirely if either leg implies a fill beyond the daily
-        circuit band from the prior session's close, and only signals whose
-        model probability clears signals.confidence.min_threshold are
-        traded at all - matching the bar the live signal generator actually
-        requires before acting.
+        lstm_cfg = self.config.get("models", {}).get("classical", {}).get("lstm", {})
+        nas_frequency_days = evolution_cfg.get("nas_frequency_days", 30)
+
+        if is_nas_due(nas_state_path, nas_frequency_days):
+            nas_result = run_lstm_nas(
+                X_train,
+                y_train,
+                X_val_es,
+                y_val_es,
+                input_size=X_train.shape[1],
+                sequence_length=sequence_length,
+                groups_train=pooled["groups_train"],
+                groups_val=pooled["groups_val_es"],
+                base_learning_rate=lstm_cfg.get("learning_rate", 0.001),
+                base_weight_decay=lstm_cfg.get("weight_decay", 0.0001),
+                base_batch_size=lstm_cfg.get("batch_size", 64),
+            )
+            if nas_result["best_config"]:
+                save_nas_state(nas_state_path, nas_result["best_config"])
+                logger.info(
+                    "lstm_nas_done",
+                    best_config=nas_result["best_config"],
+                    val_accuracy=nas_result["best_val_accuracy"],
+                )
+
+        nas_state = load_nas_state(nas_state_path)
+        if nas_state and nas_state.get("best_config"):
+            self.config["models"]["classical"]["lstm"] = {**lstm_cfg, **nas_state["best_config"]}
+            self.model = HybridQMLModel(config=build_hybrid_model_config(self.config))
+
+    def _score_oos_realistic(
+        self,
+        model: HybridQMLModel,
+        oos: pd.DataFrame,
+        feature_cols: list,
+        cost_pct: float,
+        initial_capital: float,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Shared out-of-sample scoring for backtest_validation() and
+        walk_forward_validation(): a real discrete round-trip trade
+        simulation rather than a blanket-cost vectorized approximation.
+        Entry/exit prices are tick-rounded, every trade pays the full
+        Zerodha-style cost stack via CostCalculator (delivery=False - the
+        intraday STT/no-stamp-duty side), a trade is skipped entirely if
+        either leg implies a fill beyond the daily circuit band from the
+        prior session's close, and only signals whose model probability
+        clears signals.confidence.min_threshold are traded at all -
+        matching the bar the live signal generator actually requires
+        before acting.
+
+        `cost_pct` is accepted only to match WalkForwardValidator's
+        score_oos_fn signature - real per-trade costs come from
+        self.config via CostCalculator, not a flat percentage.
 
         This does NOT reconstruct historical regime state or cross-model
         ensemble agreement (both feed the live composite confidence score
         but require data this offline pass doesn't have), so it is a lower
         bound on how selective real trading will be, not an upper bound.
         """
-        capital_cfg = self.config["trading"]["capital"]
-        initial_capital = capital_cfg["initial"]
+        if oos.empty:
+            return None
+
         signals_cfg = self.config.get("signals", {})
         min_threshold = signals_cfg.get("confidence", {}).get("min_threshold", 0.60)
         max_position_size_pct = self.config["trading"]["position_sizing"]["max_position_size_pct"]
         cost_calc = CostCalculator(self.config["trading"]["costs"])
         circuit = CircuitCheck()
+
+        # A column present for the pooled training set but absent for
+        # this symbol (e.g. a frequency-dependent feature suppressed
+        # by a data gap) becomes NaN here, cleaned up below by the
+        # same transform_features() nan_to_num pass every other
+        # feature goes through - never a shape mismatch.
+        missing_cols = [c for c in feature_cols if c not in oos.columns]
+        if missing_cols:
+            oos = oos.copy()
+            for col in missing_cols:
+                oos[col] = np.nan
+
+        X_oos = oos[feature_cols].to_numpy()
+        X_oos = model.transform_features(X_oos)
+
+        proba = model.predict_proba(X_oos)
+        class_idx = np.argmax(proba, axis=1)
+        model_probability = proba[np.arange(len(proba)), class_idx]
+
+        # NSE circuit bands are measured off the prior trading
+        # session's closing price, not the previous intraday bar.
+        prev_day_close = self._prev_session_close(oos)
+
+        quantity_notional = min(max_position_size_pct * initial_capital, initial_capital)
+
+        trades = []
+        for i in range(len(oos)):
+            if model_probability[i] < min_threshold:
+                continue
+            future_return = oos["future_return"].iloc[i]
+            if pd.isna(future_return):
+                continue
+
+            action = "BUY" if class_idx[i] == 1 else "SELL"
+            entry_price = round_to_tick(float(oos["close"].iloc[i]))
+            exit_price = round_to_tick(entry_price * (1 + future_return))
+            if entry_price <= 0:
+                continue
+
+            ref_close = prev_day_close[i]
+            if not pd.isna(ref_close) and (
+                circuit.is_frozen(ref_close, entry_price) or circuit.is_frozen(ref_close, exit_price)
+            ):
+                continue
+
+            quantity = int(quantity_notional // entry_price)
+            if quantity <= 0:
+                continue
+
+            net_pnl = cost_calc.net_pnl(entry_price, exit_price, quantity, side=action, delivery=False)
+            pnl_pct = net_pnl / (entry_price * quantity)
+
+            trades.append({
+                "pnl": net_pnl,
+                "pnl_pct": pnl_pct,
+                "confidence": float(model_probability[i]),
+            })
+
+        trades_df = pd.DataFrame(trades) if trades else pd.DataFrame()
+        equity_curve = (
+            (1 + trades_df["pnl_pct"]).cumprod() * initial_capital
+            if not trades_df.empty else pd.Series(dtype=float)
+        )
+
+        return generate_performance_report(trades_df, equity_curve)
+
+    def backtest_validation(self) -> Dict[str, Any]:
+        """
+        Task: out-of-sample backtest on a held-out slice beyond the validation set.
+        See _score_oos_realistic() for the trade-simulation methodology.
+        """
+        initial_capital = self.config["trading"]["capital"]["initial"]
 
         results = {}
         # Must match the pooled training matrix's columns exactly (see the
@@ -408,6 +671,9 @@ class TrainingPipeline:
             if df.empty:
                 continue
 
+            if self.evolved_genes:
+                df = FeatureEvolver.apply_genes(df, self.evolved_genes)
+
             # Use the same date-based cutoff as the pooled training split
             if hasattr(self, "_oos_date_cutoff") and self._oos_date_cutoff is not None and "date" in df.columns:
                 oos = df[df["date"] >= self._oos_date_cutoff].reset_index(drop=True)
@@ -417,70 +683,32 @@ class TrainingPipeline:
             if oos.empty:
                 continue
 
-            # A column present for the pooled training set but absent for
-            # this symbol (e.g. a frequency-dependent feature suppressed
-            # by a data gap) becomes NaN here, cleaned up below by the
-            # same transform_features() nan_to_num pass every other
-            # feature goes through - never a shape mismatch.
-            missing_cols = [c for c in feature_cols if c not in oos.columns]
-            for col in missing_cols:
-                oos[col] = np.nan
-
-            X_oos = oos[feature_cols].to_numpy()
-            X_oos = self.model.transform_features(X_oos)
-
-            proba = self.model.predict_proba(X_oos)
-            class_idx = np.argmax(proba, axis=1)
-            model_probability = proba[np.arange(len(proba)), class_idx]
-
-            # NSE circuit bands are measured off the prior trading
-            # session's closing price, not the previous intraday bar.
-            prev_day_close = self._prev_session_close(oos)
-
-            quantity_notional = min(max_position_size_pct * initial_capital, initial_capital)
-
-            trades = []
-            for i in range(len(oos)):
-                if model_probability[i] < min_threshold:
-                    continue
-                future_return = oos["future_return"].iloc[i]
-                if pd.isna(future_return):
-                    continue
-
-                action = "BUY" if class_idx[i] == 1 else "SELL"
-                entry_price = round_to_tick(float(oos["close"].iloc[i]))
-                exit_price = round_to_tick(entry_price * (1 + future_return))
-                if entry_price <= 0:
-                    continue
-
-                ref_close = prev_day_close[i]
-                if not pd.isna(ref_close) and (
-                    circuit.is_frozen(ref_close, entry_price) or circuit.is_frozen(ref_close, exit_price)
-                ):
-                    continue
-
-                quantity = int(quantity_notional // entry_price)
-                if quantity <= 0:
-                    continue
-
-                net_pnl = cost_calc.net_pnl(entry_price, exit_price, quantity, side=action, delivery=False)
-                pnl_pct = net_pnl / (entry_price * quantity)
-
-                trades.append({
-                    "pnl": net_pnl,
-                    "pnl_pct": pnl_pct,
-                    "confidence": float(model_probability[i]),
-                })
-
-            trades_df = pd.DataFrame(trades) if trades else pd.DataFrame()
-            equity_curve = (
-                (1 + trades_df["pnl_pct"]).cumprod() * initial_capital
-                if not trades_df.empty else pd.Series(dtype=float)
-            )
-
-            results[symbol] = generate_performance_report(trades_df, equity_curve)
+            report = self._score_oos_realistic(self.model, oos, feature_cols, 0.0, initial_capital)
+            if report is not None:
+                results[symbol] = report
 
         return results
+
+    def walk_forward_validation(self) -> Dict[str, Any]:
+        """Task: expanding-window walk-forward validation (training.validation.walk_forward_windows),
+        reusing the same realistic trade-simulation methodology as backtest_validation()."""
+        initial_capital = self.config["trading"]["capital"]["initial"]
+        n_windows = self.training_cfg.get("validation", {}).get("walk_forward_windows", 6)
+
+        validator = WalkForwardValidator(
+            featured_data=self.featured_data,
+            feature_engineer=self.feature_engineer,
+            build_model_config_fn=lambda: build_hybrid_model_config(self.config),
+            score_oos_fn=self._score_oos_realistic,
+            cost_pct=0.0,  # unused by _score_oos_realistic; real costs come from CostCalculator
+            initial_capital=initial_capital,
+            n_windows=n_windows,
+        )
+        try:
+            return validator.run()
+        except ValueError as e:
+            logger.warning("walk_forward_validation_skipped", reason=str(e))
+            return {"folds": [], "aggregate": {}, "skipped_reason": str(e)}
 
     @staticmethod
     def _prev_session_close(oos: pd.DataFrame) -> np.ndarray:
@@ -541,12 +769,18 @@ class TrainingPipeline:
     def model_deployment(
         self, model_dir: str = "models/latest", allocation: Optional[AllocationResult] = None
     ) -> str:
-        """Task: persist the trained ensemble (and capital allocation, if
-        computed) for the paper/live trading service."""
+        """Task: persist the trained ensemble (capital allocation, evolved
+        feature genes, and regime sub-models, if computed) for the
+        paper/live trading service."""
         self.model.save(model_dir)
         if allocation is not None:
             with open(Path(model_dir) / "allocation.json", "w") as f:
                 json.dump(allocation.as_dict(), f, indent=2)
+        if self.evolved_genes:
+            with open(Path(model_dir) / "evolved_features.json", "w") as f:
+                json.dump([gene.to_dict() for gene in self.evolved_genes], f, indent=2)
+        if self.regime_submodel_trainer is not None:
+            self.regime_submodel_trainer.save(model_dir)
         return self.model.model_version
 
     def run_full_pipeline(self) -> Dict[str, Any]:
@@ -573,6 +807,21 @@ class TrainingPipeline:
         backtest_results = self.backtest_validation()
         summary["backtest_validation"] = backtest_results
         logger.info("pipeline_stage_done", stage="backtest_validation")
+
+        logger.info("pipeline_stage_starting", stage="walk_forward_validation")
+        wf_result = self.walk_forward_validation()
+        summary["walk_forward_validation"] = wf_result
+        aggregate = wf_result.get("aggregate", {})
+        if aggregate:
+            self.db.log_model_metrics(
+                {
+                    "model_version": self.model.model_version,
+                    "model_type": "walk_forward_aggregate",
+                    "accuracy": aggregate.get("win_rate", {}).get("mean"),
+                    "quantum_circuit_depth": 0,
+                }
+            )
+        logger.info("pipeline_stage_done", stage="walk_forward_validation")
 
         logger.info("pipeline_stage_starting", stage="capital_allocation")
         allocation = self.capital_allocation(backtest_results)

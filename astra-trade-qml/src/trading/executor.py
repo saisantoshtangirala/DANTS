@@ -15,6 +15,23 @@ from src.utils.logger import log_trade_event
 class TradingEngine:
     """Orchestrates one signal-to-execution cycle for a single symbol."""
 
+    # Maps (regime, prospective action) to a strategy tag that actually
+    # exists in regimes.yaml's allowed/forbidden vocabulary, so regime
+    # alignment reflects whether THIS direction fits THIS regime.
+    @staticmethod
+    def _infer_strategy(regime: str, action: str) -> str:
+        if regime == "bull_trend":
+            return "trend_following" if action == "BUY" else "short_selling"
+        if regime == "bear_trend":
+            return "short_momentum" if action == "SELL" else "long_momentum"
+        if regime == "sideways":
+            return "mean_reversion"
+        if regime == "high_volatility":
+            return "volatility_breakout"
+        if regime == "pre_event":
+            return "directional_bias"
+        return "trend_following"
+
     def __init__(
         self,
         signal_generator: SignalGenerator,
@@ -40,9 +57,10 @@ class TradingEngine:
         win_rate: float = 0.5,
         avg_win_pct: float = 0.015,
         avg_loss_pct: float = 0.008,
-        strategy: str = "momentum_breakout",
+        strategy: Optional[str] = None,
         sub_model_probabilities: Optional[Dict[str, np.ndarray]] = None,
         capital_cap: Optional[float] = None,
+        regime_submodel_probabilities_by_regime: Optional[Dict[str, np.ndarray]] = None,
     ) -> Optional[TradeSignal]:
         """
         Run one full decision cycle for a symbol: detect the regime,
@@ -52,8 +70,30 @@ class TradingEngine:
         capital_cap, when given, ceilings this symbol's position notional
         (e.g. to its slice from PortfolioAllocator) independent of the
         risk manager's pool-wide sizing.
+
+        regime_submodel_probabilities_by_regime: optional {regime_name:
+            class-probability vector} from models trained only on each
+            regime's historical rows (see src/training/regime_submodels.py).
+            Keyed by regime rather than pre-selected so this method's own
+            regime detection (below) stays the single source of truth for
+            "which regime is active" - avoids a second detect() call
+            mutating the detector's hysteresis state twice per cycle. The
+            entry for the *detected* regime, if any, is blended (simple
+            average) with the general ensemble's class_probabilities before
+            the signal is generated, and folded into sub_model_probabilities
+            for ensemble-agreement scoring.
         """
         regime = self.regime_detector.detect(indicators)
+
+        regime_submodel_probabilities = (regime_submodel_probabilities_by_regime or {}).get(regime)
+        if regime_submodel_probabilities is not None:
+            class_probabilities = (class_probabilities + regime_submodel_probabilities) / 2.0
+            sub_model_probabilities = dict(sub_model_probabilities or {})
+            sub_model_probabilities["regime_submodel"] = regime_submodel_probabilities
+
+        prospective_action = "BUY" if class_probabilities[-1] >= class_probabilities[0] else "SELL"
+        if strategy is None:
+            strategy = self._infer_strategy(regime, prospective_action)
         regime_aligned = self.regime_detector.is_strategy_allowed(regime, strategy)
 
         signal = self.signal_generator.generate(
@@ -80,8 +120,13 @@ class TradingEngine:
         if signal.action == "HOLD" or signal.execution_action in ("none", "queue_review"):
             return signal
 
-        # Close any existing position for this symbol before checking capacity
-        if symbol in self.broker.open_positions:
+        # If already positioned in the same direction, do nothing — closing
+        # and reopening on every re-signal would pay a full round-trip cost
+        # every poll cycle for zero net movement. Only close on a direction flip.
+        existing = self.broker.open_positions.get(symbol)
+        if existing is not None:
+            if existing.action == signal.action:
+                return signal
             self.close_symbol(symbol, price)
 
         if not self.risk_manager.can_open_position():

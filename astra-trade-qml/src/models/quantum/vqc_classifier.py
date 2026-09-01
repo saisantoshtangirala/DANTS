@@ -58,6 +58,7 @@ class VQCMarketClassifier:
         use_pca: bool = True,
         pca_components: int = 4,
         fallback_to_classical: bool = True,
+        quantum_depth_adaptation: bool = False,
     ):
         """
         Initialize VQC classifier.
@@ -73,6 +74,9 @@ class VQCMarketClassifier:
             use_pca: Reduce dimensionality before encoding
             pca_components: PCA components (must equal n_qubits)
             fallback_to_classical: Use MLP if quantum fails
+            quantum_depth_adaptation: After the initial fit, sweep
+                the ansatz reps over {1, 2, 3} and keep whichever gives
+                the best validation accuracy (requires X_val/y_val)
         """
         self.n_qubits = n_qubits
         self.feature_map_type = feature_map_type
@@ -84,6 +88,7 @@ class VQCMarketClassifier:
         self.use_pca = use_pca
         self.pca_components = min(pca_components, n_qubits)
         self.fallback_to_classical = fallback_to_classical
+        self.quantum_depth_adaptation = quantum_depth_adaptation
 
         self.feature_map = None
         self.ansatz = None
@@ -211,6 +216,8 @@ class VQCMarketClassifier:
             try:
                 self._fit_quantum(X_normalized, y_train_mapped, X_val_normalized, y_val_mapped)
                 self.is_quantum = True
+                if self.quantum_depth_adaptation and X_val_normalized is not None and y_val_mapped is not None:
+                    self._adapt_circuit_depth(X_normalized, y_train_mapped, X_val_normalized, y_val_mapped)
             except Exception as e:
                 if self.fallback_to_classical:
                     print(f"VQC training failed: {e}. Falling back to classical MLP.", flush=True)
@@ -223,6 +230,45 @@ class VQCMarketClassifier:
             self.is_quantum = False
 
         return self.training_metrics
+
+    def _adapt_circuit_depth(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+    ) -> None:
+        """Sweep ansatz reps over {1, 2, 3}, keeping whichever depth gives
+        the best validation accuracy. Reuses the already-fit scaler/PCA/
+        minmax-scaler - only the ansatz (and thus circuit depth) changes."""
+        original_reps = self.reps
+        best_reps = original_reps
+        best_val_acc = self.training_metrics.get("val_accuracy", -1.0)
+        best_state = (
+            self.feature_map, self.ansatz, self.vqc, self.circuit_depth, dict(self.training_metrics),
+        )
+
+        for candidate_reps in (1, 2, 3):
+            if candidate_reps == original_reps:
+                continue
+            self.reps = candidate_reps
+            try:
+                self._fit_quantum(X, y, X_val, y_val)
+                candidate_val_acc = self.training_metrics.get("val_accuracy", -1.0)
+                if candidate_val_acc > best_val_acc:
+                    best_val_acc = candidate_val_acc
+                    best_reps = candidate_reps
+                    best_state = (
+                        self.feature_map, self.ansatz, self.vqc, self.circuit_depth, dict(self.training_metrics),
+                    )
+            except Exception as e:
+                print(f"  VQC depth adaptation: reps={candidate_reps} failed: {e}", flush=True)
+
+        self.reps = best_reps
+        self.feature_map, self.ansatz, self.vqc, self.circuit_depth, self.training_metrics = best_state
+        self.training_metrics["adapted_from_reps"] = original_reps
+        self.training_metrics["adapted_reps"] = best_reps
+        print(f"  VQC depth adaptation: chose reps={best_reps} (val_acc={best_val_acc:.4f})", flush=True)
 
     @staticmethod
     def _make_sampler(shots: int):
@@ -393,17 +439,17 @@ class VQCMarketClassifier:
         if self.is_quantum and self.vqc is not None:
             try:
                 # NeuralNetworkClassifier exposes predict() but not
-                # predict_proba().  Convert hard predictions to one-hot
-                # probabilities (the SamplerQNN already produces
-                # distribution-quality outputs internally).
-                preds = self.vqc.predict(X_normalized)
-                n = len(X_normalized)
-                proba = np.ones((n, self.NUM_CLASSES)) * (0.1 / (self.NUM_CLASSES - 1))
-                for i, p in enumerate(preds):
-                    c = int(p) % self.NUM_CLASSES
-                    proba[i, c] = 0.9
+                # predict_proba(). Pull the real output distribution from
+                # the underlying SamplerQNN by running forward() with the
+                # classifier's fitted weights, instead of manufacturing a
+                # fixed 90/10 split from the hard label.
+                weights = self.vqc.weights
+                raw = self.vqc.neural_network.forward(X_normalized, weights)
+                proba = np.asarray(raw, dtype=float)
+                proba = np.clip(proba, 0.0, None)
                 row_sums = proba.sum(axis=1, keepdims=True)
-                proba /= row_sums
+                row_sums = np.where(row_sums > 0, row_sums, 1.0)
+                proba = proba / row_sums
                 return proba
             except TimeoutError:
                 # Let the caller's wall-clock timeout (hybrid_model.py's

@@ -4,6 +4,7 @@ Downloads historical EOD data, F&O archives, and corporate actions.
 """
 
 import os
+import re
 import requests
 import zipfile
 import io
@@ -16,6 +17,80 @@ import pandas as pd
 import numpy as np
 
 
+def _parse_corporate_action_factor(purpose: str) -> Optional[float]:
+    """
+    Parse an NSE corporate-action purpose/subject string into a
+    multiplicative price-adjustment factor (< 1 for any action that
+    increases share count, e.g. bonus/split).
+
+    Recognized forms:
+        "Bonus 1:1"                                          -> 1/2
+        "Face Value Split (Sub-Division) - From Rs 10/- Per
+         Share To Rs 2/- Per Share"                           -> 2/10
+    Unrecognized purposes return None so the caller can skip them
+    rather than guess at an adjustment.
+    """
+    if not purpose:
+        return None
+    text = purpose.strip()
+
+    bonus_match = re.search(r"bonus\s+(\d+)\s*:\s*(\d+)", text, re.IGNORECASE)
+    if bonus_match:
+        existing, new = float(bonus_match.group(1)), float(bonus_match.group(2))
+        if existing + new > 0:
+            return existing / (existing + new)
+        return None
+
+    split_match = re.search(
+        r"face\s+value\s+split.*?rs\.?\s*(\d+(?:\.\d+)?).*?rs\.?\s*(\d+(?:\.\d+)?)",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if split_match:
+        old_fv, new_fv = float(split_match.group(1)), float(split_match.group(2))
+        if old_fv > 0:
+            return new_fv / old_fv
+        return None
+
+    return None
+
+
+def adjust_for_corporate_actions(df: pd.DataFrame, actions: List[Dict]) -> pd.DataFrame:
+    """
+    Standard back-adjustment: for every date strictly before an action's
+    ex-date, multiply OHLC by that action's factor and divide volume by it.
+    Multiple actions in range accumulate. Matches the convention yfinance's
+    auto_adjust=True already uses, so both data sources agree.
+
+    Args:
+        df: OHLCV frame with a "date" column, one row per trading day
+        actions: list of {"ex_date": datetime, "factor": float, ...}
+
+    Returns:
+        A new, adjusted DataFrame (input is not mutated).
+    """
+    if df.empty or not actions:
+        return df
+
+    adjusted = df.sort_values("date").reset_index(drop=True).copy()
+    dates = pd.to_datetime(adjusted["date"])
+    cumulative_factor = np.ones(len(adjusted))
+
+    for action in actions:
+        ex_date = action["ex_date"]
+        factor = action["factor"]
+        pre_ex_date = (dates < ex_date).to_numpy()
+        cumulative_factor[pre_ex_date] *= factor
+
+    for col in ("open", "high", "low", "close"):
+        if col in adjusted.columns:
+            adjusted[col] = adjusted[col] * cumulative_factor
+    if "volume" in adjusted.columns:
+        adjusted["volume"] = adjusted["volume"] / cumulative_factor
+
+    return adjusted
+
+
 class NSEDataIngestion:
     """
     NSE historical data ingestion handler.
@@ -24,6 +99,7 @@ class NSEDataIngestion:
 
     BASE_URL = "https://archives.nseindia.com/content/historical/EQUITIES"
     FNO_URL = "https://archives.nseindia.com/content/historical/DERIVATIVES"
+    CORPORATE_ACTIONS_URL = "https://www.nseindia.com/api/corporates-corporateActions"
 
     def __init__(self, data_dir: str = "data/nse"):
         """
@@ -38,6 +114,63 @@ class NSEDataIngestion:
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         })
+        self._nse_cookie_warmed_up = False
+
+    def download_corporate_actions(
+        self,
+        symbol: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> List[Dict]:
+        """
+        Fetch NSE's corporate-actions archive for a symbol/date range and
+        parse each action into a multiplicative price-adjustment factor.
+
+        Returns:
+            List of {"ex_date": datetime, "factor": float, "purpose": str}.
+            Empty on any network/parse failure (fail-soft - the caller
+            falls back to unadjusted data rather than raising).
+        """
+        try:
+            if not self._nse_cookie_warmed_up:
+                # nseindia.com's API endpoints require an initial cookie-setting
+                # request to the homepage before they'll serve API responses.
+                self.session.get("https://www.nseindia.com", timeout=15)
+                self._nse_cookie_warmed_up = True
+
+            params = {
+                "index": "equities",
+                "symbol": symbol,
+                "from_date": start_date.strftime("%d-%m-%Y"),
+                "to_date": end_date.strftime("%d-%m-%Y"),
+            }
+            response = self.session.get(self.CORPORATE_ACTIONS_URL, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            print(f"Error downloading corporate actions for {symbol}: {e}")
+            return []
+
+        if not isinstance(data, list):
+            return []
+
+        actions = []
+        for item in data:
+            purpose = item.get("subject") or item.get("purpose") or ""
+            ex_date_str = item.get("exDate") or item.get("exdate")
+            if not ex_date_str:
+                continue
+            try:
+                ex_date = pd.to_datetime(ex_date_str, dayfirst=True)
+            except Exception:
+                continue
+            factor = _parse_corporate_action_factor(purpose)
+            if factor is None:
+                print(f"  Skipping unrecognized corporate action for {symbol}: {purpose!r}")
+                continue
+            actions.append({"ex_date": ex_date, "factor": factor, "purpose": purpose})
+
+        return actions
 
     def download_bhavcopy(self, date: Optional[datetime] = None) -> pd.DataFrame:
         """
@@ -230,7 +363,18 @@ class NSEDataIngestion:
             return pd.DataFrame()
 
         result = pd.concat(all_data, ignore_index=True)
+        result = result.drop_duplicates(subset=["symbol", "date"], keep="last")
         result = result.sort_values("date").reset_index(drop=True)
+
+        try:
+            actions = self.download_corporate_actions(symbol, start_date, end_date)
+            if actions:
+                result = adjust_for_corporate_actions(result, actions)
+        except Exception as e:
+            # A corporate-actions outage shouldn't take down ingestion -
+            # fall back to unadjusted data rather than raising.
+            print(f"Warning: corporate-action adjustment failed for {symbol}: {e}. Using unadjusted data.")
+
         return result
 
     def _get_last_trading_day(self) -> datetime:
@@ -328,6 +472,8 @@ class YFinanceDataProvider:
         history["date"] = dates.dt.tz_convert(None) if dates.dt.tz is not None else dates
         history["symbol"] = symbol
         history["turnover"] = history["close"] * history["volume"]
+        history = history.drop_duplicates(subset=["symbol", "date"], keep="last")
+        history = history.sort_values("date").reset_index(drop=True)
 
         return history[["symbol", "date", "open", "high", "low", "close", "volume", "turnover"]]
 

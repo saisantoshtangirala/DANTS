@@ -50,6 +50,7 @@ class QuantumKernelClassifier:
         use_pca: bool = True,
         pca_components: int = 4,
         fallback_to_classical: bool = True,
+        quantum_depth_adaptation: bool = False,
     ):
         """
         Initialize Quantum Kernel classifier.
@@ -63,6 +64,9 @@ class QuantumKernelClassifier:
             use_pca: Whether to reduce dimensionality before quantum encoding
             pca_components: Number of PCA components (must equal n_qubits)
             fallback_to_classical: Use classical SVM if quantum fails
+            quantum_depth_adaptation: After the initial fit, sweep
+                feature_map_reps over {1, 2, 3} and keep whichever gives
+                the best validation accuracy (requires X_val/y_val)
         """
         self.n_qubits = n_qubits
         self.feature_map_type = feature_map_type
@@ -72,6 +76,7 @@ class QuantumKernelClassifier:
         self.use_pca = use_pca
         self.pca_components = min(pca_components, n_qubits)
         self.fallback_to_classical = fallback_to_classical
+        self.quantum_depth_adaptation = quantum_depth_adaptation
 
         self.feature_map = None
         self.quantum_kernel = None
@@ -135,9 +140,14 @@ class QuantumKernelClassifier:
                 # Pad with zeros
                 padding = np.zeros((X_processed.shape[0], self.n_qubits - X_processed.shape[1]))
                 X_processed = np.hstack([X_processed, padding])
+            pca_diagnostics = {
+                "explained_variance_ratio": [float(v) for v in self.pca.explained_variance_ratio_],
+                "cumulative_explained_variance": float(np.sum(self.pca.explained_variance_ratio_)),
+            }
         else:
             # Take first n_qubits features
             X_processed = X_scaled[:, :self.n_qubits]
+            pca_diagnostics = None
 
         # Preprocess validation data the same way (transform, not fit)
         X_val_processed = None
@@ -162,6 +172,8 @@ class QuantumKernelClassifier:
             try:
                 self._fit_quantum(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
                 self.is_quantum = True
+                if self.quantum_depth_adaptation and X_val_processed is not None and y_val_mapped is not None:
+                    self._adapt_circuit_depth(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
             except Exception as e:
                 if self.fallback_to_classical:
                     print(f"Quantum training failed: {e}. Falling back to classical SVM.", flush=True)
@@ -173,7 +185,45 @@ class QuantumKernelClassifier:
             self._fit_classical(X_processed, y_train_mapped, X_val_processed, y_val_mapped)
             self.is_quantum = False
 
+        if pca_diagnostics is not None:
+            self.training_metrics["pca_diagnostics"] = pca_diagnostics
+
         return self.training_metrics
+
+    def _adapt_circuit_depth(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+    ) -> None:
+        """Sweep feature_map_reps over {1, 2, 3}, keeping whichever depth
+        gives the best validation accuracy. Reuses the already-fit
+        scaler/PCA - only the feature map (and thus circuit depth) changes."""
+        best_reps = self.feature_map_reps
+        best_val_acc = self.training_metrics.get("val_accuracy", -1.0)
+        best_state = (self.feature_map, self.quantum_kernel, self.qsvc, dict(self.training_metrics))
+        original_reps = self.feature_map_reps
+
+        for candidate_reps in (1, 2, 3):
+            if candidate_reps == original_reps:
+                continue
+            self.feature_map_reps = candidate_reps
+            try:
+                self._fit_quantum(X, y, X_val, y_val)
+                candidate_val_acc = self.training_metrics.get("val_accuracy", -1.0)
+                if candidate_val_acc > best_val_acc:
+                    best_val_acc = candidate_val_acc
+                    best_reps = candidate_reps
+                    best_state = (self.feature_map, self.quantum_kernel, self.qsvc, dict(self.training_metrics))
+            except Exception as e:
+                print(f"  Quantum depth adaptation: reps={candidate_reps} failed: {e}", flush=True)
+
+        self.feature_map_reps = best_reps
+        self.feature_map, self.quantum_kernel, self.qsvc, self.training_metrics = best_state
+        self.training_metrics["adapted_from_reps"] = original_reps
+        self.training_metrics["adapted_reps"] = best_reps
+        print(f"  Quantum depth adaptation: chose reps={best_reps} (val_acc={best_val_acc:.4f})", flush=True)
 
     @staticmethod
     def _make_sampler():
@@ -229,6 +279,22 @@ class QuantumKernelClassifier:
         self.qsvc.fit(X_sub, y_sub)
         print(f"  Quantum Kernel: QSVC fit completed in {_time.monotonic() - t0:.1f}s", flush=True)
 
+        # Kernel concentration diagnostic: as qubit count grows, quantum
+        # kernels tend toward the identity matrix (all off-diagonal entries
+        # near 0), which kills class separability. Off-diagonal mean close
+        # to 0 / std close to 0 is a red flag worth surfacing before deploy.
+        try:
+            kernel_matrix = self.quantum_kernel.evaluate(X_sub)
+            off_diag_mask = ~np.eye(kernel_matrix.shape[0], dtype=bool)
+            off_diag_values = kernel_matrix[off_diag_mask]
+            kernel_diagnostics = {
+                "off_diagonal_mean": float(np.mean(off_diag_values)),
+                "off_diagonal_std": float(np.std(off_diag_values)),
+            }
+        except Exception as e:
+            print(f"  Quantum Kernel: diagnostic kernel evaluation failed: {e}", flush=True)
+            kernel_diagnostics = None
+
         # Metrics
         train_pred = self.qsvc.predict(X_sub)
         self.training_metrics = {
@@ -239,6 +305,8 @@ class QuantumKernelClassifier:
             "circuit_depth": len(self.feature_map.data),
             "training_samples": len(X_sub),
         }
+        if kernel_diagnostics is not None:
+            self.training_metrics["kernel_diagnostics"] = kernel_diagnostics
 
         if X_val is not None and y_val is not None:
             # Quantum kernel prediction cost is O(n_val * n_train) circuit

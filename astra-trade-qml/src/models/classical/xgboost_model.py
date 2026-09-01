@@ -297,6 +297,7 @@ class XGBoostMarketModel:
 
         self.model = xgb.XGBClassifier(**self.params)
         self.model.load_model(str(load_path / "xgboost_model.json"))
-        # Restore sklearn wrapper state so predict_proba works correctly
-        self.model.classes_ = np.array([0, 1])
-        self.model.n_classes_ = 2
+        # load_model() restores n_classes_ (and the classes_ property derived
+        # from it) from the booster's own config - no manual reconstruction
+        # needed. (Older xgboost releases required setting classes_ directly,
+        # but current releases expose it as a read-only property.)
