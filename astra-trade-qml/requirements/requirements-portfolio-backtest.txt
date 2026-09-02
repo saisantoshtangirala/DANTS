@@ -1,0 +1,40 @@
+# Astra-Trade QML - Portfolio Optimizer Backtest Diagnostic (plain CI runner, no GPU)
+#
+# run_rolling_backtest() (src/portfolio/backtest.py) involves no ML model
+# training - it pulls daily OHLCV from Yahoo Finance and compares
+# classical (equal-weight, mean-variance) vs. QUBO/simulated-annealing
+# asset-selection allocation strategies. Runs on a plain ubuntu-latest
+# GitHub Actions runner, same reasoning as
+# requirements-pairs-trading.txt: torch stays CPU-only (main.py
+# initializes CUDA and imports TrainingPipeline's dependency chain at
+# module level even though this diagnostic mode never trains a model),
+# and qiskit is deliberately NOT listed - the full 18-symbol backtest
+# does not exercise QAOA at all (see backtest.py's NOTE_QAOA_SCALE), and
+# quantum_optimizer.py's qiskit import is already guarded by a
+# try/except that degrades to simulated-annealing-only.
+
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+pyyaml>=6.0
+python-dotenv>=1.0
+python-dateutil>=2.8
+pytz>=2023.3
+
+requests>=2.31
+yfinance>=0.2.40
+
+scikit-learn>=1.5
+xgboost>=2.0
+statsmodels>=0.14
+
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.4
+--extra-index-url https://pypi.org/simple
+
+SQLAlchemy>=2.0
+structlog>=23.1
+
+kiteconnect>=4.2
+websocket-client>=1.6
+pyotp>=2.9

@@ -11,6 +11,7 @@ Usage:
     python3 -m src.main --mode xgboost-baseline    # diagnostic: bare XGBoost on the production feature set, no quantum ensemble
     python3 -m src.main --mode regime-gated-test   # diagnostic: regime-gated backtest against the full production ensemble
     python3 -m src.main --mode pairs-trading-test  # diagnostic: market-neutral pairs/relative-value trading, no ML model
+    python3 -m src.main --mode portfolio-optimizer-backtest  # diagnostic: quantum-inspired vs classical portfolio allocation
 """
 
 import argparse
@@ -702,6 +703,41 @@ def run_pairs_trading_test(config: dict, logger) -> None:
         )
 
 
+def run_portfolio_optimizer_backtest(config: dict, logger) -> None:
+    """Diagnostic: rolling out-of-sample comparison of three portfolio
+    allocation strategies (naive top-K equal weight, classical
+    mean-variance, and QUBO/quantum-inspired asset selection via
+    simulated annealing) over the existing 18-symbol equity universe -
+    see src/portfolio/backtest.py's module docstring for the full
+    methodology. Answers a different question than every other
+    diagnostic this session: not "can we predict a stock's next move",
+    but "given some return estimate, does the quantum-inspired
+    allocation layer pick a better basket than simple classical
+    baselines". No ML model training, no Kite needed - Yahoo Finance
+    daily OHLCV only, runs on a plain CI runner."""
+    from src.portfolio.backtest import run_rolling_backtest
+
+    logger.info("portfolio_optimizer_backtest_started")
+    results = run_rolling_backtest(
+        symbols=config.get("data", {}).get("symbols", {}).get("equity_universe"),
+        starting_capital=50_000.0,
+        target_k=6,
+        trailing_window_days=60,
+        lookback_days=1095,
+    )
+    for name, summary in results.items():
+        logger.info(
+            "portfolio_optimizer_backtest_result",
+            strategy=name,
+            n_periods=len(summary.periods),
+            total_return_pct=summary.total_return_pct,
+            annualized_sharpe=summary.annualized_sharpe,
+            max_drawdown_pct=summary.max_drawdown_pct,
+            n_risk_breaches=summary.n_risk_breaches,
+        )
+    logger.info("portfolio_optimizer_backtest_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -722,7 +758,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "portfolio-optimizer-backtest"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -753,6 +789,8 @@ def main() -> None:
         run_regime_gated_test(config, logger)
     elif args.mode == "pairs-trading-test":
         run_pairs_trading_test(config, logger)
+    elif args.mode == "portfolio-optimizer-backtest":
+        run_portfolio_optimizer_backtest(config, logger)
 
 
 if __name__ == "__main__":
