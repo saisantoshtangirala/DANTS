@@ -808,20 +808,27 @@ class TrainingPipeline:
         summary["backtest_validation"] = backtest_results
         logger.info("pipeline_stage_done", stage="backtest_validation")
 
-        logger.info("pipeline_stage_starting", stage="walk_forward_validation")
-        wf_result = self.walk_forward_validation()
-        summary["walk_forward_validation"] = wf_result
-        aggregate = wf_result.get("aggregate", {})
-        if aggregate:
-            self.db.log_model_metrics(
-                {
-                    "model_version": self.model.model_version,
-                    "model_type": "walk_forward_aggregate",
-                    "accuracy": aggregate.get("win_rate", {}).get("mean"),
-                    "quantum_circuit_depth": 0,
-                }
-            )
-        logger.info("pipeline_stage_done", stage="walk_forward_validation")
+        # OFF by default - see the comment on training.validation.
+        # walk_forward_enabled in config.yaml. Each fold retrains the
+        # full quantum ensemble from scratch; running it nightly alongside
+        # the main training run is what timed out run #62.
+        if self.training_cfg.get("validation", {}).get("walk_forward_enabled", False):
+            logger.info("pipeline_stage_starting", stage="walk_forward_validation")
+            wf_result = self.walk_forward_validation()
+            summary["walk_forward_validation"] = wf_result
+            aggregate = wf_result.get("aggregate", {})
+            if aggregate:
+                self.db.log_model_metrics(
+                    {
+                        "model_version": self.model.model_version,
+                        "model_type": "walk_forward_aggregate",
+                        "accuracy": aggregate.get("win_rate", {}).get("mean"),
+                        "quantum_circuit_depth": 0,
+                    }
+                )
+            logger.info("pipeline_stage_done", stage="walk_forward_validation")
+        else:
+            summary["walk_forward_validation"] = "SKIPPED: training.validation.walk_forward_enabled is false (costly - see config.yaml)"
 
         logger.info("pipeline_stage_starting", stage="capital_allocation")
         allocation = self.capital_allocation(backtest_results)

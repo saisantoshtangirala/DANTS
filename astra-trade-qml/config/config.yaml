@@ -228,6 +228,17 @@ training:
     quantum_depth_adaptation: true  # Auto-adjust circuit depth
 
   validation:
+    # OFF by default in the daily pipeline: each walk-forward fold retrains
+    # the FULL ensemble from scratch, including the quantum kernel and VQC
+    # (each already costs 10-30 minutes for a single fit in the main daily
+    # training run). walk_forward_windows folds means that many full
+    # quantum retrains in one run - run #62 (the run this was first wired
+    # into the daily pipeline) hit the 3-hour training-pod timeout mid-fold
+    # 2 of 6 and was killed (exit=124). Run TrainingPipeline.walk_forward_validation()
+    # manually/periodically instead (e.g. monthly, matching the "6-month
+    # rolling window" comment below) until it has a lightweight
+    # classical-only mode cheap enough to run nightly.
+    walk_forward_enabled: false
     walk_forward_windows: 6         # 6-month rolling window
     out_of_sample_pct: 0.20         # 20% OOS
     paper_trading_months: 6         # 6-month incubation

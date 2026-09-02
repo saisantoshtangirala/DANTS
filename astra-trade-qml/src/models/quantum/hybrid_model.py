@@ -169,7 +169,8 @@ class HybridQMLModel:
                 "status": "trained",
                 "history": lstm_history,
             }
-            print(f"  LSTM trained in {_time.monotonic() - t0:.1f}s. Best val acc: {max(lstm_history.get('val_acc', [0])):.4f}", flush=True)
+            val_acc_history = lstm_history.get("val_acc") or [0]
+            print(f"  LSTM trained in {_time.monotonic() - t0:.1f}s. Best val acc: {max(val_acc_history):.4f}", flush=True)
         except Exception as e:
             metrics["lstm"] = {"status": "failed", "error": str(e)}
             print(f"  LSTM failed after {_time.monotonic() - t0:.1f}s: {e}", flush=True)
