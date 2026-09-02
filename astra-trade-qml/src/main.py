@@ -9,6 +9,7 @@ Usage:
     python3 -m src.main --mode swing-test    # diagnostic: test for a coarser-horizon (multi-day) edge
     python3 -m src.main --mode swing-walk-forward  # diagnostic: walk-forward stability check on swing-test's promising symbols
     python3 -m src.main --mode xgboost-baseline    # diagnostic: bare XGBoost on the production feature set, no quantum ensemble
+    python3 -m src.main --mode regime-gated-test   # diagnostic: regime-gated backtest against the full production ensemble
 """
 
 import argparse
@@ -569,6 +570,81 @@ def run_xgboost_baseline(config: dict, logger) -> None:
         )
 
 
+def run_regime_gated_test(config: dict, logger) -> None:
+    """Diagnostic: regime-gating tested against the FULL production
+    ensemble, not the xgboost-only baseline. The xgboost-baseline
+    diagnostic's own regime-gated re-score came back inconclusive - that
+    model almost never traded at all (0-5 trades out of ~2,000 OOS rows
+    across two runs), so filtering its already-empty call set by regime
+    had nothing to filter. The full ensemble's meta-learner reliably
+    generates hundreds of trades per symbol (run #69), so this is the
+    model that can actually test the hypothesis: does sitting out
+    sideways/high_volatility rows and only trading bull_trend/bear_trend
+    ones turn the ensemble's uniformly-negative null result (runs
+    #64/#65/#69) around, or does the null persist even regime-filtered?
+
+    Trains via the same classical_and_quantum_training() the real nightly/
+    on-demand production run uses (full LSTM+XGBoost+quantum kernel+VQC+
+    meta-learner), then reports backtest_validation() (ungated) and
+    TrainingPipeline.regime_gated_backtest_symbols_oos() (gated) side by
+    side from that one trained model - no changes to the trade-simulation
+    methodology itself, so the two are directly comparable line for line.
+    Deliberately its own isolated mode/pod/workflow (not bundled into
+    train-and-deploy.yml) since this is a research question, not a
+    production deploy - see regime-gated-test.yml."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_regime_gated_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("regime_gated_test_started")
+    n_symbols = len(pipeline.data_ingestion())
+    logger.info("data_ingestion_done", n_symbols=n_symbols)
+
+    n_featured = len(pipeline.feature_engineering())
+    logger.info("feature_engineering_done", n_symbols=n_featured)
+
+    pipeline.classical_and_quantum_training()
+    logger.info("classical_and_quantum_training_done", model_version=pipeline.model.model_version)
+
+    feature_cols = pipeline._trained_feature_cols
+    ungated = pipeline.backtest_validation()
+    gated = pipeline.regime_gated_backtest_symbols_oos(pipeline.model, feature_cols)
+
+    for symbol, report in ungated.items():
+        logger.info(
+            "regime_gated_test_ungated_result",
+            symbol=symbol,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            expectancy=report.get("expectancy"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+        )
+    for symbol, report in gated.items():
+        logger.info(
+            "regime_gated_test_gated_result",
+            symbol=symbol,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            expectancy=report.get("expectancy"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+        )
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -589,7 +665,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -616,6 +692,8 @@ def main() -> None:
         run_swing_walk_forward(config, logger)
     elif args.mode == "xgboost-baseline":
         run_xgboost_baseline(config, logger)
+    elif args.mode == "regime-gated-test":
+        run_regime_gated_test(config, logger)
 
 
 if __name__ == "__main__":

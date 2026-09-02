@@ -1,0 +1,106 @@
+name: Regime-Gated Backtest Diagnostic (RunPod)
+
+# Diagnostic-only: tests regime-gated trading against the FULL production
+# ensemble (not the cheap xgboost-only baseline, whose own regime-gated
+# test came back inconclusive - it almost never trades at all, so
+# filtering its already-empty call set by regime had nothing to filter).
+# See TrainingPipeline.regime_gated_backtest_symbols_oos()'s docstring and
+# run_regime_gated_test() in src/main.py for exactly what this tests: does
+# sitting out sideways/high_volatility rows and only trading bull_trend/
+# bear_trend ones turn the ensemble's uniformly-negative null result
+# (runs #64/#65/#69) around, or does the null persist even regime-filtered.
+#
+# Trains via the same classical_and_quantum_training() the real
+# train-and-deploy.yml run uses (full LSTM+XGBoost+quantum kernel+VQC+
+# meta-learner) - same cost profile as that workflow's train job - then
+# reports backtest_validation() (ungated) and
+# regime_gated_backtest_symbols_oos() (gated) from that one trained model,
+# side by side. Deliberately isolated (own concurrency group, pod name,
+# status/log paths via launch_training_pod.py's --script-mode) since this
+# is a research run, not a production deploy - no deploy job here at all.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch:
+    inputs:
+      min_vram_gb:
+        description: "Minimum GPU VRAM (GB) to select"
+        required: false
+        default: "12"
+
+concurrency:
+  group: regime-gated-test
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  regime-gated-test:
+    runs-on: ubuntu-latest
+    # Same cost profile as train-and-deploy.yml's train job (full quantum
+    # ensemble training) - see that workflow's own timeout comment for the
+    # reasoning behind this budget.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install script dependencies
+        run: pip install requests
+
+      - name: Select cheapest available GPU
+        id: gpu
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: |
+          GPU_IDS=$(python3 astra-trade-qml/scripts/ci/select_gpu.py \
+            --min-vram-gb "${{ github.event.inputs.min_vram_gb || '12' }}")
+          echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
+          echo "Selected GPUs: $GPU_IDS"
+
+      - name: Generate ephemeral SSH key for pod log streaming
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
+          chmod 600 /tmp/runpod_ssh_key
+
+      - name: Launch regime-gated-test pod and wait for completion
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        run: |
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
+            --script-mode regime-gated-test \
+            --train-timeout-seconds 10800 \
+            --poll-timeout-seconds 11400 \
+            > >(tee /tmp/launch_regime_gated_test_pod.log) 2>&1
+
+      - name: Summarize regime-gated-test run
+        if: always()
+        run: |
+          {
+            echo "### Regime-gated backtest diagnostic run"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
+            echo
+            echo '```'
+            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+              /tmp/launch_regime_gated_test_pod.log || echo "(no matching status lines captured)"
+            echo '```'
+            echo
+            echo "Full results: \`astra-trade-qml/logs/regime-gated-test_training_full.log\` on the \`model-artifacts\` branch."
+          } >> "$GITHUB_STEP_SUMMARY"
