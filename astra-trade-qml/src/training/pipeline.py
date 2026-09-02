@@ -428,7 +428,7 @@ class TrainingPipeline:
             oos = df[df["date"] >= val_date].reset_index(drop=True)
             if oos.empty:
                 continue
-            report = self._score_oos_swing(oos, feature_cols, initial_capital)
+            report = self._score_oos_swing(self.swing_model, oos, feature_cols, 0.0, initial_capital)
             if report is not None:
                 backtest_results[symbol] = report
 
@@ -441,7 +441,12 @@ class TrainingPipeline:
         }
 
     def _score_oos_swing(
-        self, oos: pd.DataFrame, feature_cols: list, initial_capital: float,
+        self,
+        model: HybridQMLModel,
+        oos: pd.DataFrame,
+        feature_cols: list,
+        cost_pct: float,
+        initial_capital: float,
     ) -> Optional[Dict[str, Any]]:
         """
         Delivery-cost OOS scoring for the swing model - the swing
@@ -449,6 +454,14 @@ class TrainingPipeline:
         (STT both legs, no stamp-duty/STT split by side) and no
         circuit-band/tick-rounding checks, since swing holds span many
         days rather than resolving within one session.
+
+        `model` is passed explicitly (rather than reading self.swing_model)
+        and `cost_pct` is accepted-but-unused, both purely so this matches
+        WalkForwardValidator's score_oos_fn signature - see
+        _score_oos_realistic's docstring for the same reasoning on the
+        intraday side. swing_training_and_backtest() passes self.swing_model
+        explicitly for its own single-split call; swing_walk_forward_validation()
+        passes each fold's freshly-trained model instead.
         """
         if oos.empty:
             return None
@@ -465,9 +478,9 @@ class TrainingPipeline:
                 oos[col] = np.nan
 
         X_oos = oos[feature_cols].to_numpy()
-        X_oos = self.swing_model.transform_features(X_oos)
+        X_oos = model.transform_features(X_oos)
 
-        proba = self.swing_model.predict_proba(X_oos)
+        proba = model.predict_proba(X_oos)
         class_idx = np.argmax(proba, axis=1)
         model_probability = proba[np.arange(len(proba)), class_idx]
 
@@ -507,6 +520,74 @@ class TrainingPipeline:
         )
 
         return generate_performance_report(trades_df, equity_curve)
+
+    # Symbols that cleared BOTH a positive expectancy AND the 20-trade
+    # "meaningful sample" bar (allocator.min_backtest_trades) in swing-test
+    # run #1's single 80/10/10 OOS split. HDFCBANK's +3.48%/trade on only
+    # 12 trades was flagged there as a likely small-sample outlier and is
+    # deliberately excluded - the whole point of walk-forward here is to
+    # stop trusting any one split, so the default set shouldn't already
+    # include a result that split alone couldn't be trusted on.
+    SWING_WALK_FORWARD_DEFAULT_SYMBOLS = ["INFY", "PNB", "BANKBARODA", "TATAPOWER", "CANBK", "ITC"]
+
+    def swing_walk_forward_validation(
+        self, symbols: Optional[List[str]] = None, n_windows: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic task: checks whether swing-test run #1's positive-expectancy
+        symbols hold up across multiple time windows, not just the one
+        train/val/OOS split swing_training_and_backtest() checked - a single
+        split can look like an edge by chance the same way run #64's clean
+        null result showed a single split can also correctly show no edge.
+        Reuses WalkForwardValidator (already validated end-to-end for the
+        intraday path via walk_forward_validation()) with _score_oos_swing's
+        delivery-cost economics in place of _score_oos_realistic's intraday
+        ones. Each fold trains a dedicated swing model from scratch and
+        scores it strictly out-of-sample on the next window.
+
+        Deliberately its own isolated diagnostic path (own script_mode, own
+        CI workflow - see swing-walk-forward.yml) rather than folded into
+        swing_training_and_backtest() or the intraday pipeline's own
+        walk_forward_validation(): quantum sub-model training cost is
+        dataset-size-independent (fixed subsample budgets), so retraining
+        the full ensemble n_windows times here costs the same order of
+        magnitude as walk_forward_validation() already did for run #62 -
+        the exact bundling mistake that blew that run's 3-hour timeout.
+        Defaults to only the 6 symbols above (not the full 18-symbol swing
+        universe) and a smaller n_windows than the intraday default to keep
+        this bounded to its own CI budget.
+        """
+        symbols = symbols if symbols is not None else self.SWING_WALK_FORWARD_DEFAULT_SYMBOLS
+        n_windows = (
+            n_windows if n_windows is not None
+            else self.training_cfg.get("validation", {}).get("swing_walk_forward_windows", 4)
+        )
+
+        featured = {
+            s: df for s, df in self.swing_featured_data.items()
+            if s in symbols and not df.empty
+        }
+        if not featured:
+            raise ValueError(
+                "No swing featured data available for the requested symbols. "
+                "Run swing_data_ingestion()/swing_feature_engineering() first."
+            )
+
+        initial_capital = self.config["trading"]["capital"]["initial"]
+        validator = WalkForwardValidator(
+            featured_data=featured,
+            feature_engineer=self.feature_engineer,
+            build_model_config_fn=lambda: build_hybrid_model_config(self.config),
+            score_oos_fn=self._score_oos_swing,
+            cost_pct=0.0,  # unused by _score_oos_swing; real costs come from CostCalculator(delivery=True)
+            initial_capital=initial_capital,
+            n_windows=n_windows,
+        )
+        try:
+            return validator.run()
+        except ValueError as e:
+            logger.warning("swing_walk_forward_validation_skipped", reason=str(e))
+            return {"folds": [], "aggregate": {}, "skipped_reason": str(e)}
 
     def compute_liquidity(self) -> Dict[str, float]:
         """Average daily traded value (INR crore) per symbol, from the

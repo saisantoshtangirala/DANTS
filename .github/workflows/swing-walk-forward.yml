@@ -1,0 +1,117 @@
+name: Swing Walk-Forward Stability Check (RunPod)
+
+# Diagnostic-only: checks whether swing-test's positive-expectancy
+# symbols (see TrainingPipeline.SWING_WALK_FORWARD_DEFAULT_SYMBOLS -
+# INFY, PNB, BANKBARODA, TATAPOWER, CANBK, ITC, the 6 that cleared both
+# a positive expectancy AND the 20-trade "meaningful sample" bar in
+# swing-test run #1) hold up across multiple out-of-sample time windows,
+# rather than trusting the one 80/10/10 split swing-test checked. See
+# TrainingPipeline.swing_walk_forward_validation()'s docstring for
+# exactly what this does (expanding-window folds, each retraining a
+# dedicated swing model from scratch and scoring it strictly OOS on the
+# next window) and does not (still no live swing-execution path) test.
+#
+# Deliberately its own isolated workflow - own concurrency group, own
+# pod name (astra-trade-qml-swing-walk-forward, via
+# launch_training_pod.py's --script-mode), own status/log file paths on
+# model-artifacts (logs/swing-walk-forward_*) - for the same reason
+# swing-test.yml is isolated from train-and-deploy.yml, plus one more:
+# quantum sub-model training cost is dataset-size-independent (fixed
+# subsample budgets), so each walk-forward fold here costs the same
+# order of magnitude as swing-test's own single training step -
+# bundling training.validation.swing_walk_forward_windows folds worth
+# of that into any other run risks the exact 3-hour timeout run #62 hit
+# bundling the intraday pipeline's own walk-forward validation into its
+# single training run. Hence the much larger budget below and its own
+# workflow entirely.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# stability check, not a recurring production job.
+on:
+  workflow_dispatch:
+    inputs:
+      min_vram_gb:
+        description: "Minimum GPU VRAM (GB) to select"
+        required: false
+        default: "12"
+
+concurrency:
+  group: swing-walk-forward
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  swing-walk-forward:
+    runs-on: ubuntu-latest
+    # Own, much larger budget than swing-test.yml's 150min: with
+    # training.validation.swing_walk_forward_windows: 4 (config.yaml),
+    # up to 3 folds each retrain a full swing model from scratch,
+    # including the quantum kernel and VQC - the same dataset-size-
+    # independent cost swing-test.yml's single training step pays once,
+    # paid here up to 3x. Padded well above the pod's own 320min
+    # poll-timeout-seconds cap (3 launch attempts x 30min boot check,
+    # worst case, + the poll timeout once booted).
+    timeout-minutes: 420
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install script dependencies
+        run: pip install requests
+
+      - name: Select cheapest available GPU
+        id: gpu
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: |
+          GPU_IDS=$(python3 astra-trade-qml/scripts/ci/select_gpu.py \
+            --min-vram-gb "${{ github.event.inputs.min_vram_gb || '12' }}")
+          echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
+          echo "Selected GPUs: $GPU_IDS"
+
+      - name: Generate ephemeral SSH key for pod log streaming
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
+          chmod 600 /tmp/runpod_ssh_key
+
+      - name: Launch swing-walk-forward pod and wait for completion
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        run: |
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
+            --script-mode swing-walk-forward \
+            --train-timeout-seconds 18000 \
+            --poll-timeout-seconds 19200 \
+            > >(tee /tmp/launch_swing_walk_forward_pod.log) 2>&1
+
+      - name: Summarize swing walk-forward run
+        if: always()
+        run: |
+          {
+            echo "### Swing walk-forward stability check"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
+            echo
+            echo '```'
+            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+              /tmp/launch_swing_walk_forward_pod.log || echo "(no matching status lines captured)"
+            echo '```'
+            echo
+            echo "Full results: \`astra-trade-qml/logs/swing-walk-forward_training_full.log\` on the \`model-artifacts\` branch."
+          } >> "$GITHUB_STEP_SUMMARY"

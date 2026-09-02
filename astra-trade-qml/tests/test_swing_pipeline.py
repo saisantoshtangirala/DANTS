@@ -102,3 +102,43 @@ def test_swing_training_and_backtest_runs_end_to_end(pipeline):
 def test_swing_training_and_backtest_raises_without_featured_data(pipeline):
     with pytest.raises(ValueError, match="swing_data_ingestion"):
         pipeline.swing_training_and_backtest()
+
+
+def test_swing_walk_forward_default_symbols_match_run_1_promising_set():
+    """Regression test: the 6 symbols that cleared both a positive
+    expectancy AND the 20-trade meaningful-sample bar in swing-test run #1.
+    HDFCBANK (+3.48%/trade on only 12 trades, flagged as a likely
+    small-sample outlier) must stay excluded from the default set."""
+    assert TrainingPipeline.SWING_WALK_FORWARD_DEFAULT_SYMBOLS == [
+        "INFY", "PNB", "BANKBARODA", "TATAPOWER", "CANBK", "ITC",
+    ]
+    assert "HDFCBANK" not in TrainingPipeline.SWING_WALK_FORWARD_DEFAULT_SYMBOLS
+
+
+def test_swing_walk_forward_validation_runs_end_to_end(pipeline):
+    """Expanding-window walk-forward across a few symbols: each fold
+    retrains a (faked) swing model from scratch and scores it OOS on the
+    next window. HybridQMLModel is faked at its walk_forward.py import
+    site (WalkForwardValidator imports it directly, independent of
+    pipeline.py's own HybridQMLModel import) so this exercises the real
+    fold-splitting/pooling/scoring logic without a multi-minute quantum fit."""
+    symbols = ["INFY", "PNB", "BANKBARODA"]
+    pipeline.swing_raw_data = {s: _synthetic_daily_ohlcv(seed=i) for i, s in enumerate(symbols)}
+    pipeline.swing_feature_engineering(forward_periods=10)
+
+    with patch("src.training.walk_forward.HybridQMLModel", _FakeSwingModel):
+        result = pipeline.swing_walk_forward_validation(symbols=symbols, n_windows=3)
+
+    assert "skipped_reason" not in result
+    assert result["aggregate"]["n_folds"] > 0
+    assert len(result["folds"]) == result["aggregate"]["n_folds"]
+    for fold in result["folds"]:
+        assert fold["test_start"] < fold["test_end"]
+
+
+def test_swing_walk_forward_validation_raises_without_matching_symbols(pipeline):
+    pipeline.swing_raw_data = {"INFY": _synthetic_daily_ohlcv(seed=1)}
+    pipeline.swing_feature_engineering(forward_periods=10)
+
+    with pytest.raises(ValueError, match="swing_data_ingestion"):
+        pipeline.swing_walk_forward_validation(symbols=["SOME_OTHER_SYMBOL"])

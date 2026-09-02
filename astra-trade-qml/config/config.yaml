@@ -282,6 +282,17 @@ training:
     out_of_sample_pct: 0.20         # 20% OOS
     paper_trading_months: 6         # 6-month incubation
 
+    # TrainingPipeline.swing_walk_forward_validation()'s own window count -
+    # deliberately smaller than walk_forward_windows above. Quantum
+    # sub-model training cost is dataset-size-independent (fixed subsample
+    # budgets), so each fold here costs the same order of magnitude as a
+    # full swing_training_and_backtest() training step regardless of the
+    # daily-bar dataset being much smaller than intraday's - the same class
+    # of cost run #62 hit doing this for the intraday path, avoided here by
+    # keeping this diagnostic in its own isolated CI workflow (see
+    # swing-walk-forward.yml) with fewer folds than the intraday default.
+    swing_walk_forward_windows: 4
+
 ipo:
   enabled: true
   mode: "paper_only"                # Never automate IPOs live (regulatory risk)

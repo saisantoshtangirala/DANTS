@@ -7,6 +7,7 @@ Usage:
     python3 -m src.main --mode dashboard     # launch the Streamlit dashboard
     python3 -m src.main --mode stress-test   # stress-test risk management against historical crises
     python3 -m src.main --mode swing-test    # diagnostic: test for a coarser-horizon (multi-day) edge
+    python3 -m src.main --mode swing-walk-forward  # diagnostic: walk-forward stability check on swing-test's promising symbols
 """
 
 import argparse
@@ -437,6 +438,64 @@ def run_swing_test(config: dict, logger) -> None:
         )
 
 
+def run_swing_walk_forward(config: dict, logger) -> None:
+    """Diagnostic: checks whether swing-test run #1's positive-expectancy
+    symbols (see TrainingPipeline.SWING_WALK_FORWARD_DEFAULT_SYMBOLS) hold
+    up across multiple out-of-sample time windows rather than trusting the
+    one split swing-test checked. Deliberately its own isolated mode/pod/
+    workflow (not folded into swing-test or the intraday pipeline's own
+    walk-forward validation) - see swing_walk_forward_validation()'s
+    docstring for why bundling this elsewhere risks the same timeout class
+    run #62 hit."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_swing_walk_forward")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_yfinance", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    symbols = TrainingPipeline.SWING_WALK_FORWARD_DEFAULT_SYMBOLS
+    logger.info("swing_walk_forward_started", symbols=symbols)
+    n_symbols = len(pipeline.swing_data_ingestion(symbols=symbols))
+    logger.info("swing_data_ingestion_done", n_symbols=n_symbols)
+
+    n_featured = len(pipeline.swing_feature_engineering())
+    logger.info("swing_feature_engineering_done", n_symbols=n_featured)
+
+    result = pipeline.swing_walk_forward_validation(symbols=symbols)
+    if "skipped_reason" in result:
+        logger.warning("swing_walk_forward_skipped", reason=result["skipped_reason"])
+        return
+
+    logger.info("swing_walk_forward_aggregate", n_folds=result["aggregate"].get("n_folds"), **{
+        k: v for k, v in result["aggregate"].items() if k != "n_folds"
+    })
+    for fold in result["folds"]:
+        for symbol, report in fold["symbol_reports"].items():
+            logger.info(
+                "swing_walk_forward_fold_result",
+                fold=fold["fold"],
+                test_start=fold["test_start"],
+                test_end=fold["test_end"],
+                symbol=symbol,
+                total_trades=report.get("total_trades"),
+                win_rate=report.get("win_rate"),
+                avg_trade_return_pct=report.get("avg_trade_return_pct"),
+                expectancy=report.get("expectancy"),
+                sharpe_ratio=report.get("sharpe_ratio"),
+            )
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -457,7 +516,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -480,6 +539,8 @@ def main() -> None:
         run_stress_test(config, logger)
     elif args.mode == "swing-test":
         run_swing_test(config, logger)
+    elif args.mode == "swing-walk-forward":
+        run_swing_walk_forward(config, logger)
 
 
 if __name__ == "__main__":
