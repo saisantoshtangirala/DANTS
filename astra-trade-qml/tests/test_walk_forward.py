@@ -92,9 +92,38 @@ def test_pool_train_matrix_produces_scaled_features_and_group_ids():
     validator = _make_validator()
     train_frames = _make_featured_data(n_symbols=2, n_rows=50)
 
-    X, y, groups, feature_cols, scaler = validator._pool_train_matrix(train_frames)
+    pooled = validator._pool_train_matrix(train_frames)
 
-    assert X.shape[0] == 100
-    assert set(np.unique(groups)) == {0, 1}
-    assert feature_cols == ["feature_1", "feature_2"]
-    assert np.isfinite(X).all()
+    assert set(np.unique(pooled["groups_train"])) <= {0, 1}
+    assert pooled["feature_cols"] == ["feature_1", "feature_2"]
+    assert np.isfinite(pooled["X_train"]).all()
+    assert np.isfinite(pooled["X_val_es"]).all()
+    assert np.isfinite(pooled["X_val_meta"]).all()
+    # No rows silently dropped: train + early-stopping val + meta val
+    # slices must account for every pooled row.
+    total = len(pooled["X_train"]) + len(pooled["X_val_es"]) + len(pooled["X_val_meta"])
+    assert total == 100
+
+
+def test_pool_train_matrix_carves_out_a_validation_slice():
+    """
+    Regression test: without a validation slice, model.fit() falls back
+    to X_val=None in WalkForwardValidator.run(), which disables early
+    stopping entirely (each sub-model then trains for its full fixed
+    epoch/round budget with no generalization check - observed reaching
+    95%+ LSTM train accuracy over 100 uncontrolled epochs) and makes the
+    meta-learner reuse X_train, teaching it to trust already-overfit
+    in-sample predictions. _pool_train_matrix() must always carve one off
+    the end of the training window whenever there are enough distinct
+    dates to do so.
+    """
+    validator = _make_validator()
+    train_frames = _make_featured_data(n_symbols=2, n_rows=50)
+
+    pooled = validator._pool_train_matrix(train_frames)
+
+    assert len(pooled["X_val_es"]) > 0
+    assert len(pooled["X_val_meta"]) > 0
+    # The validation slice must be the most recent dates, strictly after
+    # every training-set row - never sampled from the middle of the window.
+    assert len(pooled["X_train"]) < 100
