@@ -17,7 +17,7 @@ live rule-based detector.
 """
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -26,20 +26,47 @@ from src.models.classical.xgboost_model import XGBoostMarketModel
 
 MIN_ROWS_PER_REGIME = 100
 
+REGIME_PROXY_REQUIRED_COLUMNS = {"close_to_sma_20", "close_to_sma_50", "volatility_20d", "atr_pct"}
 
-def label_regime_proxy(df: pd.DataFrame) -> pd.Series:
+
+def compute_regime_thresholds(df: pd.DataFrame) -> Dict[str, float]:
+    """
+    The vol_low/vol_high/atr_high quantile cutoffs label_regime_proxy() uses,
+    split out so a caller can compute them once on a training-window slice
+    and apply the same fixed cutoffs to label a later out-of-sample slice -
+    otherwise labeling the OOS slice on its own quantiles lets the regime
+    boundary itself peek at the OOS distribution, the same class of leakage
+    _pooled_training_matrix()'s train-only StandardScaler fit avoids for
+    the feature matrix.
+    """
+    missing = REGIME_PROXY_REQUIRED_COLUMNS - set(df.columns)
+    if missing:
+        raise ValueError(f"compute_regime_thresholds requires columns {sorted(missing)}")
+    return {
+        "vol_low": df["volatility_20d"].quantile(0.33),
+        "vol_high": df["volatility_20d"].quantile(0.67),
+        "atr_high": df["atr_pct"].quantile(0.67),
+    }
+
+
+def label_regime_proxy(df: pd.DataFrame, thresholds: Optional[Dict[str, float]] = None) -> pd.Series:
     """
     Assign one of {bull_trend, bear_trend, high_volatility, sideways} to
     every row using only per-symbol technicals already in the featured frame.
+
+    `thresholds`, when given, must be a dict from compute_regime_thresholds()
+    (typically computed on a training-window slice) - pass it explicitly to
+    label an out-of-sample slice without the vol_low/vol_high/atr_high
+    cutoffs themselves being computed from that same OOS slice. Defaults to
+    computing thresholds from `df` itself (the original, single-slice
+    behavior), unchanged for every existing caller.
     """
-    required = {"close_to_sma_20", "close_to_sma_50", "volatility_20d", "atr_pct"}
-    missing = required - set(df.columns)
+    missing = REGIME_PROXY_REQUIRED_COLUMNS - set(df.columns)
     if missing:
         raise ValueError(f"label_regime_proxy requires columns {sorted(missing)}")
 
-    vol_low = df["volatility_20d"].quantile(0.33)
-    vol_high = df["volatility_20d"].quantile(0.67)
-    atr_high = df["atr_pct"].quantile(0.67)
+    thresholds = thresholds if thresholds is not None else compute_regime_thresholds(df)
+    vol_low, vol_high, atr_high = thresholds["vol_low"], thresholds["vol_high"], thresholds["atr_high"]
 
     bull = (df["close_to_sma_20"] > 0.02) & (df["close_to_sma_50"] > 0.05) & (df["volatility_20d"] < vol_low)
     bear = (df["close_to_sma_50"] < -0.02) & (df["volatility_20d"] > vol_high)

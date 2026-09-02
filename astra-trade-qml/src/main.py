@@ -507,7 +507,10 @@ def run_xgboost_baseline(config: dict, logger) -> None:
     whether that's about the model (ensemble complexity adding nothing a
     much cheaper single model wouldn't already find) or the signal
     (nothing in the current feature set has an edge at all) - see
-    TrainingPipeline.xgboost_baseline_training_and_backtest()'s docstring."""
+    TrainingPipeline.xgboost_baseline_training_and_backtest()'s docstring.
+    Also reports a regime-gated re-score of the same trained model (only
+    bull_trend/bear_trend OOS rows, sideways/high_volatility sat out) at
+    no extra training cost - see regime_gated_backtest_symbols_oos()."""
     import os
 
     from src.data.nse_ingestion import KiteDataProvider
@@ -543,6 +546,20 @@ def run_xgboost_baseline(config: dict, logger) -> None:
     for symbol, report in result["backtest"].items():
         logger.info(
             "xgboost_baseline_backtest_result",
+            symbol=symbol,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            expectancy=report.get("expectancy"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+        )
+    # Same trained model, re-scored only on bull_trend/bear_trend rows
+    # (sitting out sideways/high_volatility ones) - tests whether the
+    # null result above is masking a real edge that only shows up once
+    # regime-filtered. See TrainingPipeline.regime_gated_backtest_symbols_oos().
+    for symbol, report in result["regime_gated_backtest"].items():
+        logger.info(
+            "xgboost_regime_gated_backtest_result",
             symbol=symbol,
             total_trades=report.get("total_trades"),
             win_rate=report.get("win_rate"),

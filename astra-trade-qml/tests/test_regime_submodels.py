@@ -4,7 +4,12 @@ import pytest
 
 pytest.importorskip("xgboost")
 
-from src.training.regime_submodels import MIN_ROWS_PER_REGIME, RegimeSubModelTrainer, label_regime_proxy
+from src.training.regime_submodels import (
+    MIN_ROWS_PER_REGIME,
+    RegimeSubModelTrainer,
+    compute_regime_thresholds,
+    label_regime_proxy,
+)
 
 
 def _base_df(n=300) -> pd.DataFrame:
@@ -30,6 +35,55 @@ def test_label_regime_proxy_returns_only_known_regimes():
     regimes = label_regime_proxy(df)
     assert set(regimes.unique()).issubset({"bull_trend", "bear_trend", "high_volatility", "sideways"})
     assert len(regimes) == len(df)
+
+
+def test_compute_regime_thresholds_raises_on_missing_columns():
+    df = pd.DataFrame({"close_to_sma_20": [0.1]})
+    with pytest.raises(ValueError, match="requires columns"):
+        compute_regime_thresholds(df)
+
+
+def test_label_regime_proxy_with_explicit_thresholds_matches_manual_default():
+    """
+    Regression test: passing compute_regime_thresholds(df)'s own output
+    back into label_regime_proxy(df, thresholds=...) must reproduce the
+    exact same labels as calling label_regime_proxy(df) with no thresholds -
+    the explicit-thresholds path is meant to let a caller apply
+    TRAINING-window cutoffs to a DIFFERENT (out-of-sample) slice without
+    changing behavior for the single-slice case.
+    """
+    df = _base_df()
+    default_regimes = label_regime_proxy(df)
+    explicit_regimes = label_regime_proxy(df, thresholds=compute_regime_thresholds(df))
+    pd.testing.assert_series_equal(default_regimes, explicit_regimes)
+
+
+def test_label_regime_proxy_applies_training_thresholds_to_oos_slice():
+    """
+    The whole point of the thresholds param: fixed cutoffs from a training
+    slice, applied to label a differently-distributed OOS slice, must NOT
+    silently recompute quantiles from the OOS slice's own (possibly much
+    smaller/skewed) distribution.
+    """
+    train_df = _base_df(n=300)
+    train_thresholds = compute_regime_thresholds(train_df)
+
+    # An OOS slice with a deliberately different volatility distribution -
+    # if thresholds were recomputed from this slice alone, vol_low/vol_high
+    # would shift substantially away from the training-derived cutoffs.
+    oos_df = _base_df(n=50)
+    oos_df["volatility_20d"] = np.linspace(0.01, 0.05, len(oos_df))
+
+    oos_regimes_fixed_thresholds = label_regime_proxy(oos_df, thresholds=train_thresholds)
+    oos_regimes_self_thresholds = label_regime_proxy(oos_df)  # recomputes from oos_df itself
+    oos_thresholds_recomputed = compute_regime_thresholds(oos_df)
+
+    # The two threshold sets must actually differ for this test to prove
+    # anything - confirms the OOS slice's distribution really is different.
+    assert train_thresholds["vol_low"] != pytest.approx(oos_thresholds_recomputed["vol_low"])
+    # And that difference must actually change at least one row's label -
+    # otherwise passing fixed training thresholds would be a no-op.
+    assert not oos_regimes_fixed_thresholds.equals(oos_regimes_self_thresholds)
 
 
 def test_label_regime_proxy_flags_clear_bull_row():

@@ -28,7 +28,7 @@ from src.trading.market_rules import CircuitCheck, round_to_tick
 from src.trading.portfolio_allocator import AllocationResult, PortfolioAllocator
 from src.training.feature_evolution import FeatureEvolver
 from src.training.lstm_nas import is_nas_due, load_nas_state, run_lstm_nas, save_nas_state
-from src.training.regime_submodels import RegimeSubModelTrainer, label_regime_proxy
+from src.training.regime_submodels import RegimeSubModelTrainer, compute_regime_thresholds, label_regime_proxy
 from src.training.walk_forward import WalkForwardValidator
 from src.utils.database import DatabaseManager
 from src.utils.metrics import generate_performance_report
@@ -1026,6 +1026,29 @@ class TrainingPipeline:
 
         return self._backtest_symbols_oos(self.model, feature_cols)
 
+    def _train_oos_slice_for_symbol(self, df: pd.DataFrame) -> "tuple[pd.DataFrame, pd.DataFrame]":
+        """
+        Split one symbol's featured frame into (train_slice, oos_slice)
+        using the same date-based cutoff _pooled_training_matrix() used to
+        build the pooled training/OOS split, so any per-symbol slicing
+        downstream (OOS backtesting, regime-threshold calibration) lines up
+        exactly with what the model was actually trained/held out on.
+        Applies evolved feature genes first, same as the callers below did
+        inline before this was extracted.
+        """
+        if self.evolved_genes:
+            df = FeatureEvolver.apply_genes(df, self.evolved_genes)
+
+        if hasattr(self, "_oos_date_cutoff") and self._oos_date_cutoff is not None and "date" in df.columns:
+            train_slice = df[df["date"] < self._oos_date_cutoff]
+            oos_slice = df[df["date"] >= self._oos_date_cutoff].reset_index(drop=True)
+        else:
+            oos_start = int(len(df) * 0.9)
+            train_slice = df.iloc[:oos_start]
+            oos_slice = df.iloc[oos_start:].reset_index(drop=True)
+
+        return train_slice, oos_slice
+
     def _backtest_symbols_oos(self, model: HybridQMLModel, feature_cols: list) -> Dict[str, Any]:
         """
         Shared per-symbol OOS backtest loop: same evolved-genes handling,
@@ -1044,19 +1067,65 @@ class TrainingPipeline:
             if df.empty:
                 continue
 
-            if self.evolved_genes:
-                df = FeatureEvolver.apply_genes(df, self.evolved_genes)
-
-            # Use the same date-based cutoff as the pooled training split
-            if hasattr(self, "_oos_date_cutoff") and self._oos_date_cutoff is not None and "date" in df.columns:
-                oos = df[df["date"] >= self._oos_date_cutoff].reset_index(drop=True)
-            else:
-                oos_start = int(len(df) * 0.9)
-                oos = df.iloc[oos_start:].reset_index(drop=True)
+            _train_slice, oos = self._train_oos_slice_for_symbol(df)
             if oos.empty:
                 continue
 
             report = self._score_oos_realistic(model, oos, feature_cols, 0.0, initial_capital)
+            if report is not None:
+                results[symbol] = report
+
+        return results
+
+    def regime_gated_backtest_symbols_oos(
+        self,
+        model: HybridQMLModel,
+        feature_cols: list,
+        trending_regimes: "tuple[str, ...]" = ("bull_trend", "bear_trend"),
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: re-scores the same per-symbol OOS slices
+        _backtest_symbols_oos() does, but only on rows classified as a
+        trending regime (bull_trend/bear_trend, per label_regime_proxy) -
+        sitting out sideways/high_volatility rows entirely rather than
+        trading through them. Tests the hypothesis that the model's
+        directional calls are more trustworthy when the market is actually
+        trending and mostly noise during choppy/sideways stretches - i.e.
+        whether backtest_validation()'s uniformly-negative null result
+        (runs #64/#65/#69) is masking a real edge that only shows up once
+        regime-filtered, rather than an edge nowhere in the data at all.
+
+        Regime thresholds (vol_low/vol_high/atr_high) are computed once per
+        symbol from that symbol's TRAINING-window rows only (via
+        compute_regime_thresholds()) and applied as fixed cutoffs to label
+        the OOS rows - the regime boundary itself never peeks at the OOS
+        distribution, same discipline as the feature scaler being fit
+        train-only in _pooled_training_matrix(). Symbols missing the
+        required regime-proxy columns, or with an empty train/OOS slice,
+        are skipped (not silently zero-filled).
+        """
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        results = {}
+        for symbol, df in self.featured_data.items():
+            if df.empty:
+                continue
+
+            train_slice, oos = self._train_oos_slice_for_symbol(df)
+            if oos.empty or train_slice.empty:
+                continue
+
+            try:
+                thresholds = compute_regime_thresholds(train_slice)
+                regimes = label_regime_proxy(oos, thresholds=thresholds)
+            except ValueError:
+                continue
+
+            oos_trending = oos[regimes.isin(trending_regimes).to_numpy()].reset_index(drop=True)
+            if oos_trending.empty:
+                continue
+
+            report = self._score_oos_realistic(model, oos_trending, feature_cols, 0.0, initial_capital)
             if report is not None:
                 results[symbol] = report
 
@@ -1097,12 +1166,18 @@ class TrainingPipeline:
 
         adapter = _XGBoostOnlyAdapter(xgb_model, self._feature_scaler)
         backtest_results = self._backtest_symbols_oos(adapter, feature_cols)
+        # Same trained adapter, zero extra training cost - tests whether
+        # sitting out sideways/high_volatility rows turns this baseline's
+        # null result around. See regime_gated_backtest_symbols_oos()'s
+        # docstring for the full reasoning.
+        regime_gated_backtest_results = self.regime_gated_backtest_symbols_oos(adapter, feature_cols)
 
         return {
             "train_metrics": train_metrics,
             "train_samples": int(len(X_train)),
             "val_samples": int(len(X_val_es)),
             "backtest": backtest_results,
+            "regime_gated_backtest": regime_gated_backtest_results,
         }
 
     def walk_forward_validation(self) -> Dict[str, Any]:

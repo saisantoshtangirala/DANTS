@@ -312,6 +312,116 @@ def test_xgboost_baseline_uses_same_pooled_matrix_feature_columns_as_ensemble(co
     assert "_symbol_id" not in pipeline._trained_feature_cols
 
 
+def test_xgboost_baseline_includes_regime_gated_comparison(config):
+    """The regime-gated re-score must ride along on the same trained
+    adapter at no extra training cost - see run_xgboost_baseline()'s
+    docstring in main.py for why this piggybacks on the cheap baseline
+    rather than needing its own training run."""
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    pipeline.featured_data = {
+        "SYM_A": _synthetic_featured_symbol(seed=1),
+        "SYM_B": _synthetic_featured_symbol(seed=2),
+    }
+
+    result = pipeline.xgboost_baseline_training_and_backtest()
+
+    assert "regime_gated_backtest" in result
+    assert isinstance(result["regime_gated_backtest"], dict)
+
+
+class _AlwaysConfidentModel:
+    """Always predicts a fixed confident UP call regardless of row count -
+    unlike _FakeModel's fixed-size probabilities array, this must work
+    against both the full OOS slice and regime_gated_backtest_symbols_oos()'s
+    row-filtered (smaller) subset."""
+
+    def transform_features(self, X):
+        return X
+
+    def predict_proba(self, X):
+        n = len(X)
+        return np.tile([0.05, 0.95], (n, 1))
+
+
+def _regime_synthetic_df(n: int = 60, oos_start_idx: int = 40) -> pd.DataFrame:
+    """Featured frame with regime-proxy columns explicitly controlled: the
+    first half of the OOS window is constructed to be unambiguously
+    bull_trend (high close-to-SMA, very low volatility relative to the
+    training window) and the second half unambiguously sideways (near-zero
+    close-to-SMA, moderate volatility) - so regime_gated_backtest_symbols_oos()
+    can be checked for actually filtering by regime, not just passing
+    everything through."""
+    rng = np.random.default_rng(3)
+    dates = pd.date_range("2024-01-01 09:15", periods=n, freq="5min")
+    close = np.full(n, 100.0)
+    close_to_sma_20 = rng.normal(0, 0.01, n)
+    close_to_sma_50 = rng.normal(0, 0.01, n)
+    volatility_20d = rng.uniform(0.01, 0.03, n)
+    atr_pct = rng.uniform(0.005, 0.02, n)
+
+    half = (n - oos_start_idx) // 2
+    bull_end = oos_start_idx + half
+    close_to_sma_20[oos_start_idx:bull_end] = 0.10
+    close_to_sma_50[oos_start_idx:bull_end] = 0.15
+    volatility_20d[oos_start_idx:bull_end] = 0.001
+    atr_pct[oos_start_idx:bull_end] = 0.001
+    close_to_sma_20[bull_end:] = 0.0
+    close_to_sma_50[bull_end:] = 0.0
+    volatility_20d[bull_end:] = 0.02
+    atr_pct[bull_end:] = 0.01
+
+    future_return = rng.normal(0, 0.01, n)
+    label = (future_return > 0).astype(float)
+    return pd.DataFrame({
+        "date": dates, "close": close,
+        "close_to_sma_20": close_to_sma_20, "close_to_sma_50": close_to_sma_50,
+        "volatility_20d": volatility_20d, "atr_pct": atr_pct,
+        "feature_a": rng.normal(size=n),
+        "future_return": future_return, "label": label,
+    })
+
+
+def test_regime_gated_backtest_only_scores_trending_oos_rows(config):
+    """
+    Regression test: regime_gated_backtest_symbols_oos() must score a
+    strict subset of what _backtest_symbols_oos() scores on the exact
+    same OOS slice - with an always-confident model, the ungated backtest
+    trades every OOS row, while the regime-gated one must trade fewer
+    (only the constructed bull_trend half, not the sideways half).
+    """
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    n, oos_start = 60, 40
+    df = _regime_synthetic_df(n=n, oos_start_idx=oos_start)
+    pipeline.featured_data = {"SYM_A": df}
+    pipeline._oos_date_cutoff = df["date"].iloc[oos_start]
+    feature_cols = ["feature_a", "close_to_sma_20", "close_to_sma_50", "volatility_20d", "atr_pct"]
+    pipeline._trained_feature_cols = feature_cols
+
+    model = _AlwaysConfidentModel()
+    ungated = pipeline._backtest_symbols_oos(model, feature_cols)
+    gated = pipeline.regime_gated_backtest_symbols_oos(model, feature_cols)
+
+    assert ungated["SYM_A"]["total_trades"] == n - oos_start
+    assert 0 < gated["SYM_A"]["total_trades"] < ungated["SYM_A"]["total_trades"]
+
+
+def test_regime_gated_backtest_skips_symbols_missing_regime_columns(config):
+    """A symbol whose featured data lacks the regime-proxy columns must be
+    skipped, not raise - matches _backtest_symbols_oos()'s style of
+    skipping rather than crashing on a single bad/incomplete symbol."""
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    pipeline.featured_data = {"SYM_A": _synthetic_featured_symbol(seed=1)}
+    pipeline._oos_date_cutoff = pipeline.featured_data["SYM_A"]["date"].iloc[160]
+    feature_cols = ["feature_a", "feature_b"]
+
+    result = pipeline.regime_gated_backtest_symbols_oos(_AlwaysConfidentModel(), feature_cols)
+
+    assert result == {}
+
+
 def test_capital_allocation_excludes_symbol_with_listing_continuity_failure(config):
     """
     Regression test for the survivorship-bias safeguard: a symbol whose
