@@ -60,7 +60,14 @@ jobs:
           KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
           KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
           KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
-        run: python3 -u -m src.main --mode pairs-trading-test | tee /tmp/pairs_trading_test.log
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), so a crashing python3
+        # still shows this step - and the whole job - as green. Confirmed
+        # in practice: run #1 crashed with a NameError and still came back
+        # "success".
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode pairs-trading-test | tee /tmp/pairs_trading_test.log
 
       - name: Summarize pairs-trading run
         if: always()

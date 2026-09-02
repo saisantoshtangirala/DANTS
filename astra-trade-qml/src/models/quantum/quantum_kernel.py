@@ -3,6 +3,18 @@ Quantum Kernel SVM for market regime classification.
 Uses Qiskit QuantumKernel to compute similarity in quantum feature space.
 """
 
+# PEP 563 (postponed annotation evaluation): _build_feature_map() below
+# type-hints its return as `-> QuantumCircuit`. Without this, Python
+# evaluates that annotation eagerly at class-definition time - fine when
+# qiskit imported successfully, but a NameError the moment qiskit isn't
+# installed at all (as opposed to installed-but-a-submodule-mismatched,
+# the only "qiskit unavailable" case exercised before this was caught:
+# every RunPod pod so far installs some qiskit version per
+# requirements-runpod-image.txt). This defers every annotation in the
+# module to a string, so QuantumCircuit never needs to actually exist
+# unless something calls typing.get_type_hints() on it - nothing here does.
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 from typing import Optional, List, Dict, Tuple
