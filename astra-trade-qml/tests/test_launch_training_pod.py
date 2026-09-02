@@ -48,6 +48,43 @@ def test_build_start_command_runs_cuda_diagnostics_before_training():
     assert nvidia_pos < train_pos
 
 
+def test_build_start_command_pushes_to_model_artifacts_additively_not_blind_force():
+    """
+    Regression test: two pods (e.g. a production training run and a
+    swing-test diagnostic run) each start from their own fresh clone
+    with no idea what the other has already pushed to model-artifacts.
+    A blind `git checkout -B model-artifacts && git push --force` means
+    whichever pod finishes last silently wipes out the other's pushed
+    artifacts. The pod must instead fetch the branch, build its commit
+    on top of whatever's already there, and push non-force - falling
+    back to --force only as a last resort after repeated non-force
+    push rejections.
+    """
+    cmd = ltp.build_start_command("owner/repo", "main", 10800)
+
+    fetch_pos = cmd.index("git fetch")
+    non_force_push_pos = cmd.index('git push "$REPO_URL" HEAD:model-artifacts')
+    assert fetch_pos < non_force_push_pos, "must fetch model-artifacts before pushing to it"
+
+    # The primary push path must not pass --force.
+    non_force_push_line = cmd.splitlines()[cmd[:non_force_push_pos].count("\n")]
+    assert "--force" not in non_force_push_line
+
+    # A --force push must still exist, but only in the last-resort
+    # fallback branch, after the retry loop and its warning.
+    fallback_pos = cmd.index('git push "$REPO_URL" HEAD:model-artifacts --force')
+    warning_pos = cmd.index("falling back to a force push")
+    assert warning_pos < fallback_pos
+    assert non_force_push_pos < fallback_pos
+
+    # New artifacts must be staged before any branch switch, so a
+    # `git checkout` onto model-artifacts's already-committed files at
+    # the same paths can't collide with our freshly-written ones.
+    stage_pos = cmd.index("ARTIFACT_STAGE=$(mktemp -d)")
+    checkout_pos = cmd.index("git checkout -B model-artifacts")
+    assert stage_pos < checkout_pos
+
+
 def test_default_image_is_public_runpod_base():
     assert ltp.DEFAULT_IMAGE == "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
 

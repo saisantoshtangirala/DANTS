@@ -195,12 +195,69 @@ mkdir -p models/latest logs
 }} > {status_file}
 cp "$LOG_FILE" {log_file_dest} 2>/dev/null || true
 
-git checkout -B model-artifacts
-git add -f models/latest logs
-git commit -m "Automated training run $(date -u +%Y-%m-%dT%H:%M:%SZ) (exit=$TRAIN_EXIT)"
-set +x  # hide token from trace
-git push "$REPO_URL" HEAD:model-artifacts --force
-set -x
+# Stage our new output files outside the working tree before touching
+# branches: model-artifacts already has committed files at these same
+# paths (models/latest/*, logs/*) from earlier runs, and a plain
+# `git checkout` onto it would abort ("untracked working tree files
+# would be overwritten") with our freshly-written, not-yet-committed
+# files sitting right there.
+ARTIFACT_STAGE=$(mktemp -d)
+mkdir -p "$ARTIFACT_STAGE/models/latest" "$ARTIFACT_STAGE/logs"
+cp -a models/latest/. "$ARTIFACT_STAGE/models/latest/" 2>/dev/null || true
+cp -a logs/. "$ARTIFACT_STAGE/logs/" 2>/dev/null || true
+
+# Fetch-and-merge instead of a blind force-push: two pods (e.g. a
+# production training run and a swing-test diagnostic run, or two
+# production runs queued back-to-back) each start from their own fresh
+# clone with no idea what the other has already pushed. A blind
+# `git checkout -B model-artifacts && git push --force` here means
+# whichever pod finishes last silently wipes out the other's pushed
+# models/logs. Each script_mode writes to its own paths (train:
+# models/latest/, logs/last_run_status.txt, logs/training_full.log;
+# swing-test: logs/swing-test_*), so there's never a real content
+# conflict to resolve — layering our new files on top of whatever is
+# already on the branch and pushing non-force is enough. Retry with
+# backoff on a rejected push (another pod won the race and moved the
+# branch tip since our fetch); only fall back to --force if every
+# retry is rejected, so a run still completes rather than hanging
+# forever on a pathological, repeatedly-losing race.
+# (REPO_URL was already set above, before training started.)
+
+PUSH_OK=0
+for attempt in 1 2 3 4 5; do
+  set +x  # hide token from trace
+  if git fetch "$REPO_URL" model-artifacts 2>/dev/null; then
+    set -x
+    git checkout -B model-artifacts FETCH_HEAD
+  else
+    set -x
+    echo "No existing model-artifacts branch found remotely (or fetch failed) - creating it fresh"
+    git checkout -B model-artifacts
+  fi
+
+  mkdir -p models/latest logs
+  cp -a "$ARTIFACT_STAGE/models/latest/." models/latest/
+  cp -a "$ARTIFACT_STAGE/logs/." logs/
+  git add -f models/latest logs
+  git commit --allow-empty -m "Automated training run $(date -u +%Y-%m-%dT%H:%M:%SZ) (exit=$TRAIN_EXIT)"
+
+  set +x  # hide token from trace
+  if git push "$REPO_URL" HEAD:model-artifacts; then
+    PUSH_OK=1
+    set -x
+    break
+  fi
+  set -x
+  echo "Push to model-artifacts rejected on attempt $attempt/5 (likely a concurrent pod pushed first) - retrying..."
+  sleep $((5 * attempt))
+done
+
+if [ "$PUSH_OK" != "1" ]; then
+  echo "WARNING: non-force push to model-artifacts failed after 5 attempts - falling back to a force push (may overwrite a concurrent pod's changes)"
+  set +x  # hide token from trace
+  git push "$REPO_URL" HEAD:model-artifacts --force
+  set -x
+fi
 
 POD_ID="${{RUNPOD_POD_ID:-$(hostname)}}"
 echo "Training done (exit=$TRAIN_EXIT). Self-terminating pod $POD_ID..."
