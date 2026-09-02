@@ -422,6 +422,61 @@ def test_regime_gated_backtest_skips_symbols_missing_regime_columns(config):
     assert result == {}
 
 
+def _synthetic_cointegrated_ohlcv_pair(n: int = 400, seed: int = 1):
+    """Two symbols sharing a common random-walk component plus independent
+    small mean-reverting noise, on the same 5-min bar grid - their spread
+    is stationary, so pairs_trading_backtest() should find and select
+    this pair from a train window and have something real to backtest on
+    the OOS window."""
+    rng = np.random.default_rng(seed)
+    common = np.cumsum(rng.normal(0, 0.01, n))
+
+    def ar1_noise():
+        noise = np.zeros(n)
+        for i in range(1, n):
+            noise[i] = 0.5 * noise[i - 1] + rng.normal(0, 0.005)
+        return noise
+
+    close_a = np.exp(common + ar1_noise()) * 100
+    close_b = np.exp(common + ar1_noise()) * 100
+    dates = pd.date_range("2024-01-01 09:15", periods=n, freq="5min")
+
+    def _ohlcv(closes):
+        return pd.DataFrame({
+            "date": dates, "open": closes, "high": closes, "low": closes,
+            "close": closes, "volume": np.full(n, 10_000.0),
+        })
+
+    return _ohlcv(close_a), _ohlcv(close_b)
+
+
+def test_pairs_trading_backtest_finds_and_scores_synthetic_cointegrated_pair(config):
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    df_a, df_b = _synthetic_cointegrated_ohlcv_pair()
+    pipeline.raw_data = {"SYM_A": df_a, "SYM_B": df_b}
+
+    result = pipeline.pairs_trading_backtest()
+
+    assert result["n_symbols_qualified"] == 2
+    assert result["n_pairs_cointegrated"] >= 1
+    assert isinstance(result["results"], list)
+    if result["results"]:
+        pair_result = result["results"][0]
+        assert {pair_result["symbol_a"], pair_result["symbol_b"]} == {"SYM_A", "SYM_B"}
+        assert "total_trades" in pair_result
+
+
+def test_pairs_trading_backtest_raises_with_fewer_than_two_qualified_symbols(config):
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    df_a, _ = _synthetic_cointegrated_ohlcv_pair()
+    pipeline.raw_data = {"SYM_A": df_a}  # only one symbol
+
+    with pytest.raises(ValueError, match="at least 2 symbols"):
+        pipeline.pairs_trading_backtest()
+
+
 def test_capital_allocation_excludes_symbol_with_listing_continuity_failure(config):
     """
     Regression test for the survivorship-bias safeguard: a symbol whose

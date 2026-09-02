@@ -10,6 +10,7 @@ Usage:
     python3 -m src.main --mode swing-walk-forward  # diagnostic: walk-forward stability check on swing-test's promising symbols
     python3 -m src.main --mode xgboost-baseline    # diagnostic: bare XGBoost on the production feature set, no quantum ensemble
     python3 -m src.main --mode regime-gated-test   # diagnostic: regime-gated backtest against the full production ensemble
+    python3 -m src.main --mode pairs-trading-test  # diagnostic: market-neutral pairs/relative-value trading, no ML model
 """
 
 import argparse
@@ -645,6 +646,62 @@ def run_regime_gated_test(config: dict, logger) -> None:
         )
 
 
+def run_pairs_trading_test(config: dict, logger) -> None:
+    """Diagnostic: market-neutral pairs/relative-value trading - a
+    fundamentally different strategy shape than every other diagnostic
+    this session has run (all of those predict one stock's own next-move
+    direction; this instead trades the spread between two cointegrated
+    stocks, long the relatively cheap one and short the relatively
+    expensive one, betting the gap closes - regardless of which way the
+    broader market moves). No ML model training at all - see
+    TrainingPipeline.pairs_trading_backtest()'s docstring for the full
+    methodology (train-only cointegration selection with a Bonferroni
+    correction for the many pairwise tests, OOS spread mean-reversion
+    backtest, both legs closed intraday every session). Runs directly on
+    a plain CI runner (see pairs-trading-test.yml) rather than a RunPod
+    GPU pod, since nothing here needs a GPU."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_pairs_trading_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("pairs_trading_test_started")
+    n_symbols = len(pipeline.data_ingestion())
+    logger.info("data_ingestion_done", n_symbols=n_symbols)
+
+    result = pipeline.pairs_trading_backtest()
+    logger.info(
+        "pairs_trading_test_complete",
+        n_symbols_qualified=result["n_symbols_qualified"],
+        n_pairs_cointegrated=result["n_pairs_cointegrated"],
+    )
+    for pair_result in result["results"]:
+        logger.info(
+            "pairs_trading_backtest_result",
+            symbol_a=pair_result["symbol_a"],
+            symbol_b=pair_result["symbol_b"],
+            p_value=pair_result["p_value"],
+            hedge_ratio=pair_result["hedge_ratio"],
+            total_trades=pair_result.get("total_trades"),
+            win_rate=pair_result.get("win_rate"),
+            avg_trade_return_pct=pair_result.get("avg_trade_return_pct"),
+            expectancy=pair_result.get("expectancy"),
+            sharpe_ratio=pair_result.get("sharpe_ratio"),
+        )
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -665,7 +722,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -694,6 +751,8 @@ def main() -> None:
         run_xgboost_baseline(config, logger)
     elif args.mode == "regime-gated-test":
         run_regime_gated_test(config, logger)
+    elif args.mode == "pairs-trading-test":
+        run_pairs_trading_test(config, logger)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,75 @@
+name: Pairs Trading Diagnostic (CI Runner)
+
+# Diagnostic-only: market-neutral pairs/relative-value trading - a
+# fundamentally different strategy shape than every other diagnostic
+# workflow in this repo (all of those predict one stock's own next-move
+# direction via a trained classifier). This instead finds cointegrated
+# pairs and trades the spread between them, long the relatively cheap
+# leg and short the relatively expensive one, betting the gap closes -
+# regardless of which way the broader market or either individual stock
+# moves. See TrainingPipeline.pairs_trading_backtest()'s docstring (and
+# src/training/pairs_trading.py) for the full methodology: train-only
+# cointegration selection (Bonferroni-corrected for the many pairwise
+# tests this runs), OOS spread mean-reversion backtest, both legs closed
+# every session (no overnight carry - matches Indian cash-equity rules
+# against carrying a naked short past the trading day).
+#
+# No ML model training at all, so unlike every other diagnostic here this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod, no
+# launch_training_pod.py, no model-artifacts push (there's no model to
+# save). requirements-pairs-trading.txt deliberately installs a CPU-only
+# torch wheel (not requirements-training.txt's CUDA 12.4 pin) since
+# importing TrainingPipeline transitively needs torch importable even
+# though nothing on this path trains one.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: pairs-trading-test
+  cancel-in-progress: false
+
+jobs:
+  pairs-trading-test:
+    runs-on: ubuntu-latest
+    # Generous relative to what this actually needs (cointegration
+    # testing + backtesting are seconds of CPU work even across all
+    # pairs in the universe; Kite ingestion for ~18 symbols x 365 days
+    # is the dominant cost, typically well under 10 minutes) - no rented
+    # GPU pod to bound this against, so there's no cost pressure to trim
+    # the budget tightly.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-pairs-trading.txt
+
+      - name: Run pairs-trading diagnostic
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        run: python3 -u -m src.main --mode pairs-trading-test | tee /tmp/pairs_trading_test.log
+
+      - name: Summarize pairs-trading run
+        if: always()
+        run: |
+          {
+            echo "### Pairs trading diagnostic run"
+            echo
+            echo '```'
+            grep -E "pairs_trading_test_complete|pairs_trading_backtest_result" /tmp/pairs_trading_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

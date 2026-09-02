@@ -28,6 +28,7 @@ from src.trading.market_rules import CircuitCheck, round_to_tick
 from src.trading.portfolio_allocator import AllocationResult, PortfolioAllocator
 from src.training.feature_evolution import FeatureEvolver
 from src.training.lstm_nas import is_nas_due, load_nas_state, run_lstm_nas, save_nas_state
+from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
 from src.training.regime_submodels import RegimeSubModelTrainer, compute_regime_thresholds, label_regime_proxy
 from src.training.walk_forward import WalkForwardValidator
 from src.utils.database import DatabaseManager
@@ -1178,6 +1179,101 @@ class TrainingPipeline:
             "val_samples": int(len(X_val_es)),
             "backtest": backtest_results,
             "regime_gated_backtest": regime_gated_backtest_results,
+        }
+
+    # Minimum raw rows a symbol needs (after an 80/20 date split) for both
+    # a train window long enough for a meaningful cointegration test
+    # (pairs_trading.MIN_ROWS_FOR_COINTEGRATION) and a non-trivial OOS
+    # window to backtest on.
+    MIN_ROWS_FOR_PAIRS_SPLIT = 300
+
+    def pairs_trading_backtest(
+        self,
+        family_significance: float = 0.05,
+        entry_z: float = 2.0,
+        exit_z: float = 0.5,
+        stop_z: float = 4.0,
+        window: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: market-neutral pairs/relative-value trading - a
+        fundamentally different strategy shape than everything else this
+        pipeline tests (single-stock directional prediction via a trained
+        classifier). No ML model involved at all - the signal is a
+        rolling z-score of a cointegrated spread between two stocks, not
+        a supervised prediction - so this needs none of
+        classical_and_quantum_training()'s machinery and runs on plain
+        self.raw_data (not the feature-engineered frames the classifier
+        path needs). Assumes data_ingestion() has already been run.
+
+        For each symbol, splits raw_data 80/20 by date into a train
+        window and a held-out OOS window, finds cointegrated pairs on the
+        pooled train windows only (find_cointegrated_pairs() - Bonferroni-
+        corrected for the many pairwise tests this runs, see its
+        docstring), then backtests each selected pair's spread mean-
+        reversion strategy bar-by-bar on the OOS window
+        (pairs_trading.backtest_pair()) using the fixed hedge ratio/
+        intercept the train window produced - a pair is never selected or
+        fit using the same data it's backtested on.
+        """
+        symbols = [s for s, df in self.raw_data.items() if not df.empty and "date" in df.columns]
+        if len(symbols) < 2:
+            raise ValueError("Need at least 2 symbols with ingested data to test pairs. Run data_ingestion() first.")
+
+        log_prices_train: Dict[str, pd.Series] = {}
+        oos_frames: Dict[str, pd.DataFrame] = {}
+
+        for symbol in symbols:
+            df = self.raw_data[symbol].dropna(subset=["close"]).sort_values("date").reset_index(drop=True)
+            if len(df) < self.MIN_ROWS_FOR_PAIRS_SPLIT:
+                continue
+            cutoff_idx = int(len(df) * 0.8)
+            train_df = df.iloc[:cutoff_idx]
+            oos_df = df.iloc[cutoff_idx:].reset_index(drop=True)
+            if train_df.empty or oos_df.empty:
+                continue
+
+            log_prices_train[symbol] = pd.Series(np.log(train_df["close"].to_numpy()), index=train_df["date"])
+            oos_frames[symbol] = oos_df
+
+        if len(log_prices_train) < 2:
+            raise ValueError(
+                f"Not enough symbols with >= {self.MIN_ROWS_FOR_PAIRS_SPLIT} rows to test pairs "
+                f"({len(log_prices_train)} qualified out of {len(symbols)})."
+            )
+
+        pairs = find_cointegrated_pairs(log_prices_train, family_significance=family_significance)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+        max_position_size_pct = self.config["trading"]["position_sizing"]["max_position_size_pct"]
+
+        results = []
+        for pair in pairs:
+            a, b = pair["symbol_a"], pair["symbol_b"]
+            if a not in oos_frames or b not in oos_frames:
+                continue
+
+            report = backtest_pair(
+                oos_frames[a], oos_frames[b],
+                hedge_ratio=pair["hedge_ratio"], intercept=pair["intercept"],
+                cost_calc=cost_calc, initial_capital=initial_capital,
+                max_position_size_pct=max_position_size_pct,
+                entry_z=entry_z, exit_z=exit_z, stop_z=stop_z, window=window,
+                warmup_log_price_a=log_prices_train[a].iloc[-window:],
+                warmup_log_price_b=log_prices_train[b].iloc[-window:],
+            )
+            if report is not None:
+                results.append({
+                    "symbol_a": a, "symbol_b": b,
+                    "p_value": pair["p_value"], "hedge_ratio": pair["hedge_ratio"],
+                    **report,
+                })
+
+        return {
+            "n_symbols_qualified": len(log_prices_train),
+            "n_pairs_cointegrated": len(pairs),
+            "results": results,
         }
 
     def walk_forward_validation(self) -> Dict[str, Any]:

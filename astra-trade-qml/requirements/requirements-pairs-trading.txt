@@ -1,0 +1,43 @@
+# Astra-Trade QML - Pairs-Trading Diagnostic (plain CI runner, no GPU)
+#
+# TrainingPipeline.pairs_trading_backtest() involves no ML model training
+# at all (it's a classical cointegration + rolling z-score signal), so
+# this diagnostic runs directly on a plain ubuntu-latest GitHub Actions
+# runner instead of a rented RunPod GPU pod - see
+# .github/workflows/pairs-trading-test.yml.
+#
+# Deliberately NOT requirements-training.txt: that file pins torch to the
+# CUDA 12.4 wheel index (`--index-url https://download.pytorch.org/whl/cu124`),
+# a multi-GB download meant for the RunPod GPU image. Even though nothing
+# on this path actually trains a torch model, importing
+# TrainingPipeline transitively imports HybridQMLModel -> LSTMModel, so
+# torch must still be importable - the CPU wheel below is a fraction of
+# the size and installs in a fraction of the time. qiskit is NOT listed:
+# quantum_kernel.py/vqc_classifier.py already catch ImportError and fall
+# back to classical, and nothing on this path exercises them anyway.
+
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+pyyaml>=6.0
+python-dotenv>=1.0
+python-dateutil>=2.8
+pytz>=2023.3
+
+requests>=2.31
+yfinance>=0.2.40
+
+scikit-learn>=1.5
+xgboost>=2.0
+statsmodels>=0.14
+
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.4
+--extra-index-url https://pypi.org/simple
+
+SQLAlchemy>=2.0
+structlog>=23.1
+
+kiteconnect>=4.2
+websocket-client>=1.6
+pyotp>=2.9
