@@ -80,6 +80,7 @@ class FeatureEngineer:
 
         if include_microstructure:
             df = self._add_microstructure_features(df)
+            df = self._add_order_flow_proxy_features(df)
 
         # Momentum and trend features
         df = self._add_momentum_features(df)
@@ -309,6 +310,62 @@ class FeatureEngineer:
             (df["upper_shadow"] > 2 * df["body_size"]) &
             (df["lower_shadow"] < df["body_size"])
         ).astype(int)
+
+        return df
+
+    def _add_order_flow_proxy_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        OHLCV-derived proxies for order-flow/participation signals.
+
+        Neither Kite's nor Yahoo's historical APIs expose real bid-ask
+        depth or tick-level trade data (only OHLCV bars), so genuine
+        order-book imbalance/tick-rule signals aren't computable here.
+        These are the standard bar-derived proxies the microstructure
+        literature uses instead - distinct from the existing
+        price_impact/VWAP-deviation/candlestick/MFI/OBV features already
+        generated above, not a re-derivation of any of them.
+        """
+        # Chaikin Money Flow: volume weighted by where the close landed
+        # within the bar's range (close near the high = buying pressure
+        # absorbed the bar; near the low = selling pressure did).
+        # Distinct from OBV above, which only uses the SIGN of the
+        # close-to-close change, throwing away where within the bar's
+        # range that close actually sits.
+        bar_range = (df["high"] - df["low"]).replace(0, np.nan)
+        clv = ((df["close"] - df["low"]) - (df["high"] - df["close"])) / bar_range
+        clv_volume = (clv * df["volume"]).fillna(0)
+        df["chaikin_money_flow"] = clv_volume.rolling(20).sum() / df["volume"].rolling(20).sum()
+
+        # Volume z-score: how many standard deviations this bar's volume
+        # sits from its recent normal - distinct from the existing
+        # volume_ratio (mean-relative only, not variance-normalized), so
+        # a genuine outlier is scored differently than a merely
+        # above-average one.
+        vol_mean = df["volume"].rolling(20).mean()
+        vol_std = df["volume"].rolling(20).std(ddof=0).replace(0, np.nan)
+        df["volume_zscore"] = (df["volume"] - vol_mean) / vol_std
+
+        # Directional streak: signed count of consecutive same-direction
+        # bars (positive = N up-closes in a row, negative = N down-closes),
+        # a proxy for order-flow persistence vs exhaustion that no
+        # existing feature captures.
+        direction = np.sign(df["close"].diff()).fillna(0)
+        streak_group = (direction != direction.shift()).cumsum()
+        df["directional_streak"] = direction.groupby(streak_group).cumsum()
+
+        # Gap: the jump between this bar's open and the prior bar's close
+        # - unlike intraday_range/body_size above (both within-bar), this
+        # captures the price discontinuity BETWEEN bars, which is where
+        # order flow that accumulated while this instrument wasn't
+        # trading (session close, or a thin-liquidity gap) actually shows up.
+        df["gap_pct"] = (df["open"] - df["close"].shift(1)) / df["close"].shift(1)
+
+        # Rolling return autocorrelation: whether recent moves have been
+        # trending (positive) or mean-reverting (negative) - a genuinely
+        # different statistical signal from the trend-strength indicators
+        # (ADX/momentum) above, which measure magnitude/direction of a
+        # trend, not its short-term persistence structure.
+        df["return_autocorr_10"] = df["returns"].rolling(10).corr(df["returns"].shift(1))
 
         return df
 

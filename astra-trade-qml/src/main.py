@@ -6,6 +6,7 @@ Usage:
     python3 -m src.main --mode paper         # run the paper trading service
     python3 -m src.main --mode dashboard     # launch the Streamlit dashboard
     python3 -m src.main --mode stress-test   # stress-test risk management against historical crises
+    python3 -m src.main --mode swing-test    # diagnostic: test for a coarser-horizon (multi-day) edge
 """
 
 import argparse
@@ -385,6 +386,57 @@ def run_stress_test(config: dict, logger) -> None:
     logger.info("stress_test_summary", **summary)
 
 
+def run_swing_test(config: dict, logger) -> None:
+    """Diagnostic: test for a coarser-horizon (multi-day) edge as an
+    alternative to the intraday pipeline's 5-min bars, across the same
+    equity universe (large-caps + midcaps). Trains a dedicated swing
+    model and reports per-symbol delivery-cost backtest expectancy -
+    see TrainingPipeline.swing_data_ingestion()'s docstring for why this
+    stops at training+backtest validation rather than a live swing
+    execution path."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_swing_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_yfinance", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("swing_test_started")
+    n_symbols = len(pipeline.swing_data_ingestion())
+    logger.info("swing_data_ingestion_done", n_symbols=n_symbols)
+
+    n_featured = len(pipeline.swing_feature_engineering())
+    logger.info("swing_feature_engineering_done", n_symbols=n_featured)
+
+    result = pipeline.swing_training_and_backtest()
+    logger.info(
+        "swing_test_complete",
+        noise_threshold=result["noise_threshold"],
+        train_samples=result["train_samples"],
+        val_samples=result["val_samples"],
+    )
+    for symbol, report in result["backtest"].items():
+        logger.info(
+            "swing_backtest_result",
+            symbol=symbol,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            expectancy=report.get("expectancy"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+        )
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -405,7 +457,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -426,6 +478,8 @@ def main() -> None:
         run_dashboard(config, logger)
     elif args.mode == "stress-test":
         run_stress_test(config, logger)
+    elif args.mode == "swing-test":
+        run_swing_test(config, logger)
 
 
 if __name__ == "__main__":

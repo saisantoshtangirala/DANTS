@@ -1,0 +1,109 @@
+name: Swing Edge Diagnostic (RunPod)
+
+# Diagnostic-only: tests for a coarser-horizon (multi-day) trading edge
+# as an alternative to the intraday pipeline's 5-min bars, across the
+# same equity universe (large-caps + midcaps) plus the order-flow-proxy
+# features shared with the intraday pipeline. See
+# TrainingPipeline.swing_data_ingestion()'s docstring for exactly what
+# this does (and does not - no live swing-execution path exists) test.
+#
+# Deliberately isolated from train-and-deploy.yml: its own concurrency
+# group, its own pod name (astra-trade-qml-swing-test, via
+# launch_training_pod.py's --script-mode), and its own status/log file
+# paths on model-artifacts (logs/swing-test_*), so a swing-test run can
+# never collide with (or be mistaken for) a concurrent production
+# training run - the exact class of bug this session already had to fix
+# once for the production path alone. No deploy job: this produces a
+# diagnostic report, not a model to serve.
+#
+# workflow_dispatch only - not on every push, and no schedule. This is
+# a one-off (or occasional, re-run manually) research question, not a
+# recurring production job.
+on:
+  workflow_dispatch:
+    inputs:
+      min_vram_gb:
+        description: "Minimum GPU VRAM (GB) to select"
+        required: false
+        default: "12"
+
+concurrency:
+  group: swing-test
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  swing-test:
+    runs-on: ubuntu-latest
+    # Own, smaller budget than train-and-deploy.yml's 300min: quantum
+    # depth adaptation (qkernel + VQC each sweeping 3 circuit depths) is
+    # the dominant cost there too, but swing's daily-bar dataset is far
+    # smaller in raw bar count than intraday's 5-min bars over the same
+    # calendar window, so ingestion/feature-engineering/backtest are
+    # correspondingly cheaper. 150min padded above the pod's own
+    # 130min poll-timeout-seconds cap (3 launch attempts x 30min boot
+    # check, worst case, + the poll timeout once booted).
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install script dependencies
+        run: pip install requests
+
+      - name: Select cheapest available GPU
+        id: gpu
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: |
+          GPU_IDS=$(python3 astra-trade-qml/scripts/ci/select_gpu.py \
+            --min-vram-gb "${{ github.event.inputs.min_vram_gb || '12' }}")
+          echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
+          echo "Selected GPUs: $GPU_IDS"
+
+      - name: Generate ephemeral SSH key for pod log streaming
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
+          chmod 600 /tmp/runpod_ssh_key
+
+      - name: Launch swing-test pod and wait for completion
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        run: |
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
+            --script-mode swing-test \
+            --train-timeout-seconds 7200 \
+            --poll-timeout-seconds 7800 \
+            > >(tee /tmp/launch_swing_test_pod.log) 2>&1
+
+      - name: Summarize swing-test run
+        if: always()
+        run: |
+          {
+            echo "### Swing edge diagnostic run"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
+            echo
+            echo '```'
+            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+              /tmp/launch_swing_test_pod.log || echo "(no matching status lines captured)"
+            echo '```'
+            echo
+            echo "Full results: \`astra-trade-qml/logs/swing-test_training_full.log\` on the \`model-artifacts\` branch."
+          } >> "$GITHUB_STEP_SUMMARY"

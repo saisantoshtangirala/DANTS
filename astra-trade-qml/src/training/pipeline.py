@@ -10,7 +10,7 @@ model_deployment.
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -114,6 +114,9 @@ class TrainingPipeline:
         self.used_synthetic_data = False
         self.evolved_genes: list = []
         self.regime_submodel_trainer: Optional[RegimeSubModelTrainer] = None
+        self.swing_raw_data: Dict[str, pd.DataFrame] = {}
+        self.swing_featured_data: Dict[str, pd.DataFrame] = {}
+        self.swing_model: Optional[HybridQMLModel] = None
 
     def data_ingestion(self, lookback_days: Optional[int] = None) -> Dict[str, pd.DataFrame]:
         """Task: download historical 5-min intraday OHLCV for the focus universe
@@ -180,7 +183,13 @@ class TrainingPipeline:
     def _fetch_kite_intraday_chunked(self, symbol: str, interval: str, lookback_days: int) -> pd.DataFrame:
         """Chunk a long intraday backfill into <=55-day windows, under Kite's
         per-request history limit for minute-level intervals."""
-        chunk_days = 55
+        return self._fetch_kite_range_chunked(symbol, interval, lookback_days, chunk_days=55)
+
+    def _fetch_kite_range_chunked(self, symbol: str, interval: str, lookback_days: int, chunk_days: int) -> pd.DataFrame:
+        """Chunk a long backfill into <=chunk_days windows, under Kite's
+        per-request history limit for the given interval (minute-level
+        intervals need small chunks; day-interval requests tolerate much
+        larger ones - see swing_data_ingestion)."""
         end_date = datetime.now()
         start_date = end_date - timedelta(days=lookback_days)
 
@@ -264,6 +273,240 @@ class TrainingPipeline:
             self.featured_data[symbol] = featured
 
         return self.featured_data
+
+    def swing_data_ingestion(
+        self, symbols: Optional[List[str]] = None, lookback_days: int = 1825,
+    ) -> Dict[str, pd.DataFrame]:
+        """
+        Diagnostic task: download DAILY OHLCV for a coarser-horizon
+        swing-trading edge test (Kite day-interval first, Yahoo Finance
+        daily as fallback). Separate from data_ingestion()'s self.raw_data
+        so it never collides with the production intraday pipeline's
+        state - stored in self.swing_raw_data.
+
+        This is a research/validation path only (training + backtest via
+        swing_training_and_backtest()), not a live swing-execution system -
+        no swing paper-broker or multi-day position tracking exists, since
+        the question being answered is "is there an edge here at all",
+        not "build a second production trading system".
+        """
+        symbols = symbols if symbols is not None else self.data_cfg.get("symbols", {}).get("equity_universe", [])
+        self.swing_raw_data: Dict[str, pd.DataFrame] = {}
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=lookback_days)
+
+        for i, symbol in enumerate(symbols, 1):
+            logger.info("swing_data_ingestion_symbol", symbol=symbol, progress=f"{i}/{len(symbols)}")
+            df = pd.DataFrame()
+
+            if self.kite_feed is not None:
+                try:
+                    # Kite's documented history limit for day-interval
+                    # candles is far longer than for minute-level ones
+                    # (~2000 days vs ~55-100), so a single wide chunk
+                    # covers the full lookback in one request; chunking
+                    # infrastructure is reused (not duplicated) in case
+                    # that assumption is ever wrong for some instrument.
+                    df = self._fetch_kite_range_chunked(symbol, "day", lookback_days, chunk_days=1800)
+                except Exception:
+                    df = pd.DataFrame()
+
+            if df.empty:
+                logger.info("trying_yfinance_swing_fallback", symbol=symbol)
+                df = self.yfinance_ingestion.download_historical_range(symbol, start_date, end_date)
+
+            if not df.empty:
+                logger.info("swing_symbol_data_ready", symbol=symbol, rows=len(df))
+                self.swing_raw_data[symbol] = df
+            else:
+                logger.warning("swing_symbol_no_data", symbol=symbol)
+
+        return self.swing_raw_data
+
+    def swing_feature_engineering(self, forward_periods: int = 10) -> Dict[str, pd.DataFrame]:
+        """
+        Diagnostic task: generate the same technical/order-flow feature
+        set as the intraday pipeline - every indicator in FeatureEngineer
+        is bar-count-based, not calendar-time-based, so it applies
+        identically to daily bars - with a swing-appropriate multi-day
+        forward_periods label. session_aware=False: there's no intraday
+        session boundary to respect once each row already IS one full
+        trading day.
+        """
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        capital_cfg = self.config["trading"]["capital"]
+        max_position_size_pct = self.config["trading"]["position_sizing"]["max_position_size_pct"]
+        notional = max_position_size_pct * capital_cfg["initial"]
+        # Delivery round-trip cost floor at a representative position
+        # (STT applies on BOTH legs for delivery, unlike intraday's
+        # sell-side-only STT) - the swing dead-zone threshold must clear
+        # this or the model is trained to call directions on moves too
+        # small to survive costs even predicted perfectly, same reasoning
+        # as signals.noise_threshold's comment for the intraday case.
+        representative_price = 1000.0
+        quantity = max(1, int(notional // representative_price))
+        cost_floor = cost_calc.round_trip_cost(
+            representative_price, representative_price, quantity, side="BUY", delivery=True
+        )
+        cost_floor_pct = cost_floor / (representative_price * quantity)
+        noise_threshold = max(cost_floor_pct * 2.0, 0.01)
+
+        self.swing_featured_data: Dict[str, pd.DataFrame] = {}
+        for symbol, df in self.swing_raw_data.items():
+            featured = self.feature_engineer.generate_all_features(df)
+            featured = self.feature_engineer.generate_labels(
+                featured, forward_periods=forward_periods, noise_threshold=noise_threshold, session_aware=False,
+            )
+            self.swing_featured_data[symbol] = featured
+
+        self._swing_noise_threshold = noise_threshold
+        return self.swing_featured_data
+
+    def swing_training_and_backtest(self, forward_periods: int = 10) -> Dict[str, Any]:
+        """
+        Diagnostic task: train a dedicated swing (daily-bar) HybridQMLModel
+        and backtest it out-of-sample with delivery-cost economics,
+        reporting per-symbol expectancy - answers "does a coarser horizon
+        show a real edge" the same way backtest_validation()/
+        capital_allocation() answer it for intraday. See
+        swing_data_ingestion()'s docstring for why this stops at
+        training+backtest rather than a live execution path.
+        """
+        from sklearn.preprocessing import StandardScaler
+
+        symbols = [s for s, df in self.swing_featured_data.items() if not df.empty]
+        if not symbols:
+            raise ValueError("No swing featured data available. Run swing_data_ingestion()/swing_feature_engineering() first.")
+
+        frames = []
+        for symbol_id, symbol in enumerate(symbols):
+            df = self.swing_featured_data[symbol].dropna(subset=["label"]).reset_index(drop=True).copy()
+            df["_symbol_id"] = symbol_id
+            frames.append(df)
+        pooled = pd.concat(frames, ignore_index=True)
+
+        feature_cols = self.feature_engineer.get_feature_columns(pooled)
+        X = pooled[feature_cols].to_numpy()
+        y = pooled["label"].to_numpy().astype(int)
+        symbol_ids = pooled["_symbol_id"].to_numpy()
+
+        unique_dates = np.sort(pooled["date"].unique())
+        if len(unique_dates) < 20:
+            raise ValueError(
+                f"Not enough distinct swing trading dates ({len(unique_dates)}) for a meaningful train/OOS split"
+            )
+        train_date = unique_dates[int(len(unique_dates) * 0.8)]
+        val_date = unique_dates[int(len(unique_dates) * 0.9)]
+        train_mask = (pooled["date"] < train_date).to_numpy()
+        val_mask = ((pooled["date"] >= train_date) & (pooled["date"] < val_date)).to_numpy()
+
+        scaler = StandardScaler()
+        X_scaled = X.astype(float).copy()
+        X_scaled[train_mask] = scaler.fit_transform(X[train_mask])
+        non_train = ~train_mask
+        if non_train.any():
+            X_scaled[non_train] = scaler.transform(X[non_train])
+        np.nan_to_num(X_scaled, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+
+        lookback = self.data_cfg.get("timeframes", {}).get("features_lookback", 20)
+        sequence_length = min(lookback, max(1, int(train_mask.sum()) - 1))
+
+        self.swing_model = HybridQMLModel(config=build_hybrid_model_config(self.config))
+        model_metrics = self.swing_model.fit(
+            X_scaled[train_mask], y[train_mask],
+            X_scaled[val_mask], y[val_mask],
+            feature_names=feature_cols, sequence_length=sequence_length,
+            groups_train=symbol_ids[train_mask], groups_val=symbol_ids[val_mask],
+        )
+        self.swing_model._feature_scaler = scaler
+
+        initial_capital = self.config["trading"]["capital"]["initial"]
+        backtest_results = {}
+        for symbol, df in self.swing_featured_data.items():
+            if df.empty:
+                continue
+            oos = df[df["date"] >= val_date].reset_index(drop=True)
+            if oos.empty:
+                continue
+            report = self._score_oos_swing(oos, feature_cols, initial_capital)
+            if report is not None:
+                backtest_results[symbol] = report
+
+        return {
+            "model_metrics": model_metrics,
+            "train_samples": int(train_mask.sum()),
+            "val_samples": int(val_mask.sum()),
+            "noise_threshold": getattr(self, "_swing_noise_threshold", None),
+            "backtest": backtest_results,
+        }
+
+    def _score_oos_swing(
+        self, oos: pd.DataFrame, feature_cols: list, initial_capital: float,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Delivery-cost OOS scoring for the swing model - the swing
+        analogue of _score_oos_realistic(), using delivery=True costs
+        (STT both legs, no stamp-duty/STT split by side) and no
+        circuit-band/tick-rounding checks, since swing holds span many
+        days rather than resolving within one session.
+        """
+        if oos.empty:
+            return None
+
+        signals_cfg = self.config.get("signals", {})
+        min_threshold = signals_cfg.get("confidence", {}).get("min_threshold", 0.60)
+        max_position_size_pct = self.config["trading"]["position_sizing"]["max_position_size_pct"]
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+
+        missing_cols = [c for c in feature_cols if c not in oos.columns]
+        if missing_cols:
+            oos = oos.copy()
+            for col in missing_cols:
+                oos[col] = np.nan
+
+        X_oos = oos[feature_cols].to_numpy()
+        X_oos = self.swing_model.transform_features(X_oos)
+
+        proba = self.swing_model.predict_proba(X_oos)
+        class_idx = np.argmax(proba, axis=1)
+        model_probability = proba[np.arange(len(proba)), class_idx]
+
+        quantity_notional = min(max_position_size_pct * initial_capital, initial_capital)
+
+        trades = []
+        for i in range(len(oos)):
+            if model_probability[i] < min_threshold:
+                continue
+            future_return = oos["future_return"].iloc[i]
+            if pd.isna(future_return):
+                continue
+
+            action = "BUY" if class_idx[i] == 1 else "SELL"
+            entry_price = float(oos["close"].iloc[i])
+            if entry_price <= 0:
+                continue
+            exit_price = entry_price * (1 + future_return)
+
+            quantity = int(quantity_notional // entry_price)
+            if quantity <= 0:
+                continue
+
+            net_pnl = cost_calc.net_pnl(entry_price, exit_price, quantity, side=action, delivery=True)
+            pnl_pct = net_pnl / (entry_price * quantity)
+
+            trades.append({
+                "pnl": net_pnl,
+                "pnl_pct": pnl_pct,
+                "confidence": float(model_probability[i]),
+            })
+
+        trades_df = pd.DataFrame(trades) if trades else pd.DataFrame()
+        equity_curve = (
+            (1 + trades_df["pnl_pct"]).cumprod() * initial_capital
+            if not trades_df.empty else pd.Series(dtype=float)
+        )
+
+        return generate_performance_report(trades_df, equity_curve)
 
     def compute_liquidity(self) -> Dict[str, float]:
         """Average daily traded value (INR crore) per symbol, from the

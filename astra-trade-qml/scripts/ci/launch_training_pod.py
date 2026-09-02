@@ -105,7 +105,17 @@ signal.signal(signal.SIGTERM, _cancel_handler)
 signal.signal(signal.SIGINT, _cancel_handler)
 
 
-def build_start_command(repo: str, branch: str, train_timeout_seconds: int) -> str:
+def build_start_command(repo: str, branch: str, train_timeout_seconds: int, script_mode: str = "train") -> str:
+    # "train" keeps the original, unprefixed paths - check_training_exit_code()/
+    # check_fresh_completion_marker() hardcode logs/last_run_status.txt for the
+    # production training path. Any other script_mode (e.g. swing-test) gets its
+    # own prefixed paths so a run in that mode never collides with (or is
+    # mistaken for) a concurrent production training run's status/log on the
+    # shared model-artifacts branch - the exact class of bug
+    # check_fresh_completion_marker's since-timestamp guard exists to prevent,
+    # here avoided by not sharing a path at all.
+    status_file = "logs/last_run_status.txt" if script_mode == "train" else f"logs/{script_mode}_last_run_status.txt"
+    log_file_dest = "logs/training_full.log" if script_mode == "train" else f"logs/{script_mode}_training_full.log"
     return f"""set -uxo pipefail
 
 # Start sshd for CI log streaming — dockerStartCmd overrides the
@@ -175,15 +185,15 @@ REPO_URL="https://x-access-token:${{GH_TOKEN}}@github.com/{repo}.git"
 set -x
 
 echo "=== Starting training ==="
-PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode train 2>&1
+PYTHONUNBUFFERED=1 timeout {train_timeout_seconds} python3 -u -m src.main --mode {script_mode} 2>&1
 TRAIN_EXIT=$?
 
 mkdir -p models/latest logs
 {{
   echo "exit=$TRAIN_EXIT"
   echo "finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}} > logs/last_run_status.txt
-cp "$LOG_FILE" logs/training_full.log 2>/dev/null || true
+}} > {status_file}
+cp "$LOG_FILE" {log_file_dest} 2>/dev/null || true
 
 git checkout -B model-artifacts
 git add -f models/latest logs
@@ -238,9 +248,10 @@ def create_pod(
     start_command: str,
     container_disk_gb: int = 40,
     cloud_type: str = "SECURE",
+    pod_name: str = "astra-trade-qml-training",
 ) -> dict:
     payload = {
-        "name": "astra-trade-qml-training",
+        "name": pod_name,
         "imageName": image,
         "gpuTypeIds": gpu_ids,
         "gpuCount": 1,
@@ -532,6 +543,7 @@ def poll_until_terminated(
     api_key: str, pod_id: str, timeout_seconds: int, poll_interval: int = 30,
     ssh_key_path: str = "", ssh_host: str = "", ssh_port: int = 0,
     repo: str = "", gh_token: str = "", launched_at: "datetime | None" = None,
+    status_file: str = "logs/last_run_status.txt",
 ) -> bool:
     """Returns True if the pod finished (self-terminated, or we detected
     completion via git and force-terminated it ourselves), False if
@@ -574,7 +586,7 @@ def poll_until_terminated(
             # rather than wait on a self-termination that may never land.
             if check_git_marker and elapsed - last_marker_check >= marker_check_interval:
                 last_marker_check = elapsed
-                finished_at = check_fresh_completion_marker(repo, gh_token, launched_at)
+                finished_at = check_fresh_completion_marker(repo, gh_token, launched_at, status_file=status_file)
                 if finished_at is not None:
                     print(
                         f"Pod {pod_id}: training finished at {finished_at.isoformat()} per "
@@ -617,6 +629,8 @@ def launch_and_wait(
     ssh_key_path: str = "",
     repo: str = "",
     gh_token: str = "",
+    pod_name: str = "astra-trade-qml-training",
+    status_file: str = "logs/last_run_status.txt",
 ) -> bool:
     """
     Create a pod and wait for it to boot; if it never boots (a
@@ -649,7 +663,7 @@ def launch_and_wait(
     for cloud in clouds_to_try:
         for attempt in range(1, max_launch_attempts + 1):
             try:
-                pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud)
+                pod = create_pod(api_key, image, gpu_ids, pod_env, start_command, container_disk_gb=container_disk_gb, cloud_type=cloud, pod_name=pod_name)
             except RuntimeError as e:
                 print(f"Launch attempt {attempt}/{max_launch_attempts} on {cloud} cloud: create_pod failed ({e})")
                 continue
@@ -670,6 +684,7 @@ def launch_and_wait(
                     ssh_host=boot_info.get("host", ""),
                     ssh_port=boot_info.get("port", 0),
                     repo=repo, gh_token=gh_token, launched_at=launched_at,
+                    status_file=status_file,
                 )
                 _active_pod = None
                 return result
@@ -685,16 +700,18 @@ def launch_and_wait(
     return False
 
 
-def _fetch_last_run_status_text(repo: str, gh_token: str) -> "str | None":
-    """Fetch logs/last_run_status.txt's raw content from the
-    model-artifacts branch via the GitHub Contents API, or None if it's
-    missing/unreachable.
+def _fetch_last_run_status_text(repo: str, gh_token: str, status_file: str = "logs/last_run_status.txt") -> "str | None":
+    """Fetch a status file's raw content (default: logs/last_run_status.txt,
+    the production training path - pass a different status_file for a
+    non-"train" script_mode, e.g. swing-test's own prefixed path - see
+    build_start_command) from the model-artifacts branch via the GitHub
+    Contents API, or None if it's missing/unreachable.
 
     The Contents API (not raw.githubusercontent.com, which doesn't
     reliably authenticate against private repos) with the raw media type
     returns the file body directly.
     """
-    url = f"https://api.github.com/repos/{repo}/contents/astra-trade-qml/logs/last_run_status.txt"
+    url = f"https://api.github.com/repos/{repo}/contents/astra-trade-qml/{status_file}"
     try:
         response = requests.get(
             url,
@@ -711,18 +728,20 @@ def _fetch_last_run_status_text(repo: str, gh_token: str) -> "str | None":
     return response.text
 
 
-def check_training_exit_code(repo: str, branch: str, gh_token: str) -> "int | None":
+def check_training_exit_code(
+    repo: str, branch: str, gh_token: str, status_file: str = "logs/last_run_status.txt"
+) -> "int | None":
     """
-    Read back logs/last_run_status.txt from the model-artifacts branch
-    the pod just pushed, and return the training process's own exit
-    code. Returns None if the marker is missing (the pod never got far
-    enough to write it - already surfaced separately by
-    launch_and_wait's boot-failure handling, so this is a defense-in-
-    depth check, not the primary signal).
+    Read back the status file (default logs/last_run_status.txt) from
+    the model-artifacts branch the pod just pushed, and return the
+    training process's own exit code. Returns None if the marker is
+    missing (the pod never got far enough to write it - already
+    surfaced separately by launch_and_wait's boot-failure handling, so
+    this is a defense-in-depth check, not the primary signal).
     """
-    text = _fetch_last_run_status_text(repo, gh_token)
+    text = _fetch_last_run_status_text(repo, gh_token, status_file=status_file)
     if text is None:
-        print(f"Warning: last_run_status.txt not found on model-artifacts for branch {branch}")
+        print(f"Warning: {status_file} not found on model-artifacts for branch {branch}")
         return None
 
     match = re.search(r"^exit=(\d+)$", text, re.MULTILINE)
@@ -732,12 +751,15 @@ def check_training_exit_code(repo: str, branch: str, gh_token: str) -> "int | No
     return int(match.group(1))
 
 
-def check_fresh_completion_marker(repo: str, gh_token: str, since: datetime) -> "datetime | None":
+def check_fresh_completion_marker(
+    repo: str, gh_token: str, since: datetime, status_file: str = "logs/last_run_status.txt"
+) -> "datetime | None":
     """
-    Check whether logs/last_run_status.txt on model-artifacts shows a
-    finished_at timestamp after `since` - i.e. the CURRENT pod pushed a
-    completion marker, not a stale one left over from an earlier run.
-    Returns the parsed finished_at datetime if fresh, else None.
+    Check whether the status file (default logs/last_run_status.txt) on
+    model-artifacts shows a finished_at timestamp after `since` - i.e.
+    the CURRENT pod pushed a completion marker, not a stale one left
+    over from an earlier run. Returns the parsed finished_at datetime if
+    fresh, else None.
 
     This exists because a pod's self-DELETE call (curl ... || true,
     silently swallowing any failure) is not a reliable completion
@@ -752,7 +774,7 @@ def check_fresh_completion_marker(repo: str, gh_token: str, since: datetime) -> 
     terminate the pod ourselves the moment we see it, rather than
     depending on the pod's self-termination succeeding.
     """
-    text = _fetch_last_run_status_text(repo, gh_token)
+    text = _fetch_last_run_status_text(repo, gh_token, status_file=status_file)
     if text is None:
         return None
 
@@ -780,6 +802,8 @@ def main() -> None:
     parser.add_argument("--boot-timeout-seconds", type=int, default=1800, help="Max time to wait for the container to start (30m default - the ~15GB PyTorch image can take 15-25min to pull on cold hosts)")
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
+    parser.add_argument("--script-mode", default="train", choices=["train", "swing-test"], help="src.main --mode to run inside the pod (default: train)")
+    parser.add_argument("--pod-name", default="", help="RunPod pod name (default: astra-trade-qml-training for train mode, astra-trade-qml-{script-mode} otherwise, so a non-train run never collides with a concurrent production training pod)")
     parser.add_argument("--poll-timeout-seconds", type=int, default=11400, help="Outer safety-net cap once booted (3h10m default)")
     parser.add_argument("--ssh-key-file", default="", help="Path to SSH private key for log streaming (overrides RUNPOD_SSH_KEY env var)")
     args = parser.parse_args()
@@ -845,9 +869,16 @@ def main() -> None:
         if os.environ.get(kite_var):
             pod_env[kite_var] = os.environ[kite_var]
 
-    start_command = build_start_command(args.repo, args.branch, args.train_timeout_seconds)
+    start_command = build_start_command(args.repo, args.branch, args.train_timeout_seconds, script_mode=args.script_mode)
 
-    terminate_stale_pods_by_name(runpod_key, "astra-trade-qml-training")
+    pod_name = args.pod_name or (
+        "astra-trade-qml-training" if args.script_mode == "train" else f"astra-trade-qml-{args.script_mode}"
+    )
+    status_file = (
+        "logs/last_run_status.txt" if args.script_mode == "train" else f"logs/{args.script_mode}_last_run_status.txt"
+    )
+
+    terminate_stale_pods_by_name(runpod_key, pod_name)
 
     try:
         completed = launch_and_wait(
@@ -865,6 +896,8 @@ def main() -> None:
             ssh_key_path=ssh_key_path,
             repo=args.repo,
             gh_token=gh_token,
+            pod_name=pod_name,
+            status_file=status_file,
         )
     finally:
         if ssh_key_tmpfile:
@@ -876,9 +909,9 @@ def main() -> None:
         print("::error::Training pod never completed - either it repeatedly failed to boot or timed out mid-training", file=sys.stderr)
         sys.exit(1)
 
-    exit_code = check_training_exit_code(args.repo, args.branch, gh_token)
+    exit_code = check_training_exit_code(args.repo, args.branch, gh_token, status_file=status_file)
     if exit_code is None:
-        print("::error::Pod terminated but left no readable last_run_status.txt - treating as a failure", file=sys.stderr)
+        print(f"::error::Pod terminated but left no readable {status_file} - treating as a failure", file=sys.stderr)
         sys.exit(1)
     if exit_code != 0:
         print(f"::error::Training process inside the pod exited with code {exit_code}", file=sys.stderr)

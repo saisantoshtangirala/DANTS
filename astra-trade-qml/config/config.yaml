@@ -22,6 +22,15 @@ data:
     # focus_universe: full pool used for training/feature generation and
     # regime detection (indices included - NIFTY 50 / NIFTY BANK aren't
     # cash-tradable but their trend feeds the regime detector).
+    #
+    # The 10 midcaps below (FEDERALBNK...APOLLOTYRE) were added alongside
+    # the original 8 Nifty 50 large-caps to test whether less-competed
+    # names show a real edge where the mega-caps (every large-cap here
+    # showed consistent negative expectancy, -0.19% to -0.27%/trade,
+    # across a properly-powered ~246-trading-day backtest) didn't. Liquid,
+    # long-listed, F&O-enabled NSE midcaps, chosen for listing longevity
+    # to avoid the symbol-continuity/data-gap issues a recent IPO or
+    # renamed entity would introduce.
     focus_universe:
       - "NIFTY 50"
       - "NIFTY BANK"
@@ -33,6 +42,16 @@ data:
       - "SBIN"
       - "BHARTIARTL"
       - "ITC"
+      - "FEDERALBNK"
+      - "IDFCFIRSTB"
+      - "PNB"
+      - "BANKBARODA"
+      - "TATAPOWER"
+      - "PETRONET"
+      - "VOLTAS"
+      - "ASHOKLEY"
+      - "CANBK"
+      - "APOLLOTYRE"
     # equity_universe: the actual cash-equity symbols the paper/live
     # trading loop and portfolio allocator are allowed to hold positions
     # in. Deliberately excludes the indices above - you cannot buy "NIFTY
@@ -47,6 +66,16 @@ data:
       - "SBIN"
       - "BHARTIARTL"
       - "ITC"
+      - "FEDERALBNK"
+      - "IDFCFIRSTB"
+      - "PNB"
+      - "BANKBARODA"
+      - "TATAPOWER"
+      - "PETRONET"
+      - "VOLTAS"
+      - "ASHOKLEY"
+      - "CANBK"
+      - "APOLLOTYRE"
     fno_universe: []                # Auto-populated from NSE F&O list
     midcap_watchlist: []
 
