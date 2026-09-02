@@ -1,0 +1,34 @@
+{
+  "n_qubits": 8,
+  "feature_map_type": "ZZFeatureMap",
+  "is_quantum": true,
+  "training_metrics": {
+    "train_accuracy": 1.0,
+    "is_quantum": true,
+    "n_qubits": 8,
+    "feature_map": "ZZFeatureMap",
+    "circuit_depth": 1,
+    "training_samples": 150,
+    "kernel_diagnostics": {
+      "off_diagonal_mean": 0.005189719658836687,
+      "off_diagonal_std": 0.009269873763706723
+    },
+    "val_accuracy": 0.5133333333333333,
+    "adapted_from_reps": 2,
+    "adapted_reps": 2,
+    "pca_diagnostics": {
+      "explained_variance_ratio": [
+        0.34922491175843784,
+        0.09157420060578364,
+        0.06673382666058157,
+        0.048940354105359386,
+        0.0457857469586645,
+        0.03860148413025958,
+        0.028807861175852115,
+        0.025889995202026422
+      ],
+      "cumulative_explained_variance": 0.6955583805969651
+    }
+  },
+  "pca_components": 8
+}

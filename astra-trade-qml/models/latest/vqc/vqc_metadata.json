@@ -1,0 +1,23 @@
+{
+  "n_qubits": 8,
+  "feature_map_type": "ZZFeatureMap",
+  "ansatz_type": "EfficientSU2",
+  "reps": 2,
+  "is_quantum": true,
+  "circuit_depth": 2,
+  "training_metrics": {
+    "train_accuracy": 0.5233333333333333,
+    "is_quantum": true,
+    "n_qubits": 8,
+    "circuit_depth": 2,
+    "ansatz": "EfficientSU2",
+    "feature_map": "ZZFeatureMap",
+    "optimizer": "SPSA",
+    "training_samples": 300,
+    "num_parameters": 48,
+    "val_accuracy": 0.47070605908863294,
+    "adapted_from_reps": 2,
+    "adapted_reps": 2
+  },
+  "pca_components": 8
+}
