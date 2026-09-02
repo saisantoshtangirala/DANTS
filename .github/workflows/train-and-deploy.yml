@@ -21,9 +21,18 @@ name: Train on RunPod and Deploy to Hetzner
 # `schedule:` block below (or disable the workflow) if you'd rather
 # trigger training manually via workflow_dispatch until you've watched
 # a few real runs.
+#
+# Deliberately NOT on push: branches: [master] - during active
+# development, every commit to master (bugfixes, diagnostics, unrelated
+# refactors) would each independently trigger a full production
+# train-and-deploy run and live Hetzner redeploy as a side effect of
+# just pushing code. Confirmed in practice: 4 separate runs fired this
+# way in one session from ordinary bugfix commits, competing for the
+# same limited RunPod GPU capacity as intentional diagnostic runs and
+# repeatedly redeploying the live paper-trading model without anyone
+# deciding to. workflow_dispatch (manual) and the nightly schedule below
+# are the only intended triggers now.
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
     inputs:
       min_vram_gb:
@@ -38,9 +47,9 @@ on:
 
 # launch_training_pod.py creates the RunPod pod under a fixed name
 # ("astra-trade-qml-training"), not one unique per run - two runs firing
-# close together (e.g. a push landing right as someone triggers
-# workflow_dispatch) collide on that name and can knock each other's pod
-# out from under them. Serialize instead of parallelizing: queue the new
+# close together (e.g. the nightly schedule firing right as someone
+# triggers workflow_dispatch) collide on that name and can knock each
+# other's pod out from under them. Serialize instead of parallelizing: queue the new
 # run behind whichever is already in flight rather than cancelling it -
 # a half-finished training run silently producing no model is worse than
 # a few extra minutes of queue time.
