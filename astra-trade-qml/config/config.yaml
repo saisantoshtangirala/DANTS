@@ -62,7 +62,17 @@ data:
                                       # passed it straight to yfinance (which needs "5m") with no translation either.
     swing: "1d"                     # Daily timeframe
     features_lookback: 20           # LSTM sequence length (feature indicators handle their own lookback)
-    intraday_lookback_days: 60      # History window for 5-min bar ingestion (Yahoo's intraday cap; Kite is chunked to the same window per request but can cover more calendar days total)
+    intraday_lookback_days: 365     # History window for 5-min bar ingestion via Kite (chunked into <=55-day
+                                     # requests - see _fetch_kite_intraday_chunked - so this isn't capped at
+                                     # Kite's own per-request limit). Only Yahoo's separate intraday FALLBACK
+                                     # path is hardcapped at 60 calendar days (yfinance's own period="60d",
+                                     # unaffected by this value) - this setting only governs the primary Kite
+                                     # path. Was 60: with the 80/10/10 date-quantile train/val/OOS split, that
+                                     # left only ~41 trading days total and ~4-5 OOS trading days per symbol -
+                                     # too few for the confidence-gated (>=0.60) backtest to reach the
+                                     # allocator's 20-trade minimum for most symbols (run #63: 7 of 8 symbols
+                                     # excluded on trade count alone, not on expectancy). 365 gives ~250
+                                     # trading days pooled, ~25 OOS days per symbol.
 
   liquidity:
     min_adtv_cr: 10                 # Minimum average daily traded value (INR crore) for a symbol to be tradable/allocatable
