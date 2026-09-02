@@ -452,6 +452,15 @@ class FeatureEngineer:
         exclude = {
             "date", "open", "high", "low", "close", "volume", "turnover",
             "symbol", "label", "future_return",
+            # Pooling scaffolding, not a real feature: _pooled_training_matrix()/
+            # swing_training_and_backtest()/WalkForwardValidator._pool_train_matrix()
+            # all add this purely to group rows by symbol for LSTM windowing.
+            # It's a per-symbol constant integer (0..n_symbols-1) present during
+            # training but absent from the per-symbol OOS/live dataframe (where
+            # it silently becomes NaN -> 0 via the missing-column fallback) -
+            # any split the model learned on it during training becomes dead
+            # weight (always the same branch) the moment it's actually scored.
+            "_symbol_id",
             # Absolute-price features that leak symbol identity when pooling
             "sma_5", "sma_10", "sma_20", "sma_50",
             "ema_5", "ema_10", "ema_20", "ema_50",

@@ -20,6 +20,7 @@ from src.data.data_quality import ListingContinuityReport
 from src.data.data_quality import check_listing_continuity as check_symbol_continuity
 from src.data.feature_engineering import FeatureConfig, FeatureEngineer
 from src.data.nse_ingestion import KiteDataProvider, YFinanceDataProvider
+from src.models.classical.xgboost_model import XGBoostMarketModel
 from src.models.quantum.hybrid_model import HybridQMLModel
 from src.trading.costs import CostCalculator
 from src.trading.live_feed import KiteLiveFeed
@@ -77,6 +78,34 @@ def build_hybrid_model_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "classical_weight": quantum.get("classical_weight", 0.7),
         "quantum_weight": quantum.get("quantum_weight", 0.3),
     }
+
+
+class _XGBoostOnlyAdapter:
+    """
+    Wraps a standalone XGBoostMarketModel so it satisfies the
+    transform_features()/predict_proba() interface _score_oos_realistic()
+    expects from a HybridQMLModel. Lets
+    xgboost_baseline_training_and_backtest() reuse the exact same OOS
+    trade-simulation methodology (tick-rounding, circuit-band checks, the
+    real cost stack, confidence gating) runs #64/#65 used for the full
+    ensemble - a fair apples-to-apples comparison isolating whether a null
+    result is about the model (ensemble complexity not adding anything a
+    much cheaper single model doesn't already get) or the signal
+    (features/universe/horizon).
+    """
+
+    def __init__(self, xgb_model: XGBoostMarketModel, feature_scaler):
+        self._xgb_model = xgb_model
+        self._feature_scaler = feature_scaler
+
+    def transform_features(self, X: np.ndarray) -> np.ndarray:
+        if self._feature_scaler is not None:
+            X = self._feature_scaler.transform(X)
+            np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+        return X
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        return self._xgb_model.predict_proba(X)
 
 
 class TrainingPipeline:
@@ -661,7 +690,14 @@ class TrainingPipeline:
         # predict_proba().
         self._trained_feature_cols = feature_cols
 
-        X = pooled[feature_cols].to_numpy()
+        # copy=True: pandas can hand back a read-only view into the
+        # DataFrame's own block array here (observed when feature_cols are
+        # dtype-homogeneous enough to live in one block) - the in-place
+        # scaling assignment below then raises "assignment destination is
+        # read-only". swing_training_and_backtest() sidesteps the same risk
+        # via its own X.astype(float).copy(); this is the equivalent fix
+        # for the pooled intraday path.
+        X = pooled[feature_cols].to_numpy(copy=True)
         y = pooled["label"].to_numpy().astype(int)
         symbol_ids = pooled["_symbol_id"].to_numpy()
 
@@ -981,9 +1017,6 @@ class TrainingPipeline:
         Task: out-of-sample backtest on a held-out slice beyond the validation set.
         See _score_oos_realistic() for the trade-simulation methodology.
         """
-        initial_capital = self.config["trading"]["capital"]["initial"]
-
-        results = {}
         # Must match the pooled training matrix's columns exactly (see the
         # comment in _pooled_training_matrix) - never recompute
         # get_feature_columns() per symbol here.
@@ -991,6 +1024,22 @@ class TrainingPipeline:
         if feature_cols is None:
             raise ValueError("No trained feature columns available. Run classical_and_quantum_training() first.")
 
+        return self._backtest_symbols_oos(self.model, feature_cols)
+
+    def _backtest_symbols_oos(self, model: HybridQMLModel, feature_cols: list) -> Dict[str, Any]:
+        """
+        Shared per-symbol OOS backtest loop: same evolved-genes handling,
+        date-cutoff slicing, and _score_oos_realistic() trade simulation for
+        every caller (backtest_validation() and
+        xgboost_baseline_training_and_backtest()) - so a like-for-like
+        comparison between models isn't accidentally skewed by two
+        different scoring paths. `model` need only satisfy
+        _score_oos_realistic()'s interface (transform_features()/
+        predict_proba()), not necessarily be a HybridQMLModel.
+        """
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        results = {}
         for symbol, df in self.featured_data.items():
             if df.empty:
                 continue
@@ -1007,11 +1056,54 @@ class TrainingPipeline:
             if oos.empty:
                 continue
 
-            report = self._score_oos_realistic(self.model, oos, feature_cols, 0.0, initial_capital)
+            report = self._score_oos_realistic(model, oos, feature_cols, 0.0, initial_capital)
             if report is not None:
                 results[symbol] = report
 
         return results
+
+    def xgboost_baseline_training_and_backtest(self) -> Dict[str, Any]:
+        """
+        Diagnostic task: trains a bare XGBoostMarketModel - no LSTM, no
+        quantum kernel/VQC, no meta-learner stacking - on the exact same
+        pooled feature matrix and date split classical_and_quantum_training()
+        uses, then backtests it via _backtest_symbols_oos() with
+        _score_oos_realistic()'s exact trade-simulation methodology.
+
+        Runs #64/#65 found a uniformly negative-expectancy null result for
+        the full quantum ensemble across large-caps, then midcaps +
+        order-flow features. This isolates whether that null is about the
+        *signal* (nothing in the current feature/universe/horizon set has
+        an edge, so no model finds one) or the *model* (the four-way
+        ensemble + meta-learner isn't adding anything a single, far
+        cheaper classical model wouldn't already find) - a much simpler
+        model showing the same null narrows it to the signal; a materially
+        different result either way is itself informative.
+
+        Assumes feature_engineering() has already been run (same
+        prerequisite as classical_and_quantum_training()) - deliberately
+        does not touch self.model or any of the evolution/regime/
+        walk-forward machinery, since this is a standalone comparison run,
+        not a production training step.
+        """
+        pooled = self._pooled_training_matrix()
+        X_train, y_train = pooled["X_train"], pooled["y_train"]
+        X_val_es, y_val_es = pooled["X_val_es"], pooled["y_val_es"]
+        feature_cols = pooled["feature_cols"]
+
+        xgb_config = self.config.get("models", {}).get("classical", {}).get("xgboost", {})
+        xgb_model = XGBoostMarketModel(**xgb_config)
+        train_metrics = xgb_model.fit(X_train, y_train, X_val_es, y_val_es, feature_cols)
+
+        adapter = _XGBoostOnlyAdapter(xgb_model, self._feature_scaler)
+        backtest_results = self._backtest_symbols_oos(adapter, feature_cols)
+
+        return {
+            "train_metrics": train_metrics,
+            "train_samples": int(len(X_train)),
+            "val_samples": int(len(X_val_es)),
+            "backtest": backtest_results,
+        }
 
     def walk_forward_validation(self) -> Dict[str, Any]:
         """Task: expanding-window walk-forward validation (training.validation.walk_forward_windows),

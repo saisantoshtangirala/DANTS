@@ -98,6 +98,23 @@ def test_get_feature_columns_excludes_raw_price_data():
     assert cols == ["rsi_14"]
 
 
+def test_get_feature_columns_excludes_symbol_id_pooling_scaffold():
+    """
+    Regression test: _symbol_id is scaffolding _pooled_training_matrix()/
+    swing_training_and_backtest()/WalkForwardValidator._pool_train_matrix()
+    add purely to group pooled rows by symbol for LSTM windowing - it must
+    never leak into the actual feature matrix. It's a per-symbol constant
+    during training but absent from the per-symbol OOS/live dataframe
+    (silently NaN -> 0 there), so any split trained on it becomes dead
+    weight (always the same branch) the moment the model is actually
+    scored - a real train/serve skew bug if this column isn't excluded.
+    """
+    engineer = FeatureEngineer()
+    df = pd.DataFrame(columns=["date", "close", "rsi_14", "_symbol_id", "label"])
+    cols = engineer.get_feature_columns(df)
+    assert cols == ["rsi_14"]
+
+
 def test_generate_all_features_handles_intraday_5min_data():
     """
     Regression test: the intraday VWAP branch (only reachable for 5-min/

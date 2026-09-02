@@ -248,6 +248,70 @@ def test_backtest_validation_uses_trained_feature_columns_not_per_symbol_recompu
     assert results["RELIANCE"]["total_trades"] == 1
 
 
+def _synthetic_featured_symbol(seed: int, n: int = 200) -> pd.DataFrame:
+    """Enough distinct 5-min bars for _pooled_training_matrix()'s 80/10/10
+    date split to leave a non-trivial train/val/OOS row count, so a real
+    (small, fast) XGBoost fit has something to chew on."""
+    rng = np.random.default_rng(seed)
+    dates = pd.date_range("2024-01-01 09:15", periods=n, freq="5min")
+    close = 100 + np.cumsum(rng.normal(0, 0.5, n))
+    close = np.maximum(close, 1.0)
+    feature_a = rng.normal(size=n)
+    feature_b = rng.normal(size=n)
+    future_return = rng.normal(0, 0.01, n)
+    label = (future_return > 0).astype(float)
+    return pd.DataFrame({
+        "date": dates, "close": close,
+        "feature_a": feature_a, "feature_b": feature_b,
+        "future_return": future_return, "label": label,
+    })
+
+
+def test_xgboost_baseline_training_and_backtest_runs_end_to_end(config):
+    """
+    Trains a real (tiny, fast) standalone XGBoostMarketModel - no mocking,
+    unlike the swing/quantum diagnostic tests, since XGBoost alone trains
+    in well under a second even without the quantum sub-models that make
+    those need a fake model. Exercises the full path: pooled matrix ->
+    XGBoostMarketModel.fit() -> _XGBoostOnlyAdapter -> the same
+    _backtest_symbols_oos()/_score_oos_realistic() methodology
+    backtest_validation() uses for the full ensemble, so results are
+    directly comparable to it.
+    """
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    pipeline.featured_data = {
+        "SYM_A": _synthetic_featured_symbol(seed=1),
+        "SYM_B": _synthetic_featured_symbol(seed=2),
+    }
+
+    result = pipeline.xgboost_baseline_training_and_backtest()
+
+    assert result["train_samples"] > 0
+    assert result["val_samples"] > 0
+    assert "val_f1" in result["train_metrics"]
+    assert isinstance(result["backtest"], dict)
+    for symbol, report in result["backtest"].items():
+        assert "total_trades" in report
+
+
+def test_xgboost_baseline_uses_same_pooled_matrix_feature_columns_as_ensemble(config):
+    """_pooled_training_matrix() must exclude the _symbol_id pooling
+    scaffold from both the ensemble path and this baseline - regression
+    guard for the train/serve skew bug (see
+    test_get_feature_columns_excludes_symbol_id_pooling_scaffold)."""
+    db = DatabaseManager("sqlite:///:memory:")
+    pipeline = TrainingPipeline(config, db=db)
+    pipeline.featured_data = {
+        "SYM_A": _synthetic_featured_symbol(seed=1),
+        "SYM_B": _synthetic_featured_symbol(seed=2),
+    }
+
+    pipeline.xgboost_baseline_training_and_backtest()
+
+    assert "_symbol_id" not in pipeline._trained_feature_cols
+
+
 def test_capital_allocation_excludes_symbol_with_listing_continuity_failure(config):
     """
     Regression test for the survivorship-bias safeguard: a symbol whose

@@ -1,0 +1,113 @@
+name: XGBoost Baseline Diagnostic (RunPod)
+
+# Diagnostic-only: trains a bare XGBoost model (no LSTM, no quantum
+# kernel/VQC, no meta-learner stacking) on the exact same production
+# data ingestion and feature set (full large-cap+midcap universe,
+# order-flow features, 5-min intraday bars) as train-and-deploy.yml's
+# real training run, then backtests it with the identical trade-
+# simulation methodology. See
+# TrainingPipeline.xgboost_baseline_training_and_backtest()'s docstring
+# for exactly what this isolates: runs #64/#65 found a uniformly
+# negative-expectancy null result for the full quantum ensemble across
+# large-caps, then midcaps + order-flow features - this checks whether
+# that null is about the *model* (ensemble complexity adding nothing a
+# much cheaper single model wouldn't already find) or the *signal*
+# (nothing in the current feature/universe set has an edge at all,
+# regardless of model).
+#
+# Deliberately isolated from train-and-deploy.yml (own concurrency
+# group, pod name, status/log paths via launch_training_pod.py's
+# --script-mode) for the same reason swing-test.yml and
+# swing-walk-forward.yml are - so this diagnostic run can never collide
+# with a concurrent production training run on the shared
+# model-artifacts branch. No deploy job: this produces a diagnostic
+# report, not a model to serve.
+#
+# Own, much SMALLER timeout budget than the quantum workflows: no LSTM/
+# quantum kernel/VQC training at all, so the dominant per-run cost the
+# other workflows pay (10-70+ min per quantum sub-model fit) doesn't
+# apply here - a plain XGBoost fit on a pooled few-hundred-thousand-row
+# matrix (CPU 'hist' tree method) is a matter of minutes, not hours.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch:
+    inputs:
+      min_vram_gb:
+        description: "Minimum GPU VRAM (GB) to select"
+        required: false
+        default: "12"
+
+concurrency:
+  group: xgboost-baseline
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  xgboost-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install script dependencies
+        run: pip install requests
+
+      - name: Select cheapest available GPU
+        id: gpu
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+        run: |
+          GPU_IDS=$(python3 astra-trade-qml/scripts/ci/select_gpu.py \
+            --min-vram-gb "${{ github.event.inputs.min_vram_gb || '12' }}")
+          echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
+          echo "Selected GPUs: $GPU_IDS"
+
+      - name: Generate ephemeral SSH key for pod log streaming
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
+          chmod 600 /tmp/runpod_ssh_key
+
+      - name: Launch xgboost-baseline pod and wait for completion
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        run: |
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
+            --script-mode xgboost-baseline \
+            --train-timeout-seconds 3600 \
+            --poll-timeout-seconds 4200 \
+            > >(tee /tmp/launch_xgboost_baseline_pod.log) 2>&1
+
+      - name: Summarize xgboost-baseline run
+        if: always()
+        run: |
+          {
+            echo "### XGBoost baseline diagnostic run"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
+            echo
+            echo '```'
+            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+              /tmp/launch_xgboost_baseline_pod.log || echo "(no matching status lines captured)"
+            echo '```'
+            echo
+            echo "Full results: \`astra-trade-qml/logs/xgboost-baseline_training_full.log\` on the \`model-artifacts\` branch."
+          } >> "$GITHUB_STEP_SUMMARY"

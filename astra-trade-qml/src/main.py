@@ -8,6 +8,7 @@ Usage:
     python3 -m src.main --mode stress-test   # stress-test risk management against historical crises
     python3 -m src.main --mode swing-test    # diagnostic: test for a coarser-horizon (multi-day) edge
     python3 -m src.main --mode swing-walk-forward  # diagnostic: walk-forward stability check on swing-test's promising symbols
+    python3 -m src.main --mode xgboost-baseline    # diagnostic: bare XGBoost on the production feature set, no quantum ensemble
 """
 
 import argparse
@@ -496,6 +497,61 @@ def run_swing_walk_forward(config: dict, logger) -> None:
             )
 
 
+def run_xgboost_baseline(config: dict, logger) -> None:
+    """Diagnostic: trains a bare XGBoost model (no LSTM, no quantum
+    kernel/VQC, no meta-learner) on the same production data ingestion and
+    feature set (full large-cap+midcap universe, order-flow features) as
+    the real training pipeline, and backtests it with the exact same
+    trade-simulation methodology. Runs #64/#65 found a uniformly negative
+    expectancy null result for the full quantum ensemble; this isolates
+    whether that's about the model (ensemble complexity adding nothing a
+    much cheaper single model wouldn't already find) or the signal
+    (nothing in the current feature set has an edge at all) - see
+    TrainingPipeline.xgboost_baseline_training_and_backtest()'s docstring."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_xgboost_baseline")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("xgboost_baseline_started")
+    n_symbols = len(pipeline.data_ingestion())
+    logger.info("data_ingestion_done", n_symbols=n_symbols)
+
+    n_featured = len(pipeline.feature_engineering())
+    logger.info("feature_engineering_done", n_symbols=n_featured)
+
+    result = pipeline.xgboost_baseline_training_and_backtest()
+    logger.info(
+        "xgboost_baseline_complete",
+        train_samples=result["train_samples"],
+        val_samples=result["val_samples"],
+        val_f1=result["train_metrics"].get("val_f1"),
+        val_accuracy=result["train_metrics"].get("val_accuracy"),
+    )
+    for symbol, report in result["backtest"].items():
+        logger.info(
+            "xgboost_baseline_backtest_result",
+            symbol=symbol,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            expectancy=report.get("expectancy"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+        )
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -516,7 +572,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -541,6 +597,8 @@ def main() -> None:
         run_swing_test(config, logger)
     elif args.mode == "swing-walk-forward":
         run_swing_walk_forward(config, logger)
+    elif args.mode == "xgboost-baseline":
+        run_xgboost_baseline(config, logger)
 
 
 if __name__ == "__main__":
