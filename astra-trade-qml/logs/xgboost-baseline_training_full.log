@@ -1,0 +1,131 @@
++ echo '=== GPU diagnostics (pre-install) ==='
+=== GPU diagnostics (pre-install) ===
++ nvidia-smi
+Wed Sep  2 12:57:57 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.159.03             Driver Version: 580.159.03     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A4500               On  |   00000000:03:00.0 Off |                  Off |
+| 30%   41C    P8             18W /  200W |       1MiB /  20470MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
++ ldconfig
++ set +x
+Cloning into 'repo'...
++ cd repo/astra-trade-qml
++ pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 24.2 -> 26.2.1
+[notice] To update, run: python -m pip install --upgrade pip
++ echo '=== GPU diagnostics (post-install) ==='
+=== GPU diagnostics (post-install) ===
++ python3 -c '
+import torch
+torch.cuda.init()
+print(f'\''PyTorch {torch.__version__}, CUDA available: {torch.cuda.is_available()}'\'')
+if torch.cuda.is_available():
+    print(f'\''GPU: {torch.cuda.get_device_name(0)}, VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB'\'')
+else:
+    print('\''WARNING: CUDA not available - all training will run on CPU'\'')
+try:
+    import xgboost as xgb
+    print(f'\''XGBoost {xgb.__version__}'\'')
+except: pass
+'
+PyTorch 2.4.1+cu124, CUDA available: True
+GPU: NVIDIA RTX A4500, VRAM: 21.0 GB
+XGBoost 3.2.0
++ git config user.email runpod-bot@astra-trade-qml.local
++ git config user.name 'RunPod Training Bot'
++ set +x
++ echo '=== Starting training ==='
+=== Starting training ===
++ PYTHONUNBUFFERED=1
++ timeout 3600 python3 -u -m src.main --mode xgboost-baseline
+CUDA initialized: NVIDIA RTX A4500, VRAM: 21.0 GB
+2026-09-02 12:58:39,531 | INFO | [2m2026-09-02T12:58:39.531053Z[0m [[32m[1minfo     [0m] [1mkite_login_step1              [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
+2026-09-02 12:58:39,787 | INFO | [2m2026-09-02T12:58:39.787806Z[0m [[32m[1minfo     [0m] [1mkite_login_step2_twofa        [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
+2026-09-02 12:58:39,941 | INFO | [2m2026-09-02T12:58:39.941680Z[0m [[32m[1minfo     [0m] [1mkite_login_step3_request_token[0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
+2026-09-02 12:58:40,822 | INFO | [2m2026-09-02T12:58:40.822666Z[0m [[32m[1minfo     [0m] [1mkite_login_success            [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
+2026-09-02 12:58:40,823 | INFO | [2m2026-09-02T12:58:40.823139Z[0m [[32m[1minfo     [0m] [1mkite_session_ready_for_xgboost_baseline[0m [[0m[1m[34mastra_trade[0m][0m
+2026-09-02 12:58:40,847 | INFO | [2m2026-09-02T12:58:40.847920Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_started      [0m [[0m[1m[34mastra_trade[0m][0m
+2026-09-02 12:58:40,848 | INFO | [2m2026-09-02T12:58:40.848011Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m1/20[0m [36msymbol[0m=[35m'NIFTY 50'[0m
+2026-09-02 12:58:43,533 | INFO | [2m2026-09-02T12:58:43.533016Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18538[0m [36msymbol[0m=[35m'NIFTY 50'[0m
+2026-09-02 12:58:43,533 | INFO | [2m2026-09-02T12:58:43.533175Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m2/20[0m [36msymbol[0m=[35m'NIFTY BANK'[0m
+2026-09-02 12:58:45,147 | INFO | [2m2026-09-02T12:58:45.147848Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18538[0m [36msymbol[0m=[35m'NIFTY BANK'[0m
+2026-09-02 12:58:45,148 | INFO | [2m2026-09-02T12:58:45.148006Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m3/20[0m [36msymbol[0m=[35mRELIANCE[0m
+2026-09-02 12:58:46,838 | INFO | [2m2026-09-02T12:58:46.838509Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mRELIANCE[0m
+2026-09-02 12:58:46,838 | INFO | [2m2026-09-02T12:58:46.838670Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m4/20[0m [36msymbol[0m=[35mTCS[0m
+2026-09-02 12:58:48,444 | INFO | [2m2026-09-02T12:58:48.444287Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mTCS[0m
+2026-09-02 12:58:48,444 | INFO | [2m2026-09-02T12:58:48.444446Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m5/20[0m [36msymbol[0m=[35mINFY[0m
+2026-09-02 12:58:50,023 | INFO | [2m2026-09-02T12:58:50.023887Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mINFY[0m
+2026-09-02 12:58:50,024 | INFO | [2m2026-09-02T12:58:50.024028Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m6/20[0m [36msymbol[0m=[35mHDFCBANK[0m
+2026-09-02 12:58:51,705 | INFO | [2m2026-09-02T12:58:51.705535Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mHDFCBANK[0m
+2026-09-02 12:58:51,705 | INFO | [2m2026-09-02T12:58:51.705695Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m7/20[0m [36msymbol[0m=[35mICICIBANK[0m
+2026-09-02 12:58:53,448 | INFO | [2m2026-09-02T12:58:53.448792Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mICICIBANK[0m
+2026-09-02 12:58:53,448 | INFO | [2m2026-09-02T12:58:53.448944Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m8/20[0m [36msymbol[0m=[35mSBIN[0m
+2026-09-02 12:58:55,231 | INFO | [2m2026-09-02T12:58:55.231275Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mSBIN[0m
+2026-09-02 12:58:55,231 | INFO | [2m2026-09-02T12:58:55.231440Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m9/20[0m [36msymbol[0m=[35mBHARTIARTL[0m
+2026-09-02 12:58:56,889 | INFO | [2m2026-09-02T12:58:56.889422Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mBHARTIARTL[0m
+2026-09-02 12:58:56,889 | INFO | [2m2026-09-02T12:58:56.889593Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m10/20[0m [36msymbol[0m=[35mITC[0m
+2026-09-02 12:58:58,683 | INFO | [2m2026-09-02T12:58:58.683819Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mITC[0m
+2026-09-02 12:58:58,683 | INFO | [2m2026-09-02T12:58:58.683978Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m11/20[0m [36msymbol[0m=[35mFEDERALBNK[0m
+2026-09-02 12:59:00,373 | INFO | [2m2026-09-02T12:59:00.373227Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mFEDERALBNK[0m
+2026-09-02 12:59:00,373 | INFO | [2m2026-09-02T12:59:00.373369Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m12/20[0m [36msymbol[0m=[35mIDFCFIRSTB[0m
+2026-09-02 12:59:01,964 | INFO | [2m2026-09-02T12:59:01.964943Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mIDFCFIRSTB[0m
+2026-09-02 12:59:01,965 | INFO | [2m2026-09-02T12:59:01.965094Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m13/20[0m [36msymbol[0m=[35mPNB[0m
+2026-09-02 12:59:03,616 | INFO | [2m2026-09-02T12:59:03.616254Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mPNB[0m
+2026-09-02 12:59:03,616 | INFO | [2m2026-09-02T12:59:03.616411Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m14/20[0m [36msymbol[0m=[35mBANKBARODA[0m
+2026-09-02 12:59:05,280 | INFO | [2m2026-09-02T12:59:05.280936Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mBANKBARODA[0m
+2026-09-02 12:59:05,281 | INFO | [2m2026-09-02T12:59:05.281091Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m15/20[0m [36msymbol[0m=[35mTATAPOWER[0m
+2026-09-02 12:59:06,875 | INFO | [2m2026-09-02T12:59:06.875415Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mTATAPOWER[0m
+2026-09-02 12:59:06,875 | INFO | [2m2026-09-02T12:59:06.875574Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m16/20[0m [36msymbol[0m=[35mPETRONET[0m
+2026-09-02 12:59:08,442 | INFO | [2m2026-09-02T12:59:08.442586Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mPETRONET[0m
+2026-09-02 12:59:08,442 | INFO | [2m2026-09-02T12:59:08.442739Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m17/20[0m [36msymbol[0m=[35mVOLTAS[0m
+2026-09-02 12:59:10,015 | INFO | [2m2026-09-02T12:59:10.015591Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mVOLTAS[0m
+2026-09-02 12:59:10,015 | INFO | [2m2026-09-02T12:59:10.015749Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m18/20[0m [36msymbol[0m=[35mASHOKLEY[0m
+2026-09-02 12:59:11,587 | INFO | [2m2026-09-02T12:59:11.587073Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mASHOKLEY[0m
+2026-09-02 12:59:11,587 | INFO | [2m2026-09-02T12:59:11.587359Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m19/20[0m [36msymbol[0m=[35mCANBK[0m
+2026-09-02 12:59:13,136 | INFO | [2m2026-09-02T12:59:13.136720Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mCANBK[0m
+2026-09-02 12:59:13,136 | INFO | [2m2026-09-02T12:59:13.136874Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m20/20[0m [36msymbol[0m=[35mAPOLLOTYRE[0m
+2026-09-02 12:59:14,713 | INFO | [2m2026-09-02T12:59:14.713135Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18537[0m [36msymbol[0m=[35mAPOLLOTYRE[0m
+2026-09-02 12:59:14,713 | INFO | [2m2026-09-02T12:59:14.713309Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_done           [0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m20[0m
+2026-09-02 12:59:16,942 | INFO | [2m2026-09-02T12:59:16.942586Z[0m [[32m[1minfo     [0m] [1mfeature_engineering_done      [0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m20[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322404Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_complete     [0m [[0m[1m[34mastra_trade[0m][0m [36mtrain_samples[0m=[35m37170[0m [36mval_accuracy[0m=[35m0.4970384995064166[0m [36mval_f1[0m=[35m0.496229624808378[0m [36mval_samples[0m=[35m2026[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322579Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mRELIANCE[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322638Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mTCS[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322683Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mINFY[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322732Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mHDFCBANK[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322789Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mICICIBANK[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322834Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mSBIN[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322873Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mBHARTIARTL[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322914Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mITC[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,322 | INFO | [2m2026-09-02T12:59:17.322955Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mFEDERALBNK[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323003Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.0026506963237202786[0m [36mexpectancy[0m=[35mnp.float64(-0.002650696323720279)[0m [36msharpe_ratio[0m=[35m-10.777763242000882[0m [36msymbol[0m=[35mIDFCFIRSTB[0m [36mtotal_trades[0m=[35m5[0m [36mwin_rate[0m=[35m0.2[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323098Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mPNB[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323153Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323209Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323261Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mPETRONET[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323307Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mVOLTAS[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323365Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mASHOKLEY[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323427Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mCANBK[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
+2026-09-02 12:59:17,323 | INFO | [2m2026-09-02T12:59:17.323483Z[0m [[32m[1minfo     [0m] [1mxgboost_baseline_backtest_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35mNone[0m [36mexpectancy[0m=[35mNone[0m [36msharpe_ratio[0m=[35m0.0[0m [36msymbol[0m=[35mAPOLLOTYRE[0m [36mtotal_trades[0m=[35m0[0m [36mwin_rate[0m=[35m0.0[0m
++ TRAIN_EXIT=0
++ mkdir -p models/latest logs
++ echo exit=0
+++ date -u +%Y-%m-%dT%H:%M:%SZ
++ echo finished_at=2026-09-02T12:59:17Z
++ cp /workspace/training.log logs/xgboost-baseline_training_full.log
