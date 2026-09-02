@@ -1,378 +1,993 @@
-2026-09-02 14:53:41,237 | INFO | astra_trade.kite_auth | [2m2026-09-02T14:53:41.237090Z[0m [[32m[1minfo     [0m] [1mkite_login_step1              [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
-2026-09-02 14:53:41,486 | INFO | astra_trade.kite_auth | [2m2026-09-02T14:53:41.486018Z[0m [[32m[1minfo     [0m] [1mkite_login_step2_twofa        [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
-2026-09-02 14:53:41,669 | INFO | astra_trade.kite_auth | [2m2026-09-02T14:53:41.669317Z[0m [[32m[1minfo     [0m] [1mkite_login_step3_request_token[0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
-2026-09-02 14:53:42,257 | INFO | astra_trade.kite_auth | [2m2026-09-02T14:53:42.257547Z[0m [[32m[1minfo     [0m] [1mkite_login_success            [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
-2026-09-02 14:53:42,264 | INFO | astra_trade | [2m2026-09-02T14:53:42.263860Z[0m [[32m[1minfo     [0m] [1mkite_session_ready_for_training[0m [[0m[1m[34mastra_trade[0m][0m
-2026-09-02 14:53:42,268 | INFO | astra_trade | [2m2026-09-02T14:53:42.268000Z[0m [[32m[1minfo     [0m] [1mstarting_training_pipeline    [0m [[0m[1m[34mastra_trade[0m][0m
-2026-09-02 14:53:42,469 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:42.469540Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_starting       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mdata_ingestion[0m
-2026-09-02 14:53:42,474 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:42.474268Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m1/20[0m [36msymbol[0m=[35m'NIFTY 50'[0m
-2026-09-02 14:53:46,709 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:46.709433Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18538[0m [36msymbol[0m=[35m'NIFTY 50'[0m
-2026-09-02 14:53:46,715 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:46.715670Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m2/20[0m [36msymbol[0m=[35m'NIFTY BANK'[0m
-2026-09-02 14:53:49,695 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:49.695157Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18538[0m [36msymbol[0m=[35m'NIFTY BANK'[0m
-2026-09-02 14:53:49,707 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:49.707306Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m3/20[0m [36msymbol[0m=[35mRELIANCE[0m
-2026-09-02 14:53:52,493 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:52.493704Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mRELIANCE[0m
-2026-09-02 14:53:52,500 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:52.500297Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m4/20[0m [36msymbol[0m=[35mTCS[0m
-2026-09-02 14:53:55,264 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:55.264543Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mTCS[0m
-2026-09-02 14:53:55,288 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:55.287998Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m5/20[0m [36msymbol[0m=[35mINFY[0m
-2026-09-02 14:53:57,931 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:57.931636Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mINFY[0m
-2026-09-02 14:53:57,938 | INFO | astra_trade.pipeline | [2m2026-09-02T14:53:57.938247Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m6/20[0m [36msymbol[0m=[35mHDFCBANK[0m
-2026-09-02 14:54:00,519 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:00.519006Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mHDFCBANK[0m
-2026-09-02 14:54:00,524 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:00.524933Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m7/20[0m [36msymbol[0m=[35mICICIBANK[0m
-2026-09-02 14:54:03,339 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:03.339608Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18472[0m [36msymbol[0m=[35mICICIBANK[0m
-2026-09-02 14:54:03,347 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:03.347128Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m8/20[0m [36msymbol[0m=[35mSBIN[0m
-2026-09-02 14:54:06,238 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:06.238809Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mSBIN[0m
-2026-09-02 14:54:06,245 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:06.245583Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m9/20[0m [36msymbol[0m=[35mBHARTIARTL[0m
-2026-09-02 14:54:09,246 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:09.246810Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mBHARTIARTL[0m
-2026-09-02 14:54:09,254 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:09.253962Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m10/20[0m [36msymbol[0m=[35mITC[0m
-2026-09-02 14:54:12,057 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:12.057372Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mITC[0m
-2026-09-02 14:54:12,062 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:12.062709Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m11/20[0m [36msymbol[0m=[35mFEDERALBNK[0m
-2026-09-02 14:54:14,781 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:14.781247Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mFEDERALBNK[0m
-2026-09-02 14:54:14,787 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:14.787899Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m12/20[0m [36msymbol[0m=[35mIDFCFIRSTB[0m
-2026-09-02 14:54:17,744 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:17.744523Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mIDFCFIRSTB[0m
-2026-09-02 14:54:17,751 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:17.751838Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m13/20[0m [36msymbol[0m=[35mPNB[0m
-2026-09-02 14:54:20,354 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:20.354341Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mPNB[0m
-2026-09-02 14:54:20,363 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:20.363151Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m14/20[0m [36msymbol[0m=[35mBANKBARODA[0m
-2026-09-02 14:54:23,180 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:23.180641Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mBANKBARODA[0m
-2026-09-02 14:54:23,186 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:23.186595Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m15/20[0m [36msymbol[0m=[35mTATAPOWER[0m
-2026-09-02 14:54:25,811 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:25.811437Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mTATAPOWER[0m
-2026-09-02 14:54:25,816 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:25.816797Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m16/20[0m [36msymbol[0m=[35mPETRONET[0m
-2026-09-02 14:54:28,767 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:28.766895Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mPETRONET[0m
-2026-09-02 14:54:28,772 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:28.772612Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m17/20[0m [36msymbol[0m=[35mVOLTAS[0m
-2026-09-02 14:54:31,697 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:31.697088Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mVOLTAS[0m
-2026-09-02 14:54:31,710 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:31.710159Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m18/20[0m [36msymbol[0m=[35mASHOKLEY[0m
-2026-09-02 14:54:34,323 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:34.323617Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mASHOKLEY[0m
-2026-09-02 14:54:34,330 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:34.330203Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m19/20[0m [36msymbol[0m=[35mCANBK[0m
-2026-09-02 14:54:37,034 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:37.034456Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18471[0m [36msymbol[0m=[35mCANBK[0m
-2026-09-02 14:54:37,040 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:37.040402Z[0m [[32m[1minfo     [0m] [1mdata_ingestion_symbol         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m20/20[0m [36msymbol[0m=[35mAPOLLOTYRE[0m
-2026-09-02 14:54:39,866 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:39.866590Z[0m [[32m[1minfo     [0m] [1msymbol_data_ready             [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m18537[0m [36msymbol[0m=[35mAPOLLOTYRE[0m
-2026-09-02 14:54:39,876 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:39.876857Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_done           [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mresult[0m=[35m'20 symbols ingested'[0m [36mstage[0m=[35mdata_ingestion[0m
-2026-09-02 14:54:39,881 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:39.881916Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_starting       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mfeature_engineering[0m
-2026-09-02 14:54:47,479 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:47.479409Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_done           [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mresult[0m=[35m'20 symbols featured'[0m [36mstage[0m=[35mfeature_engineering[0m
-2026-09-02 14:54:47,482 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:47.482250Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_starting       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mmodel_training[0m
-2026-09-02 14:54:49,202 | INFO | astra_trade.pipeline | [2m2026-09-02T14:54:49.202718Z[0m [[32m[1minfo     [0m] [1mfeature_evolution_done        [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mgenes[0m=[35m['evolved_roc_20_ratio_rsi_oversold', 'evolved_roc_10_ratio_rsi_oversold', 'evolved_rsi_14_ratio_rsi_oversold', 'evolved_macd_signal_norm_ratio_rsi_oversold', 'evolved_stoch_d_ratio_shooting_star'][0m [36mn_genes[0m=[35m5[0m
-2026-09-02 15:07:18,628 | INFO | astra_trade.pipeline | [2m2026-09-02T15:07:18.628506Z[0m [[32m[1minfo     [0m] [1mlstm_nas_done                 [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mbest_config[0m=[35m{'hidden_size': 32, 'num_layers': 1, 'dropout': 0.3}[0m [36mval_accuracy[0m=[35m0.6331328594860579[0m
-2026-09-02 15:40:42,035 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
-2026-09-02 15:42:16,051 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
-2026-09-02 15:42:16,055 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 123.12881016696866, A = 0, alpha = 0.602
-2026-09-02 15:42:16,057 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
-2026-09-02 15:42:16,059 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
-2026-09-02 15:42:19,814 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 3.7534937858581543.
-2026-09-02 15:42:23,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 3.8897829055786133.
-2026-09-02 15:42:27,427 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.7131869792938232.
-2026-09-02 15:42:31,135 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.7041239738464355.
-2026-09-02 15:42:34,929 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 3.7870993614196777.
-2026-09-02 15:42:38,124 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.190037488937378.
-2026-09-02 15:42:42,159 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 4.031272649765015.
-2026-09-02 15:42:45,942 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.7787227630615234.
-2026-09-02 15:42:50,120 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 4.173590660095215.
-2026-09-02 15:42:53,875 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 3.7494797706604004.
-2026-09-02 15:42:57,621 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 3.738830089569092.
-2026-09-02 15:43:01,765 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 4.140988826751709.
-2026-09-02 15:43:05,658 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 3.887592315673828.
-2026-09-02 15:43:10,109 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 4.443251132965088.
-2026-09-02 15:43:13,929 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 3.8163716793060303.
-2026-09-02 15:43:18,042 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 4.1098244190216064.
-2026-09-02 15:43:21,944 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.898493766784668.
-2026-09-02 15:43:25,718 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 3.7659621238708496.
-2026-09-02 15:43:29,960 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 4.235782861709595.
-2026-09-02 15:43:33,763 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.79533314704895.
-2026-09-02 15:43:37,859 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 4.092431306838989.
-2026-09-02 15:43:41,349 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.485560655593872.
-2026-09-02 15:43:45,050 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 3.6962788105010986.
-2026-09-02 15:43:48,544 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.489619731903076.
-2026-09-02 15:43:52,300 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 3.752528190612793.
-2026-09-02 15:43:55,705 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.390948534011841.
-2026-09-02 15:43:59,712 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 4.002123832702637.
-2026-09-02 15:44:02,917 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.2016241550445557.
-2026-09-02 15:44:06,630 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 3.707024335861206.
-2026-09-02 15:44:10,299 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.6659786701202393.
-2026-09-02 15:44:13,495 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 3.1839447021484375.
-2026-09-02 15:44:17,632 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 4.1240270137786865.
-2026-09-02 15:44:20,941 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.305129051208496.
-2026-09-02 15:44:24,683 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.7383294105529785.
-2026-09-02 15:44:28,188 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.4982399940490723.
-2026-09-02 15:44:31,626 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.4329679012298584.
-2026-09-02 15:44:35,472 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.8395004272460938.
-2026-09-02 15:44:38,587 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.112229108810425.
-2026-09-02 15:44:42,094 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.5026774406433105.
-2026-09-02 15:44:45,241 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.142965316772461.
-2026-09-02 15:44:48,959 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.7133891582489014.
-2026-09-02 15:44:52,119 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.1557068824768066.
-2026-09-02 15:44:55,289 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 3.1627726554870605.
-2026-09-02 15:44:58,751 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.457540988922119.
-2026-09-02 15:45:01,912 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 3.1584129333496094.
-2026-09-02 15:45:05,382 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.4661898612976074.
-2026-09-02 15:45:09,107 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 3.7226579189300537.
-2026-09-02 15:45:13,140 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 4.02645468711853.
-2026-09-02 15:45:16,945 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.7991201877593994.
-2026-09-02 15:45:20,594 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 3.644200325012207.
-2026-09-02 15:45:24,726 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 4.126039981842041.
-2026-09-02 15:45:28,196 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 3.4644877910614014.
-2026-09-02 15:45:32,265 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 4.065635442733765.
-2026-09-02 15:45:35,945 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 3.673701047897339.
-2026-09-02 15:45:39,811 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 3.862236976623535.
-2026-09-02 15:45:43,612 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 3.797029733657837.
-2026-09-02 15:45:47,845 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 4.228808641433716.
-2026-09-02 15:45:51,292 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 3.4413466453552246.
-2026-09-02 15:45:54,768 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 3.4703452587127686.
-2026-09-02 15:45:58,618 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.8448803424835205.
-2026-09-02 15:46:02,235 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 3.609468936920166.
-2026-09-02 15:46:06,224 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.9850175380706787.
-2026-09-02 15:46:09,849 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.6220293045043945.
-2026-09-02 15:46:13,607 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.7534027099609375.
-2026-09-02 15:46:17,048 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 3.435392379760742.
-2026-09-02 15:46:20,750 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 3.6979665756225586.
-2026-09-02 15:46:24,178 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.4076011180877686.
-2026-09-02 15:46:27,888 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.705746650695801.
-2026-09-02 15:46:31,724 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.833049774169922.
-2026-09-02 15:46:35,451 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.722851514816284.
-2026-09-02 15:46:39,476 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 4.0213189125061035.
-2026-09-02 15:46:43,149 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 3.670313835144043.
-2026-09-02 15:46:46,607 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 3.4551658630371094.
-2026-09-02 15:46:50,065 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.454495429992676.
-2026-09-02 15:46:53,519 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 3.4503297805786133.
-2026-09-02 15:46:56,696 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.173365831375122.
-2026-09-02 15:47:00,109 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.409379482269287.
-2026-09-02 15:47:03,549 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.436629056930542.
-2026-09-02 15:47:06,697 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.1459009647369385.
-2026-09-02 15:47:10,405 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.705631732940674.
-2026-09-02 15:47:13,601 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 3.1913554668426514.
-2026-09-02 15:47:17,388 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.778510332107544.
-2026-09-02 15:47:20,555 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.1642796993255615.
-2026-09-02 15:47:23,935 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.3770408630371094.
-2026-09-02 15:47:27,654 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 3.714869737625122.
-2026-09-02 15:47:31,060 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.4019267559051514.
-2026-09-02 15:47:34,501 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.4337339401245117.
-2026-09-02 15:47:37,925 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 3.413386344909668.
-2026-09-02 15:47:41,617 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.687305450439453.
-2026-09-02 15:47:45,293 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.671072244644165.
-2026-09-02 15:47:48,450 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.1525540351867676.
-2026-09-02 15:47:52,054 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.5997867584228516.
-2026-09-02 15:47:55,803 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.7451460361480713.
-2026-09-02 15:47:59,270 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.4601426124572754.
-2026-09-02 15:48:02,997 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.7236838340759277.
-2026-09-02 15:48:06,543 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.5365569591522217.
-2026-09-02 15:48:09,710 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.162292957305908.
-2026-09-02 15:48:13,641 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.928016424179077.
-2026-09-02 15:48:17,414 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 3.7679543495178223.
-2026-09-02 15:48:21,523 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 4.10487699508667.
-2026-09-02 15:48:21,527 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 365.4668550491333
-2026-09-02 15:48:37,626 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
-2026-09-02 15:49:56,067 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
-2026-09-02 15:49:56,071 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 79.97668928627327, A = 0, alpha = 0.602
-2026-09-02 15:49:56,074 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
-2026-09-02 15:49:56,078 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
-2026-09-02 15:49:59,511 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 3.431408405303955.
-2026-09-02 15:50:02,420 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 2.9045541286468506.
-2026-09-02 15:50:05,283 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 2.8600571155548096.
-2026-09-02 15:50:08,751 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.4641010761260986.
-2026-09-02 15:50:11,902 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 3.1488258838653564.
-2026-09-02 15:50:15,437 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.526390314102173.
-2026-09-02 15:50:18,649 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 3.187415838241577.
-2026-09-02 15:50:22,126 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.472019910812378.
-2026-09-02 15:50:25,282 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.149487257003784.
-2026-09-02 15:50:28,815 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 3.5285561084747314.
-2026-09-02 15:50:31,979 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 3.159280776977539.
-2026-09-02 15:50:35,197 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 3.199007034301758.
-2026-09-02 15:50:38,593 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 3.393541097640991.
-2026-09-02 15:50:41,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 3.112194299697876.
-2026-09-02 15:50:45,134 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 3.4226505756378174.
-2026-09-02 15:50:48,214 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 3.0762743949890137.
-2026-09-02 15:50:51,571 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.352456569671631.
-2026-09-02 15:50:54,681 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 3.1064422130584717.
-2026-09-02 15:50:57,996 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.3114585876464844.
-2026-09-02 15:51:00,898 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 2.8910701274871826.
-2026-09-02 15:51:04,018 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 3.1053049564361572.
-2026-09-02 15:51:07,440 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.4182841777801514.
-2026-09-02 15:51:10,476 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 3.0335781574249268.
-2026-09-02 15:51:13,864 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.3838682174682617.
-2026-09-02 15:51:16,953 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 3.0850651264190674.
-2026-09-02 15:51:20,264 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.307337999343872.
-2026-09-02 15:51:23,372 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 3.103534698486328.
-2026-09-02 15:51:26,812 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.43727970123291.
-2026-09-02 15:51:29,927 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 3.1108944416046143.
-2026-09-02 15:51:33,085 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.150740146636963.
-2026-09-02 15:51:36,540 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 3.4264864921569824.
-2026-09-02 15:51:39,590 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.0460808277130127.
-2026-09-02 15:51:42,957 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.363562822341919.
-2026-09-02 15:51:46,007 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.045300245285034.
-2026-09-02 15:51:49,533 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.52217960357666.
-2026-09-02 15:51:52,634 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.0976805686950684.
-2026-09-02 15:51:55,984 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.3467814922332764.
-2026-09-02 15:51:59,051 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.0630905628204346.
-2026-09-02 15:52:02,112 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.05802845954895.
-2026-09-02 15:52:05,549 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.422152042388916.
-2026-09-02 15:52:08,581 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.0283942222595215.
-2026-09-02 15:52:12,021 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.434079647064209.
-2026-09-02 15:52:14,913 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 2.8889780044555664.
-2026-09-02 15:52:18,407 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.489380359649658.
-2026-09-02 15:52:21,639 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 3.225713014602661.
-2026-09-02 15:52:25,068 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.4254984855651855.
-2026-09-02 15:52:27,949 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 2.877178907394409.
-2026-09-02 15:52:31,001 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 3.046158790588379.
-2026-09-02 15:52:34,717 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.7046666145324707.
-2026-09-02 15:52:37,595 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 2.872241735458374.
-2026-09-02 15:52:40,990 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 3.3817646503448486.
-2026-09-02 15:52:44,093 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 3.100358486175537.
-2026-09-02 15:52:47,329 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.231858491897583.
-2026-09-02 15:52:50,362 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 3.0265278816223145.
-2026-09-02 15:52:53,510 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 3.144420862197876.
-2026-09-02 15:52:56,438 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 2.923804759979248.
-2026-09-02 15:52:59,090 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 2.6478476524353027.
-2026-09-02 15:53:02,454 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 3.3594696521759033.
-2026-09-02 15:53:05,525 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 3.0654196739196777.
-2026-09-02 15:53:08,932 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.4017038345336914.
-2026-09-02 15:53:12,076 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 3.137873411178589.
-2026-09-02 15:53:15,764 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.6803829669952393.
-2026-09-02 15:53:18,851 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.082545518875122.
-2026-09-02 15:53:22,179 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.324335813522339.
-2026-09-02 15:53:25,294 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 3.108290433883667.
-2026-09-02 15:53:28,238 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 2.939199209213257.
-2026-09-02 15:53:31,622 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.3786075115203857.
-2026-09-02 15:53:34,484 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 2.8578124046325684.
-2026-09-02 15:53:38,184 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.6978490352630615.
-2026-09-02 15:53:41,321 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.130565643310547.
-2026-09-02 15:53:45,058 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.7284514904022217.
-2026-09-02 15:53:48,128 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 3.064634323120117.
-2026-09-02 15:53:51,506 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 3.363882064819336.
-2026-09-02 15:53:54,703 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.174920082092285.
-2026-09-02 15:53:57,978 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 3.2658843994140625.
-2026-09-02 15:54:01,776 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.7907161712646484.
-2026-09-02 15:54:04,944 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.161217451095581.
-2026-09-02 15:54:08,402 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.4508118629455566.
-2026-09-02 15:54:11,610 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.1784443855285645.
-2026-09-02 15:54:15,212 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.594309091567993.
-2026-09-02 15:54:18,372 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 3.153102159500122.
-2026-09-02 15:54:21,699 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.319100856781006.
-2026-09-02 15:54:24,847 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.13712215423584.
-2026-09-02 15:54:27,954 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.1011173725128174.
-2026-09-02 15:54:31,374 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 3.4152462482452393.
-2026-09-02 15:54:34,420 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.0380921363830566.
-2026-09-02 15:54:37,738 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.311290740966797.
-2026-09-02 15:54:40,858 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 3.114250421524048.
-2026-09-02 15:54:43,718 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 2.854153871536255.
-2026-09-02 15:54:46,850 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.1202800273895264.
-2026-09-02 15:54:50,305 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.4479098320007324.
-2026-09-02 15:54:53,383 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.070723056793213.
-2026-09-02 15:54:56,505 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.1163432598114014.
-2026-09-02 15:54:59,866 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.354205846786499.
-2026-09-02 15:55:02,907 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.0356228351593018.
-2026-09-02 15:55:06,081 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.165689706802368.
-2026-09-02 15:55:09,185 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.0988032817840576.
-2026-09-02 15:55:12,543 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.3515639305114746.
-2026-09-02 15:55:15,629 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 3.0800094604492188.
-2026-09-02 15:55:19,228 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 3.591869831085205.
-2026-09-02 15:55:19,231 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 323.15061235427856
-2026-09-02 15:55:32,042 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
-2026-09-02 15:57:19,043 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
-2026-09-02 15:57:19,053 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 59.22711996345531, A = 0, alpha = 0.602
-2026-09-02 15:57:19,057 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
-2026-09-02 15:57:19,061 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
-2026-09-02 15:57:23,112 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 4.046472549438477.
-2026-09-02 15:57:27,342 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 4.228039026260376.
-2026-09-02 15:57:31,397 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 4.050792694091797.
-2026-09-02 15:57:35,819 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 4.410224914550781.
-2026-09-02 15:57:40,143 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 4.308509588241577.
-2026-09-02 15:57:44,280 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 4.130252361297607.
-2026-09-02 15:57:48,608 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 4.321784496307373.
-2026-09-02 15:57:52,666 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 4.055377721786499.
-2026-09-02 15:57:57,039 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 4.362462043762207.
-2026-09-02 15:58:01,125 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 4.078924894332886.
-2026-09-02 15:58:05,219 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 4.088502883911133.
-2026-09-02 15:58:09,573 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 4.3507239818573.
-2026-09-02 15:58:13,660 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 4.083679437637329.
-2026-09-02 15:58:18,237 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 4.57295560836792.
-2026-09-02 15:58:22,574 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 4.331726312637329.
-2026-09-02 15:58:27,346 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 4.765893220901489.
-2026-09-02 15:58:31,854 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 4.50248908996582.
-2026-09-02 15:58:36,467 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 4.6068785190582275.
-2026-09-02 15:58:40,553 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 4.079574346542358.
-2026-09-02 15:58:45,348 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 4.791939735412598.
-2026-09-02 15:58:50,729 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 5.375772953033447.
-2026-09-02 15:58:55,205 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 4.470012426376343.
-2026-09-02 15:59:00,465 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 5.252387285232544.
-2026-09-02 15:59:04,936 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 4.463578939437866.
-2026-09-02 15:59:09,767 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 4.826216697692871.
-2026-09-02 15:59:14,275 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 4.501793622970581.
-2026-09-02 15:59:19,071 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 4.79353404045105.
-2026-09-02 15:59:23,664 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 4.574053525924683.
-2026-09-02 15:59:28,384 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 4.710950136184692.
-2026-09-02 15:59:33,219 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 4.829971551895142.
-2026-09-02 15:59:37,591 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 4.364573955535889.
-2026-09-02 15:59:42,342 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 4.747551679611206.
-2026-09-02 15:59:46,432 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 4.083546161651611.
-2026-09-02 15:59:51,301 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 4.86336088180542.
-2026-09-02 15:59:55,527 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 4.217225790023804.
-2026-09-02 15:59:59,952 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 4.41848349571228.
-2026-09-02 16:00:04,431 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 4.473984479904175.
-2026-09-02 16:00:08,945 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 4.508148908615112.
-2026-09-02 16:00:14,346 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 5.393645763397217.
-2026-09-02 16:00:18,928 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 4.578614711761475.
-2026-09-02 16:00:24,081 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 5.150010108947754.
-2026-09-02 16:00:28,556 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 4.467601537704468.
-2026-09-02 16:00:33,041 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 4.482701301574707.
-2026-09-02 16:00:36,904 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.857260227203369.
-2026-09-02 16:00:41,252 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 4.342463970184326.
-2026-09-02 16:00:45,057 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.7977113723754883.
-2026-09-02 16:00:49,343 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 4.283777475357056.
-2026-09-02 16:00:53,916 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 4.565335273742676.
-2026-09-02 16:00:58,422 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 4.50005578994751.
-2026-09-02 16:01:03,346 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 4.916853904724121.
-2026-09-02 16:01:07,868 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 4.516101121902466.
-2026-09-02 16:01:12,889 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 5.014262676239014.
-2026-09-02 16:01:17,329 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 4.433944463729858.
-2026-09-02 16:01:22,119 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 4.784332036972046.
-2026-09-02 16:01:26,673 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 4.547423601150513.
-2026-09-02 16:01:31,070 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 4.393465757369995.
-2026-09-02 16:01:35,702 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 4.628540515899658.
-2026-09-02 16:01:40,300 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 4.591285467147827.
-2026-09-02 16:01:45,151 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 4.839252710342407.
-2026-09-02 16:01:49,657 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 4.499833106994629.
-2026-09-02 16:01:54,621 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 4.958721399307251.
-2026-09-02 16:01:59,114 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 4.489168405532837.
-2026-09-02 16:02:04,030 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 4.91250205039978.
-2026-09-02 16:02:08,497 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 4.464484930038452.
-2026-09-02 16:02:12,875 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 4.3670549392700195.
-2026-09-02 16:02:17,441 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 4.5621068477630615.
-2026-09-02 16:02:21,987 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 4.543420791625977.
-2026-09-02 16:02:26,812 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 4.819745302200317.
-2026-09-02 16:02:31,348 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 4.529761075973511.
-2026-09-02 16:02:36,062 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 4.710093259811401.
-2026-09-02 16:02:40,277 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 4.2084059715271.
-2026-09-02 16:02:45,097 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 4.81491756439209.
-2026-09-02 16:02:49,596 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 4.486492872238159.
-2026-09-02 16:02:53,933 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 4.306786298751831.
-2026-09-02 16:02:58,367 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 4.428158283233643.
-2026-09-02 16:03:02,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.976766347885132.
-2026-09-02 16:03:06,437 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 4.083830118179321.
-2026-09-02 16:03:10,198 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.755631446838379.
-2026-09-02 16:03:14,722 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 4.51189112663269.
-2026-09-02 16:03:18,425 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.7001256942749023.
-2026-09-02 16:03:22,635 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 4.205822706222534.
-2026-09-02 16:03:26,885 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 4.245692253112793.
-2026-09-02 16:03:30,596 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.7074506282806396.
-2026-09-02 16:03:34,855 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 4.256052255630493.
-2026-09-02 16:03:39,206 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 4.347801685333252.
-2026-09-02 16:03:43,261 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 4.047101974487305.
-2026-09-02 16:03:47,294 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 4.032067060470581.
-2026-09-02 16:03:51,638 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 4.338964223861694.
-2026-09-02 16:03:55,702 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 4.057890892028809.
-2026-09-02 16:04:00,415 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 4.7041335105896.
-2026-09-02 16:04:04,680 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 4.261675834655762.
-2026-09-02 16:04:08,631 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.9448227882385254.
-2026-09-02 16:04:12,841 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 4.203957557678223.
-2026-09-02 16:04:16,871 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 4.027480840682983.
-2026-09-02 16:04:21,501 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 4.626317977905273.
-2026-09-02 16:04:25,233 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.7221412658691406.
-2026-09-02 16:04:29,697 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 4.454675197601318.
-2026-09-02 16:04:34,150 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 4.442389965057373.
-2026-09-02 16:04:38,794 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 4.640345573425293.
-2026-09-02 16:04:43,347 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 4.5486979484558105.
-2026-09-02 16:04:43,349 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 444.2842037677765
-2026-09-02 16:05:38,166 | INFO | astra_trade.pipeline | [2m2026-09-02T16:05:38.166609Z[0m [[32m[1minfo     [0m] [1mregime_submodels_done         [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mskipped[0m=[35m{}[0m [36mtrained[0m=[35m{'sideways': {'n_rows': 24857, 'train_accuracy': 0.7155906853464596, 'train_precision': 0.7161735962494586, 'train_recall': 0.7155906853464596, 'train_f1': 0.7157538008574225, 'best_iteration': 48, 'val_accuracy': 0.5475998927326361, 'val_precision': 0.5469808315955829, 'val_recall': 0.5475998927326361, 'val_f1': 0.5469642314520676}, 'high_volatility': {'n_rows': 10767, 'train_accuracy': 0.7484427931373621, 'train_precision': 0.7486355270000453, 'train_recall': 0.7484427931373621, 'train_f1': 0.7484461636280972, 'best_iteration': 26, 'val_accuracy': 0.5173267326732673, 'val_precision': 0.5220928860243775, 'val_recall': 0.5173267326732673, 'val_f1': 0.5168386931899858}, 'bear_trend': {'n_rows': 1546, 'train_accuracy': 0.9550989345509894, 'train_precision': 0.955313312357348, 'train_recall': 0.9550989345509894, 'train_f1': 0.9551599058251572, 'best_iteration': 39, 'val_accuracy': 0.6508620689655172, 'val_precision': 0.646829171621086, 'val_recall': 0.6508620689655172, 'val_f1': 0.6473649400234496}}[0m
-2026-09-02 16:05:38,170 | INFO | astra_trade.pipeline | [2m2026-09-02T16:05:38.170175Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_done           [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mmodel_training[0m
-2026-09-02 16:05:38,172 | INFO | astra_trade.pipeline | [2m2026-09-02T16:05:38.172016Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_starting       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mbacktest_validation[0m
-2026-09-02 16:17:26,350 | INFO | astra_trade.pipeline | [2m2026-09-02T16:17:26.350452Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_done           [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mbacktest_validation[0m
-2026-09-02 16:17:26,354 | INFO | astra_trade.pipeline | [2m2026-09-02T16:17:26.354450Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_starting       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mstage[0m=[35mcapital_allocation[0m
-2026-09-02 16:17:26,675 | INFO | astra_trade.pipeline | [2m2026-09-02T16:17:26.675109Z[0m [[32m[1minfo     [0m] [1mpipeline_stage_done           [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mresult[0m=[35m{'allocations': [], 'excluded': {'RELIANCE': 'non-positive expectancy (-0.00214) after costs', 'TCS': 'non-positive expectancy (-0.00201) after costs', 'INFY': 'non-positive expectancy (-0.00257) after costs', 'HDFCBANK': 'non-positive expectancy (-0.00211) after costs', 'ICICIBANK': 'non-positive expectancy (-0.00206) after costs', 'SBIN': 'non-positive expectancy (-0.00222) after costs', 'BHARTIARTL': 'non-positive expectancy (-0.00205) after costs', 'ITC': 'non-positive expectancy (-0.00206) after costs', 'FEDERALBNK': 'non-positive expectancy (-0.00203) after costs', 'IDFCFIRSTB': 'non-positive expectancy (-0.00209) after costs', 'PNB': 'non-positive expectancy (-0.00212) after costs', 'BANKBARODA': 'non-positive expectancy (-0.00222) after costs', 'TATAPOWER': 'non-positive expectancy (-0.00206) after costs', 'PETRONET': 'non-positive expectancy (-0.00210) after costs', 'VOLTAS': 'non-positive expectancy (-0.00218) after costs', 'ASHOKLEY': 'non-positive expectancy (-0.00226) after costs', 'CANBK': 'non-positive expectancy (-0.00234) after costs', 'APOLLOTYRE': 'non-positive expectancy (-0.00237) after costs'}}[0m [36mstage[0m=[35mcapital_allocation[0m
-2026-09-02 16:17:26,895 | INFO | astra_trade | [2m2026-09-02T16:17:26.894983Z[0m [[32m[1minfo     [0m] [1mtraining_pipeline_complete    [0m [[0m[1m[34mastra_trade[0m][0m [36msummary[0m=[35m{'data_ingestion': '20 symbols ingested', 'used_synthetic_data': 'False', 'feature_engineering': '20 symbols featured', 'classical_training': "{'lstm': {'status': 'trained', 'history': {'train_loss': [0.6932830479409959, 0.6869939679486884, 0.6807035612356331, 0.6696531524260839, 0.6550625226356916, 0.6408964641806152, 0.6270159322561489, 0.", 'quantum_optimization': "{'lstm': {'status': 'trained', 'history': {'train_loss': [0.6932830479409959, 0.6869939679486884, 0.6807035612356331, 0.6696531524260839, 0.6550625226356916, 0.6408964641806152, 0.6270159322561489, 0.", 'ensemble_optimization': "{'lstm': {'status': 'trained', 'history': {'train_loss': [0.6932830479409959, 0.6869939679486884, 0.6807035612356331, 0.6696531524260839, 0.6550625226356916, 0.6408964641806152, 0.6270159322561489, 0.", 'backtest_validation': "{'RELIANCE': {'sharpe_ratio': -22.616810083790497, 'max_drawdown_pct': -0.5647497025738591, 'max_dd_peak_date': '0', 'max_dd_trough_date': '387', 'profit_factor': np.float64(0.03438398030408014), 'win", 'walk_forward_validation': 'SKIPPED: training.validation.walk_forward_enabled is false (costly - see config.yaml)', 'capital_allocation': "{'allocations': [], 'excluded': {'RELIANCE': 'non-positive expectancy (-0.00214) after costs', 'TCS': 'non-positive expectancy (-0.00201) after costs', 'INFY': 'non-positive expectancy (-0.00257) afte", 'model_deployment': 'b9c62ce33ca8'}[0m
+2026-09-02 13:03:15,540 | INFO | astra_trade.kite_auth | [2m2026-09-02T13:03:15.539944Z[0m [[32m[1minfo     [0m] [1mkite_login_step1              [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
+2026-09-02 13:03:15,809 | INFO | astra_trade.kite_auth | [2m2026-09-02T13:03:15.809718Z[0m [[32m[1minfo     [0m] [1mkite_login_step2_twofa        [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
+2026-09-02 13:03:16,059 | INFO | astra_trade.kite_auth | [2m2026-09-02T13:03:16.059407Z[0m [[32m[1minfo     [0m] [1mkite_login_step3_request_token[0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
+2026-09-02 13:03:16,883 | INFO | astra_trade.kite_auth | [2m2026-09-02T13:03:16.883434Z[0m [[32m[1minfo     [0m] [1mkite_login_success            [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
+2026-09-02 13:03:16,888 | INFO | astra_trade | [2m2026-09-02T13:03:16.888054Z[0m [[32m[1minfo     [0m] [1mkite_session_ready_for_swing_walk_forward[0m [[0m[1m[34mastra_trade[0m][0m
+2026-09-02 13:03:17,078 | INFO | astra_trade | [2m2026-09-02T13:03:17.078743Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_started    [0m [[0m[1m[34mastra_trade[0m][0m [36msymbols[0m=[35m['INFY', 'PNB', 'BANKBARODA', 'TATAPOWER', 'CANBK', 'ITC'][0m
+2026-09-02 13:03:17,081 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:17.081261Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m1/6[0m [36msymbol[0m=[35mINFY[0m
+2026-09-02 13:03:18,656 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:18.656154Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mINFY[0m
+2026-09-02 13:03:18,661 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:18.661623Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m2/6[0m [36msymbol[0m=[35mPNB[0m
+2026-09-02 13:03:20,146 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:20.146188Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mPNB[0m
+2026-09-02 13:03:20,149 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:20.149572Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m3/6[0m [36msymbol[0m=[35mBANKBARODA[0m
+2026-09-02 13:03:20,877 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:20.877050Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mBANKBARODA[0m
+2026-09-02 13:03:20,879 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:20.879641Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m4/6[0m [36msymbol[0m=[35mTATAPOWER[0m
+2026-09-02 13:03:21,851 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:21.851179Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mTATAPOWER[0m
+2026-09-02 13:03:22,452 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:22.452406Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m5/6[0m [36msymbol[0m=[35mCANBK[0m
+2026-09-02 13:03:23,277 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:23.277837Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mCANBK[0m
+2026-09-02 13:03:23,280 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:23.280229Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m6/6[0m [36msymbol[0m=[35mITC[0m
+2026-09-02 13:03:24,119 | INFO | astra_trade.pipeline | [2m2026-09-02T13:03:24.119591Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mITC[0m
+2026-09-02 13:03:24,126 | INFO | astra_trade | [2m2026-09-02T13:03:24.125884Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_done     [0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m6[0m
+2026-09-02 13:03:24,483 | INFO | astra_trade | [2m2026-09-02T13:03:24.483618Z[0m [[32m[1minfo     [0m] [1mswing_feature_engineering_done[0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m6[0m
+2026-09-02 13:30:49,568 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 13:32:23,784 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 13:32:23,788 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 26.29564260931808, A = 0, alpha = 0.602
+2026-09-02 13:32:23,794 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 13:32:23,796 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 13:32:27,833 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 4.035937070846558.
+2026-09-02 13:32:31,518 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 3.682011365890503.
+2026-09-02 13:32:34,925 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.40067720413208.
+2026-09-02 13:32:38,856 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.9271557331085205.
+2026-09-02 13:32:42,606 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 3.745699405670166.
+2026-09-02 13:32:46,604 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.980497360229492.
+2026-09-02 13:32:50,378 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 3.757775068283081.
+2026-09-02 13:32:53,890 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.5069148540496826.
+2026-09-02 13:32:57,464 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.569439172744751.
+2026-09-02 13:33:01,520 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 4.0522215366363525.
+2026-09-02 13:33:05,331 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 3.800373077392578.
+2026-09-02 13:33:09,080 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 3.7406458854675293.
+2026-09-02 13:33:13,190 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 4.105461597442627.
+2026-09-02 13:33:16,923 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 3.72880220413208.
+2026-09-02 13:33:20,970 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 4.039272785186768.
+2026-09-02 13:33:24,683 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 3.707594633102417.
+2026-09-02 13:33:28,600 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.913731813430786.
+2026-09-02 13:33:32,442 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 3.7933340072631836.
+2026-09-02 13:33:36,431 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.9841673374176025.
+2026-09-02 13:33:40,049 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.613633871078491.
+2026-09-02 13:33:43,235 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 3.17179536819458.
+2026-09-02 13:33:46,691 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.4463701248168945.
+2026-09-02 13:33:50,082 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 3.3869118690490723.
+2026-09-02 13:33:53,677 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.5911641120910645.
+2026-09-02 13:33:57,143 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 3.4619193077087402.
+2026-09-02 13:34:01,205 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 4.055917978286743.
+2026-09-02 13:34:04,979 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 3.7389490604400635.
+2026-09-02 13:34:08,928 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.9433658123016357.
+2026-09-02 13:34:12,795 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 3.8617563247680664.
+2026-09-02 13:34:16,527 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.7256019115448.
+2026-09-02 13:34:20,540 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 4.009130954742432.
+2026-09-02 13:34:23,787 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.2252509593963623.
+2026-09-02 13:34:27,261 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.47023606300354.
+2026-09-02 13:34:30,403 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.137171745300293.
+2026-09-02 13:34:33,869 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.437645435333252.
+2026-09-02 13:34:37,291 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.4180748462677.
+2026-09-02 13:34:40,795 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.499161958694458.
+2026-09-02 13:34:44,231 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.432117223739624.
+2026-09-02 13:34:47,402 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.1663060188293457.
+2026-09-02 13:34:50,914 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.48883318901062.
+2026-09-02 13:34:54,355 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.4308972358703613.
+2026-09-02 13:34:57,842 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.481241464614868.
+2026-09-02 13:35:01,573 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 3.726262331008911.
+2026-09-02 13:35:05,292 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.714500904083252.
+2026-09-02 13:35:09,019 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 3.723498582839966.
+2026-09-02 13:35:12,693 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.6689722537994385.
+2026-09-02 13:35:16,141 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 3.444605588912964.
+2026-09-02 13:35:19,520 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 3.374368667602539.
+2026-09-02 13:35:23,284 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.759561538696289.
+2026-09-02 13:35:27,017 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 3.7284491062164307.
+2026-09-02 13:35:30,762 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 3.73376202583313.
+2026-09-02 13:35:33,934 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 3.165360927581787.
+2026-09-02 13:35:37,868 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.930037021636963.
+2026-09-02 13:35:41,027 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 3.1519386768341064.
+2026-09-02 13:35:44,480 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 3.443223714828491.
+2026-09-02 13:35:48,112 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 3.627232074737549.
+2026-09-02 13:35:52,088 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 3.95953106880188.
+2026-09-02 13:35:55,869 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 3.7338907718658447.
+2026-09-02 13:35:59,526 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 3.653221607208252.
+2026-09-02 13:36:03,470 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.9392781257629395.
+2026-09-02 13:36:07,207 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 3.7321159839630127.
+2026-09-02 13:36:11,273 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.9972896575927734.
+2026-09-02 13:36:15,000 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.7209761142730713.
+2026-09-02 13:36:18,907 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.867588758468628.
+2026-09-02 13:36:22,504 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 3.544638156890869.
+2026-09-02 13:36:26,192 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 3.6521100997924805.
+2026-09-02 13:36:30,027 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.8310697078704834.
+2026-09-02 13:36:33,811 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.7711193561553955.
+2026-09-02 13:36:37,612 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.775963306427002.
+2026-09-02 13:36:41,305 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.6710619926452637.
+2026-09-02 13:36:45,031 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.6863133907318115.
+2026-09-02 13:36:48,585 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 3.5468764305114746.
+2026-09-02 13:36:52,672 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 4.081841468811035.
+2026-09-02 13:36:56,403 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.72483229637146.
+2026-09-02 13:37:00,561 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 4.02950119972229.
+2026-09-02 13:37:03,929 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.3624067306518555.
+2026-09-02 13:37:07,404 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.435568332672119.
+2026-09-02 13:37:11,421 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.976804733276367.
+2026-09-02 13:37:15,229 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.796005964279175.
+2026-09-02 13:37:19,287 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 4.027829885482788.
+2026-09-02 13:37:23,063 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 3.772425413131714.
+2026-09-02 13:37:26,959 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.8901283740997314.
+2026-09-02 13:37:30,683 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.7184834480285645.
+2026-09-02 13:37:34,662 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.975388765335083.
+2026-09-02 13:37:37,895 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 3.2285094261169434.
+2026-09-02 13:37:41,524 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.62576961517334.
+2026-09-02 13:37:45,231 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.678269624710083.
+2026-09-02 13:37:48,427 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 3.169182300567627.
+2026-09-02 13:37:51,877 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.445892333984375.
+2026-09-02 13:37:55,053 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.1715338230133057.
+2026-09-02 13:37:58,707 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.6503567695617676.
+2026-09-02 13:38:02,395 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.670227289199829.
+2026-09-02 13:38:06,177 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.7776236534118652.
+2026-09-02 13:38:09,953 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.769751787185669.
+2026-09-02 13:38:13,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.751760959625244.
+2026-09-02 13:38:17,533 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.805619239807129.
+2026-09-02 13:38:21,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.8137216567993164.
+2026-09-02 13:38:25,447 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 4.091599464416504.
+2026-09-02 13:38:29,416 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 3.9631543159484863.
+2026-09-02 13:38:33,466 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 4.037867784500122.
+2026-09-02 13:38:33,470 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 369.67242193222046
+2026-09-02 13:38:37,901 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 13:39:55,684 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 13:39:55,689 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 53.16447473409862, A = 0, alpha = 0.602
+2026-09-02 13:39:55,690 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 13:39:55,692 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 13:39:59,138 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 3.4441657066345215.
+2026-09-02 13:40:02,219 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 3.0758469104766846.
+2026-09-02 13:40:05,550 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.3242948055267334.
+2026-09-02 13:40:08,593 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.0391504764556885.
+2026-09-02 13:40:11,501 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 2.9046525955200195.
+2026-09-02 13:40:14,477 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 2.943098783493042.
+2026-09-02 13:40:17,576 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 3.0923545360565186.
+2026-09-02 13:40:21,138 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.553138256072998.
+2026-09-02 13:40:24,264 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.123613119125366.
+2026-09-02 13:40:27,926 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 3.637439250946045.
+2026-09-02 13:40:31,175 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 3.2405765056610107.
+2026-09-02 13:40:34,563 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 3.3823609352111816.
+2026-09-02 13:40:37,515 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 2.946861743927002.
+2026-09-02 13:40:41,248 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 3.7148995399475098.
+2026-09-02 13:40:44,383 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 3.1281347274780273.
+2026-09-02 13:40:47,475 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 3.081770658493042.
+2026-09-02 13:40:50,816 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.335839033126831.
+2026-09-02 13:40:53,913 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 3.0854499340057373.
+2026-09-02 13:40:57,330 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.4081385135650635.
+2026-09-02 13:41:00,529 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.195307970046997.
+2026-09-02 13:41:04,145 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 3.611741304397583.
+2026-09-02 13:41:07,261 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.111826181411743.
+2026-09-02 13:41:10,672 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 3.406592845916748.
+2026-09-02 13:41:13,815 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.1381659507751465.
+2026-09-02 13:41:16,923 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 3.0999791622161865.
+2026-09-02 13:41:20,280 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.353663682937622.
+2026-09-02 13:41:25,094 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 3.1080517768859863.
+2026-09-02 13:41:28,375 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.275245189666748.
+2026-09-02 13:41:31,412 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 3.028780937194824.
+2026-09-02 13:41:34,893 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.3928351402282715.
+2026-09-02 13:41:37,822 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 2.9200398921966553.
+2026-09-02 13:41:41,317 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.4769399166107178.
+2026-09-02 13:41:44,655 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.310917854309082.
+2026-09-02 13:41:47,852 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.1920013427734375.
+2026-09-02 13:41:51,601 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.743990182876587.
+2026-09-02 13:41:54,754 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.1108498573303223.
+2026-09-02 13:41:58,140 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.37674617767334.
+2026-09-02 13:42:01,189 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.0441477298736572.
+2026-09-02 13:42:04,467 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.272613048553467.
+2026-09-02 13:42:07,555 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.084439277648926.
+2026-09-02 13:42:10,984 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.4242360591888428.
+2026-09-02 13:42:13,913 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 2.913661479949951.
+2026-09-02 13:42:17,168 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 3.222710609436035.
+2026-09-02 13:42:20,605 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.431372880935669.
+2026-09-02 13:42:23,704 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 3.077889919281006.
+2026-09-02 13:42:27,215 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.4901959896087646.
+2026-09-02 13:42:30,308 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 3.08416748046875.
+2026-09-02 13:42:33,687 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 3.3638792037963867.
+2026-09-02 13:42:36,796 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.1050899028778076.
+2026-09-02 13:42:39,775 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 2.9528231620788574.
+2026-09-02 13:42:42,643 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 2.864206075668335.
+2026-09-02 13:42:45,500 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 2.852191209793091.
+2026-09-02 13:42:48,646 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.1225478649139404.
+2026-09-02 13:42:51,324 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 2.6742172241210938.
+2026-09-02 13:42:54,706 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 3.3774588108062744.
+2026-09-02 13:42:57,676 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 2.9504992961883545.
+2026-09-02 13:43:01,003 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 3.322885751724243.
+2026-09-02 13:43:04,105 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 3.063305377960205.
+2026-09-02 13:43:07,027 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 2.9041407108306885.
+2026-09-02 13:43:09,857 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 2.8233957290649414.
+2026-09-02 13:43:12,693 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 2.8325493335723877.
+2026-09-02 13:43:15,850 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.1521553993225098.
+2026-09-02 13:43:18,971 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.1175944805145264.
+2026-09-02 13:43:22,097 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.112457275390625.
+2026-09-02 13:43:25,047 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 2.9017045497894287.
+2026-09-02 13:43:28,381 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 3.3294689655303955.
+2026-09-02 13:43:31,452 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.0668857097625732.
+2026-09-02 13:43:34,799 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.343017816543579.
+2026-09-02 13:43:37,886 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.0617847442626953.
+2026-09-02 13:43:40,963 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.0355398654937744.
+2026-09-02 13:43:44,260 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.292071580886841.
+2026-09-02 13:43:47,309 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 3.0451467037200928.
+2026-09-02 13:43:50,748 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 3.409083366394043.
+2026-09-02 13:43:53,851 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.0920767784118652.
+2026-09-02 13:43:57,216 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 3.344874620437622.
+2026-09-02 13:44:00,304 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.0692570209503174.
+2026-09-02 13:44:03,671 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.3266842365264893.
+2026-09-02 13:44:06,744 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.0684916973114014.
+2026-09-02 13:44:09,744 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 2.9950032234191895.
+2026-09-02 13:44:13,163 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.413969039916992.
+2026-09-02 13:44:16,277 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 3.1076343059539795.
+2026-09-02 13:44:19,645 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.364637613296509.
+2026-09-02 13:44:22,657 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.005704879760742.
+2026-09-02 13:44:25,916 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.2558813095092773.
+2026-09-02 13:44:28,794 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 2.866826057434082.
+2026-09-02 13:44:32,114 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.3130574226379395.
+2026-09-02 13:44:35,232 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.10597825050354.
+2026-09-02 13:44:38,278 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 3.042710065841675.
+2026-09-02 13:44:41,532 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.2495486736297607.
+2026-09-02 13:44:44,613 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.0756726264953613.
+2026-09-02 13:44:47,745 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.1216816902160645.
+2026-09-02 13:44:50,852 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.1029443740844727.
+2026-09-02 13:44:54,330 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.474231243133545.
+2026-09-02 13:44:57,397 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.063009262084961.
+2026-09-02 13:45:00,589 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.1705315113067627.
+2026-09-02 13:45:03,251 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 2.6537153720855713.
+2026-09-02 13:45:06,360 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.1044678688049316.
+2026-09-02 13:45:09,632 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.266223430633545.
+2026-09-02 13:45:12,264 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 2.6260361671447754.
+2026-09-02 13:45:15,152 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 2.8802430629730225.
+2026-09-02 13:45:15,158 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 319.4633960723877
+2026-09-02 13:45:18,466 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 13:47:10,626 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 13:47:10,632 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 30.472016801088056, A = 0, alpha = 0.602
+2026-09-02 13:47:10,634 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 13:47:10,636 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 13:47:15,386 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 4.7475361824035645.
+2026-09-02 13:47:19,780 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 4.389257431030273.
+2026-09-02 13:47:24,483 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 4.696868181228638.
+2026-09-02 13:47:28,792 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 4.305304765701294.
+2026-09-02 13:47:33,389 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 4.591778993606567.
+2026-09-02 13:47:37,747 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 4.348199129104614.
+2026-09-02 13:47:42,070 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 4.320049285888672.
+2026-09-02 13:47:46,123 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 4.044919967651367.
+2026-09-02 13:47:50,126 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.994415044784546.
+2026-09-02 13:47:54,972 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 4.842097043991089.
+2026-09-02 13:47:59,263 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 4.281734943389893.
+2026-09-02 13:48:04,074 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 4.8075079917907715.
+2026-09-02 13:48:08,498 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 4.41957426071167.
+2026-09-02 13:48:13,186 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 4.6851747035980225.
+2026-09-02 13:48:17,786 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 4.593308925628662.
+2026-09-02 13:48:22,426 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 4.636054515838623.
+2026-09-02 13:48:26,970 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 4.539324998855591.
+2026-09-02 13:48:31,384 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 4.409837245941162.
+2026-09-02 13:48:36,099 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 4.710853338241577.
+2026-09-02 13:48:40,167 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 4.036928653717041.
+2026-09-02 13:48:44,907 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 4.7355499267578125.
+2026-09-02 13:48:49,389 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 4.453790903091431.
+2026-09-02 13:48:53,804 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 4.409447193145752.
+2026-09-02 13:48:58,285 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 4.4440085887908936.
+2026-09-02 13:49:02,985 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 4.696707487106323.
+2026-09-02 13:49:07,241 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 4.252808094024658.
+2026-09-02 13:49:11,637 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 4.390501260757446.
+2026-09-02 13:49:16,341 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 4.700187683105469.
+2026-09-02 13:49:20,447 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 4.101778507232666.
+2026-09-02 13:49:24,682 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 4.231125354766846.
+2026-09-02 13:49:28,811 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 4.125400066375732.
+2026-09-02 13:49:33,622 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 4.7961180210113525.
+2026-09-02 13:49:38,116 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 4.489762306213379.
+2026-09-02 13:49:42,717 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 4.5826616287231445.
+2026-09-02 13:49:47,055 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 4.326753377914429.
+2026-09-02 13:49:51,110 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 4.051332473754883.
+2026-09-02 13:49:56,020 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 4.836487531661987.
+2026-09-02 13:50:00,440 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 4.413946151733398.
+2026-09-02 13:50:05,059 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 4.61529278755188.
+2026-09-02 13:50:09,026 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.890479803085327.
+2026-09-02 13:50:13,717 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 4.686599016189575.
+2026-09-02 13:50:18,277 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 4.5508198738098145.
+2026-09-02 13:50:22,918 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 4.636560440063477.
+2026-09-02 13:50:26,788 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.853790283203125.
+2026-09-02 13:50:31,112 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 4.3191916942596436.
+2026-09-02 13:50:35,985 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 4.86004900932312.
+2026-09-02 13:50:40,592 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 4.60141658782959.
+2026-09-02 13:50:45,663 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 5.063490152359009.
+2026-09-02 13:50:50,105 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 4.437265157699585.
+2026-09-02 13:50:54,791 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 4.655436754226685.
+2026-09-02 13:50:58,943 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 4.146945476531982.
+2026-09-02 13:51:03,662 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 4.7151007652282715.
+2026-09-02 13:51:08,108 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 4.441632509231567.
+2026-09-02 13:51:12,291 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 4.132693529129028.
+2026-09-02 13:51:17,159 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 4.859301567077637.
+2026-09-02 13:51:21,871 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 4.610846519470215.
+2026-09-02 13:51:26,624 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 4.740458250045776.
+2026-09-02 13:51:31,002 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 4.3441245555877686.
+2026-09-02 13:51:35,177 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 4.143528699874878.
+2026-09-02 13:51:39,732 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 4.551267385482788.
+2026-09-02 13:51:44,512 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 4.748236894607544.
+2026-09-02 13:51:48,856 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 4.328524112701416.
+2026-09-02 13:51:53,363 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 4.502791166305542.
+2026-09-02 13:51:57,456 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 4.089861631393433.
+2026-09-02 13:52:01,996 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 4.454540491104126.
+2026-09-02 13:52:06,909 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 4.908169746398926.
+2026-09-02 13:52:11,057 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 4.128643274307251.
+2026-09-02 13:52:15,114 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 4.052399158477783.
+2026-09-02 13:52:19,384 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 4.259350776672363.
+2026-09-02 13:52:24,077 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 4.685633182525635.
+2026-09-02 13:52:28,464 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 4.3826727867126465.
+2026-09-02 13:52:32,854 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 4.370313882827759.
+2026-09-02 13:52:36,907 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 4.047948837280273.
+2026-09-02 13:52:40,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.7826104164123535.
+2026-09-02 13:52:45,150 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 4.424832582473755.
+2026-09-02 13:52:49,624 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 4.46800684928894.
+2026-09-02 13:52:54,432 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 4.803382635116577.
+2026-09-02 13:52:58,924 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 4.444721698760986.
+2026-09-02 13:53:03,684 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 4.7522125244140625.
+2026-09-02 13:53:08,127 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 4.437769651412964.
+2026-09-02 13:53:12,661 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 4.530100584030151.
+2026-09-02 13:53:17,397 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 4.729000568389893.
+2026-09-02 13:53:21,808 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 4.37583589553833.
+2026-09-02 13:53:26,365 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 4.531239748001099.
+2026-09-02 13:53:30,474 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 4.102489233016968.
+2026-09-02 13:53:34,836 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 4.356919050216675.
+2026-09-02 13:53:38,917 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 4.071733474731445.
+2026-09-02 13:53:43,311 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 4.3123619556427.
+2026-09-02 13:53:47,788 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 4.429852724075317.
+2026-09-02 13:53:53,094 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 4.143859386444092.
+2026-09-02 13:53:57,466 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 4.367942810058594.
+2026-09-02 13:54:01,824 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 4.353403568267822.
+2026-09-02 13:54:06,467 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 4.630233526229858.
+2026-09-02 13:54:10,892 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 4.41759467124939.
+2026-09-02 13:54:15,691 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 4.75435209274292.
+2026-09-02 13:54:19,520 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.821547269821167.
+2026-09-02 13:54:23,990 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 4.441559553146362.
+2026-09-02 13:54:28,434 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 4.43932032585144.
+2026-09-02 13:54:32,754 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 4.315289497375488.
+2026-09-02 13:54:36,871 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 4.107319593429565.
+2026-09-02 13:54:36,877 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 446.2389905452728
+2026-09-02 14:42:02,647 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 14:43:36,263 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 14:43:36,269 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 55.29868842767531, A = 0, alpha = 0.602
+2026-09-02 14:43:36,272 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 14:43:36,275 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 14:43:40,007 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 3.7285149097442627.
+2026-09-02 14:43:44,157 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 4.118618726730347.
+2026-09-02 14:43:47,890 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.7258083820343018.
+2026-09-02 14:43:51,965 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 4.070093393325806.
+2026-09-02 14:43:55,730 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 3.760420560836792.
+2026-09-02 14:43:59,518 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.7631702423095703.
+2026-09-02 14:44:03,566 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 4.032081127166748.
+2026-09-02 14:44:07,356 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.7827467918395996.
+2026-09-02 14:44:11,432 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 4.0719733238220215.
+2026-09-02 14:44:14,931 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 3.4950997829437256.
+2026-09-02 14:44:18,960 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 4.024980545043945.
+2026-09-02 14:44:22,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 3.7433111667633057.
+2026-09-02 14:44:26,727 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 3.9698076248168945.
+2026-09-02 14:44:30,473 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 3.7398664951324463.
+2026-09-02 14:44:34,170 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 3.6938424110412598.
+2026-09-02 14:44:38,257 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 4.082568645477295.
+2026-09-02 14:44:42,048 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.7828924655914307.
+2026-09-02 14:44:46,146 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 4.095086097717285.
+2026-09-02 14:44:49,856 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.7065608501434326.
+2026-09-02 14:44:53,794 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.934534788131714.
+2026-09-02 14:44:57,593 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 3.794278860092163.
+2026-09-02 14:45:01,606 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 4.008991241455078.
+2026-09-02 14:45:05,572 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 3.948594093322754.
+2026-09-02 14:45:09,301 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.722553253173828.
+2026-09-02 14:45:13,331 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 4.007138729095459.
+2026-09-02 14:45:16,995 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.6601991653442383.
+2026-09-02 14:45:21,020 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 4.019562244415283.
+2026-09-02 14:45:24,832 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.8042824268341064.
+2026-09-02 14:45:28,934 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 4.099640130996704.
+2026-09-02 14:45:32,662 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.723848581314087.
+2026-09-02 14:45:36,945 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 4.2786781787872314.
+2026-09-02 14:45:40,497 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.5471198558807373.
+2026-09-02 14:45:44,275 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.744584083557129.
+2026-09-02 14:45:48,156 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.875319480895996.
+2026-09-02 14:45:51,765 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.60134220123291.
+2026-09-02 14:45:55,584 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.8141231536865234.
+2026-09-02 14:45:59,024 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.435492992401123.
+2026-09-02 14:46:02,472 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.4372026920318604.
+2026-09-02 14:46:06,273 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.794602155685425.
+2026-09-02 14:46:10,378 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 4.100217580795288.
+2026-09-02 14:46:14,120 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.737185001373291.
+2026-09-02 14:46:17,853 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.718830108642578.
+2026-09-02 14:46:21,865 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 3.990330696105957.
+2026-09-02 14:46:25,551 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.681919574737549.
+2026-09-02 14:46:29,767 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 4.209722995758057.
+2026-09-02 14:46:33,555 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.7840356826782227.
+2026-09-02 14:46:37,693 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 4.13371729850769.
+2026-09-02 14:46:41,347 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 3.6496596336364746.
+2026-09-02 14:46:45,039 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.685941219329834.
+2026-09-02 14:46:48,838 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 3.794400930404663.
+2026-09-02 14:46:52,529 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 3.6860971450805664.
+2026-09-02 14:46:56,612 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 4.079392671585083.
+2026-09-02 14:47:00,451 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.815704822540283.
+2026-09-02 14:47:04,535 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 4.076796770095825.
+2026-09-02 14:47:08,432 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 3.890322685241699.
+2026-09-02 14:47:12,771 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 4.334089517593384.
+2026-09-02 14:47:16,931 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 4.1523332595825195.
+2026-09-02 14:47:20,953 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 4.016665935516357.
+2026-09-02 14:47:24,526 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 3.570272207260132.
+2026-09-02 14:47:28,305 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.77118182182312.
+2026-09-02 14:47:32,400 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 4.068909645080566.
+2026-09-02 14:47:36,265 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.8356106281280518.
+2026-09-02 14:47:40,272 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.9993512630462646.
+2026-09-02 14:47:44,005 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.7282047271728516.
+2026-09-02 14:47:47,720 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 3.6942734718322754.
+2026-09-02 14:47:51,120 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 3.3936071395874023.
+2026-09-02 14:47:54,918 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.7930357456207275.
+2026-09-02 14:47:58,475 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.5504932403564453.
+2026-09-02 14:48:02,256 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.7780556678771973.
+2026-09-02 14:48:06,395 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 4.135932445526123.
+2026-09-02 14:48:10,111 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.710052490234375.
+2026-09-02 14:48:14,213 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 4.0890350341796875.
+2026-09-02 14:48:18,046 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 3.8218700885772705.
+2026-09-02 14:48:22,308 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 4.249783992767334.
+2026-09-02 14:48:26,184 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 3.853013753890991.
+2026-09-02 14:48:30,176 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.986765146255493.
+2026-09-02 14:48:34,085 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.905057907104492.
+2026-09-02 14:48:37,937 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.8474631309509277.
+2026-09-02 14:48:41,649 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.709648370742798.
+2026-09-02 14:48:45,401 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.748359441757202.
+2026-09-02 14:48:49,468 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 4.038746118545532.
+2026-09-02 14:48:53,300 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.827955484390259.
+2026-09-02 14:48:57,498 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 4.1652915477752686.
+2026-09-02 14:49:01,342 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.8110313415527344.
+2026-09-02 14:49:05,384 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 4.015866279602051.
+2026-09-02 14:49:09,292 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.855239152908325.
+2026-09-02 14:49:13,079 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.7835261821746826.
+2026-09-02 14:49:17,129 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 4.0442705154418945.
+2026-09-02 14:49:20,983 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.841740369796753.
+2026-09-02 14:49:24,899 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.903604507446289.
+2026-09-02 14:49:28,671 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.7354342937469482.
+2026-09-02 14:49:32,817 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 4.121179580688477.
+2026-09-02 14:49:36,619 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.77799391746521.
+2026-09-02 14:49:40,489 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.8518989086151123.
+2026-09-02 14:49:44,342 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.8465664386749268.
+2026-09-02 14:49:48,063 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.7175674438476562.
+2026-09-02 14:49:51,989 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.923032760620117.
+2026-09-02 14:49:55,644 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.649210214614868.
+2026-09-02 14:49:59,760 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 4.110918045043945.
+2026-09-02 14:50:03,405 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 3.6406593322753906.
+2026-09-02 14:50:03,433 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 387.15497851371765
+2026-09-02 14:50:08,611 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 14:51:28,163 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 14:51:28,200 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 63.77456539600392, A = 0, alpha = 0.602
+2026-09-02 14:51:28,267 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 14:51:28,271 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 14:51:31,404 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 3.1291897296905518.
+2026-09-02 14:51:34,787 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 3.353830099105835.
+2026-09-02 14:51:37,864 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.0642752647399902.
+2026-09-02 14:51:41,176 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.306556224822998.
+2026-09-02 14:51:44,065 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 2.8838820457458496.
+2026-09-02 14:51:47,421 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.349696636199951.
+2026-09-02 14:51:50,210 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 2.734645128250122.
+2026-09-02 14:51:53,455 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.185917854309082.
+2026-09-02 14:51:56,608 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.1371283531188965.
+2026-09-02 14:51:59,882 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 3.238288640975952.
+2026-09-02 14:52:03,266 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 3.370877265930176.
+2026-09-02 14:52:06,247 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 2.973482131958008.
+2026-09-02 14:52:09,744 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 3.469820022583008.
+2026-09-02 14:52:12,906 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 3.1571197509765625.
+2026-09-02 14:52:16,376 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 3.4304420948028564.
+2026-09-02 14:52:19,483 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 3.1011059284210205.
+2026-09-02 14:52:22,716 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.2253851890563965.
+2026-09-02 14:52:25,772 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 3.033946990966797.
+2026-09-02 14:52:28,825 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.0453901290893555.
+2026-09-02 14:52:32,173 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.3346941471099854.
+2026-09-02 14:52:35,235 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 3.0553483963012695.
+2026-09-02 14:52:38,523 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.2809345722198486.
+2026-09-02 14:52:41,409 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 2.8597493171691895.
+2026-09-02 14:52:44,772 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.3393867015838623.
+2026-09-02 14:52:47,598 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 2.822523355484009.
+2026-09-02 14:52:50,913 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.285872220993042.
+2026-09-02 14:52:53,594 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 2.6671109199523926.
+2026-09-02 14:52:56,652 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.0273003578186035.
+2026-09-02 14:52:59,953 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 3.2986080646514893.
+2026-09-02 14:53:03,005 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.0485775470733643.
+2026-09-02 14:53:06,312 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 3.281920909881592.
+2026-09-02 14:53:09,472 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.089080572128296.
+2026-09-02 14:53:12,600 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.1249585151672363.
+2026-09-02 14:53:15,476 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 2.8535428047180176.
+2026-09-02 14:53:18,323 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 2.8441426753997803.
+2026-09-02 14:53:21,177 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 2.8507847785949707.
+2026-09-02 14:53:23,798 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 2.6171488761901855.
+2026-09-02 14:53:26,701 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 2.900214433670044.
+2026-09-02 14:53:29,827 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.1039021015167236.
+2026-09-02 14:53:33,128 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.297185182571411.
+2026-09-02 14:53:36,180 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.0484492778778076.
+2026-09-02 14:53:39,518 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.3330399990081787.
+2026-09-02 14:53:42,361 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 2.839036703109741.
+2026-09-02 14:53:45,465 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.096587896347046.
+2026-09-02 14:53:48,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 2.8812143802642822.
+2026-09-02 14:53:51,004 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 2.6499948501586914.
+2026-09-02 14:53:53,960 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 2.9341509342193604.
+2026-09-02 14:53:56,566 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 2.6014063358306885.
+2026-09-02 14:53:59,419 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 2.850302219390869.
+2026-09-02 14:54:02,257 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 2.831226348876953.
+2026-09-02 14:54:05,306 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 3.0448641777038574.
+2026-09-02 14:54:08,195 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 2.866868019104004.
+2026-09-02 14:54:11,280 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.0559353828430176.
+2026-09-02 14:54:13,941 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 2.6564173698425293.
+2026-09-02 14:54:16,561 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 2.614368200302124.
+2026-09-02 14:54:19,475 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 2.8848793506622314.
+2026-09-02 14:54:22,092 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 2.6125330924987793.
+2026-09-02 14:54:25,053 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 2.9048032760620117.
+2026-09-02 14:54:27,861 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 2.8035383224487305.
+2026-09-02 14:54:30,965 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.099717378616333.
+2026-09-02 14:54:33,670 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 2.6687803268432617.
+2026-09-02 14:54:36,747 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.0729660987854004.
+2026-09-02 14:54:39,561 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 2.8109424114227295.
+2026-09-02 14:54:42,576 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.0112428665161133.
+2026-09-02 14:54:45,515 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 2.9344170093536377.
+2026-09-02 14:54:48,283 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 2.7439141273498535.
+2026-09-02 14:54:51,390 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.103693723678589.
+2026-09-02 14:54:54,456 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.0611064434051514.
+2026-09-02 14:54:57,766 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.3057754039764404.
+2026-09-02 14:55:00,794 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.0121910572052.
+2026-09-02 14:55:04,107 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.309664011001587.
+2026-09-02 14:55:07,087 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 2.955073595046997.
+2026-09-02 14:55:09,711 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 2.6179683208465576.
+2026-09-02 14:55:12,866 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.135931968688965.
+2026-09-02 14:55:15,819 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 2.9496636390686035.
+2026-09-02 14:55:19,299 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.468752145767212.
+2026-09-02 14:55:22,528 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.1976959705352783.
+2026-09-02 14:55:25,916 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.3589398860931396.
+2026-09-02 14:55:28,977 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.0425972938537598.
+2026-09-02 14:55:32,296 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.315918445587158.
+2026-09-02 14:55:35,236 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 2.935689926147461.
+2026-09-02 14:55:38,066 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 2.8272712230682373.
+2026-09-02 14:55:41,202 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.132098436355591.
+2026-09-02 14:55:44,098 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 2.869168281555176.
+2026-09-02 14:55:47,213 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 3.1123199462890625.
+2026-09-02 14:55:50,057 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 2.8328146934509277.
+2026-09-02 14:55:53,403 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.3413593769073486.
+2026-09-02 14:55:56,293 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 2.867219924926758.
+2026-09-02 14:55:59,380 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.0808310508728027.
+2026-09-02 14:56:02,509 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.0909173488616943.
+2026-09-02 14:56:05,542 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.0171959400177.
+2026-09-02 14:56:08,856 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.310671091079712.
+2026-09-02 14:56:12,060 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.2008867263793945.
+2026-09-02 14:56:15,677 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.611316204071045.
+2026-09-02 14:56:18,882 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.1913161277770996.
+2026-09-02 14:56:22,283 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.3983819484710693.
+2026-09-02 14:56:25,404 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.1165616512298584.
+2026-09-02 14:56:28,803 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.3761844635009766.
+2026-09-02 14:56:31,918 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 3.0892739295959473.
+2026-09-02 14:56:35,027 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 3.0985844135284424.
+2026-09-02 14:56:35,059 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 306.78398513793945
+2026-09-02 14:56:39,463 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 14:58:27,615 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 14:58:27,627 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 58.51932033571256, A = 0, alpha = 0.602
+2026-09-02 14:58:27,629 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 14:58:27,631 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 14:58:31,840 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 4.2067108154296875.
+2026-09-02 14:58:36,195 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 4.352287292480469.
+2026-09-02 14:58:39,948 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.7498321533203125.
+2026-09-02 14:58:44,021 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 4.070950031280518.
+2026-09-02 14:58:48,137 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 4.108283996582031.
+2026-09-02 14:58:52,730 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 4.580846071243286.
+2026-09-02 14:58:56,759 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 4.022705316543579.
+2026-09-02 14:59:01,008 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 4.2448484897613525.
+2026-09-02 14:59:05,704 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 4.6437201499938965.
+2026-09-02 14:59:10,231 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 4.5046515464782715.
+2026-09-02 14:59:15,025 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 4.790796518325806.
+2026-09-02 14:59:19,339 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 4.305094242095947.
+2026-09-02 14:59:24,133 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 4.789681673049927.
+2026-09-02 14:59:28,743 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 4.607099533081055.
+2026-09-02 14:59:33,122 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 4.3764050006866455.
+2026-09-02 14:59:37,790 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 4.654425859451294.
+2026-09-02 14:59:42,535 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 4.737621545791626.
+2026-09-02 14:59:47,094 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 4.555216550827026.
+2026-09-02 14:59:51,645 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 4.544492721557617.
+2026-09-02 14:59:56,692 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 5.020288467407227.
+2026-09-02 15:00:01,268 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 4.5669379234313965.
+2026-09-02 15:00:06,339 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 5.040344953536987.
+2026-09-02 15:00:10,852 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 4.498669385910034.
+2026-09-02 15:00:15,909 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 5.039977312088013.
+2026-09-02 15:00:20,608 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 4.643165588378906.
+2026-09-02 15:00:25,876 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 5.229192733764648.
+2026-09-02 15:00:30,566 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 4.681986093521118.
+2026-09-02 15:00:35,123 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 4.543208122253418.
+2026-09-02 15:00:39,855 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 4.704474449157715.
+2026-09-02 15:00:44,214 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 4.346158266067505.
+2026-09-02 15:00:48,573 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 4.330191373825073.
+2026-09-02 15:00:52,701 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 4.1253697872161865.
+2026-09-02 15:00:57,251 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 4.521291732788086.
+2026-09-02 15:01:01,444 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 4.186689376831055.
+2026-09-02 15:01:06,802 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 5.353164911270142.
+2026-09-02 15:01:11,279 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 4.446351051330566.
+2026-09-02 15:01:15,640 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 4.355526685714722.
+2026-09-02 15:01:20,502 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 4.857199430465698.
+2026-09-02 15:01:24,896 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 4.365160703659058.
+2026-09-02 15:01:29,638 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 4.715046167373657.
+2026-09-02 15:01:33,771 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 4.126267433166504.
+2026-09-02 15:01:37,824 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 4.045426368713379.
+2026-09-02 15:01:41,931 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 4.100284099578857.
+2026-09-02 15:01:46,438 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 4.5017173290252686.
+2026-09-02 15:01:50,842 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 4.399874448776245.
+2026-09-02 15:01:54,649 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.801365852355957.
+2026-09-02 15:01:59,366 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 4.697759628295898.
+2026-09-02 15:02:03,814 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 4.439884424209595.
+2026-09-02 15:02:08,707 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 4.876960277557373.
+2026-09-02 15:02:13,343 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 4.565346717834473.
+2026-09-02 15:02:17,721 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 4.371858358383179.
+2026-09-02 15:02:22,207 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 4.338777542114258.
+2026-09-02 15:02:26,938 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 4.678586959838867.
+2026-09-02 15:02:31,123 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 4.173892021179199.
+2026-09-02 15:02:35,531 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 4.391409873962402.
+2026-09-02 15:02:40,321 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 4.7680182456970215.
+2026-09-02 15:02:44,846 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 4.486072778701782.
+2026-09-02 15:02:49,678 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 4.824196100234985.
+2026-09-02 15:02:54,123 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 4.442002296447754.
+2026-09-02 15:02:58,605 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 4.4736106395721436.
+2026-09-02 15:03:02,775 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 4.130284786224365.
+2026-09-02 15:03:06,850 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 4.0649943351745605.
+2026-09-02 15:03:11,309 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 4.449042558670044.
+2026-09-02 15:03:15,757 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 4.421570062637329.
+2026-09-02 15:03:20,550 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 4.789340019226074.
+2026-09-02 15:03:25,017 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 4.4636147022247314.
+2026-09-02 15:03:29,726 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 4.6962034702301025.
+2026-09-02 15:03:33,489 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.759814739227295.
+2026-09-02 15:03:38,104 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 4.612138986587524.
+2026-09-02 15:03:42,469 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 4.341923475265503.
+2026-09-02 15:03:47,111 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 4.638460636138916.
+2026-09-02 15:03:51,346 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 4.223204135894775.
+2026-09-02 15:03:55,518 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 4.144724607467651.
+2026-09-02 15:04:00,268 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 4.7440783977508545.
+2026-09-02 15:04:04,678 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 4.407407760620117.
+2026-09-02 15:04:09,164 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 4.47970724105835.
+2026-09-02 15:04:13,650 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 4.480409622192383.
+2026-09-02 15:04:18,215 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 4.558341026306152.
+2026-09-02 15:04:22,267 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 4.043147563934326.
+2026-09-02 15:04:26,902 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 4.627323150634766.
+2026-09-02 15:04:31,320 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 4.396114826202393.
+2026-09-02 15:04:35,511 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 4.185378789901733.
+2026-09-02 15:04:40,385 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 4.857449769973755.
+2026-09-02 15:04:44,696 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 4.307936429977417.
+2026-09-02 15:04:48,798 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 4.098954677581787.
+2026-09-02 15:04:53,295 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 4.493654489517212.
+2026-09-02 15:04:58,150 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 4.851458549499512.
+2026-09-02 15:05:02,605 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 4.449752330780029.
+2026-09-02 15:05:07,362 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 4.73332405090332.
+2026-09-02 15:05:11,664 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 4.29721212387085.
+2026-09-02 15:05:15,530 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.8590219020843506.
+2026-09-02 15:05:20,037 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 4.5021936893463135.
+2026-09-02 15:05:24,359 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 4.318544626235962.
+2026-09-02 15:05:29,107 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 4.738858938217163.
+2026-09-02 15:05:33,526 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 4.400121450424194.
+2026-09-02 15:05:38,251 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 4.71530294418335.
+2026-09-02 15:05:42,724 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 4.467862606048584.
+2026-09-02 15:05:47,425 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 4.684819459915161.
+2026-09-02 15:05:51,855 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 4.425401449203491.
+2026-09-02 15:05:56,206 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 4.3466410636901855.
+2026-09-02 15:05:56,225 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 448.59249448776245
+2026-09-02 15:56:40,637 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 15:58:10,226 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 15:58:10,237 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 18.64717088667458, A = 0, alpha = 0.602
+2026-09-02 15:58:10,240 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 15:58:10,243 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 15:58:13,987 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 3.7413811683654785.
+2026-09-02 15:58:18,030 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 4.038251161575317.
+2026-09-02 15:58:21,727 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 3.6888644695281982.
+2026-09-02 15:58:25,229 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.497514247894287.
+2026-09-02 15:58:28,413 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 3.180957078933716.
+2026-09-02 15:58:31,560 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.132002353668213.
+2026-09-02 15:58:34,990 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 3.425853967666626.
+2026-09-02 15:58:38,435 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.4418840408325195.
+2026-09-02 15:58:41,910 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.470766067504883.
+2026-09-02 15:58:45,120 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 3.1935763359069824.
+2026-09-02 15:58:48,794 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 3.6675190925598145.
+2026-09-02 15:58:51,994 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 3.195441961288452.
+2026-09-02 15:58:55,474 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 3.4759273529052734.
+2026-09-02 15:58:58,660 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 3.1812455654144287.
+2026-09-02 15:59:01,833 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 3.1695103645324707.
+2026-09-02 15:59:05,547 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 3.708533525466919.
+2026-09-02 15:59:08,756 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.2048494815826416.
+2026-09-02 15:59:12,230 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 3.470050811767578.
+2026-09-02 15:59:15,436 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.2012393474578857.
+2026-09-02 15:59:19,094 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.6525509357452393.
+2026-09-02 15:59:22,512 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 3.41339373588562.
+2026-09-02 15:59:26,446 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.923300266265869.
+2026-09-02 15:59:30,032 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 3.581198215484619.
+2026-09-02 15:59:33,623 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.5869126319885254.
+2026-09-02 15:59:37,341 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 3.7127373218536377.
+2026-09-02 15:59:40,566 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.221146821975708.
+2026-09-02 15:59:44,070 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 3.4995017051696777.
+2026-09-02 15:59:47,448 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.373807907104492.
+2026-09-02 15:59:51,137 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 3.6853528022766113.
+2026-09-02 15:59:54,327 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 3.1865646839141846.
+2026-09-02 15:59:58,056 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 3.7248921394348145.
+2026-09-02 16:00:01,260 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.2015559673309326.
+2026-09-02 16:00:04,742 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.4776053428649902.
+2026-09-02 16:00:08,718 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.9696526527404785.
+2026-09-02 16:00:12,470 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.7437212467193604.
+2026-09-02 16:00:16,147 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.670618772506714.
+2026-09-02 16:00:19,317 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.166449785232544.
+2026-09-02 16:00:23,170 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.8453831672668457.
+2026-09-02 16:00:26,503 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.3287038803100586.
+2026-09-02 16:00:30,140 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.6110448837280273.
+2026-09-02 16:00:33,513 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 3.368443250656128.
+2026-09-02 16:00:36,719 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.1901485919952393.
+2026-09-02 16:00:40,452 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 3.724766254425049.
+2026-09-02 16:00:43,621 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.1651792526245117.
+2026-09-02 16:00:47,088 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 3.460343599319458.
+2026-09-02 16:00:50,729 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.6367483139038086.
+2026-09-02 16:00:54,427 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 3.693718433380127.
+2026-09-02 16:00:57,835 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 3.402721643447876.
+2026-09-02 16:01:01,280 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.442002773284912.
+2026-09-02 16:01:04,498 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 3.2141921520233154.
+2026-09-02 16:01:07,677 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 3.174557685852051.
+2026-09-02 16:01:11,136 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 3.455516815185547.
+2026-09-02 16:01:14,538 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.398606061935425.
+2026-09-02 16:01:18,008 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 3.4667704105377197.
+2026-09-02 16:01:21,492 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 3.463076591491699.
+2026-09-02 16:01:25,145 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 3.6491808891296387.
+2026-09-02 16:01:28,323 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 3.1740987300872803.
+2026-09-02 16:01:31,754 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 3.4276819229125977.
+2026-09-02 16:01:34,931 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 3.1742045879364014.
+2026-09-02 16:01:38,198 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.262890577316284.
+2026-09-02 16:01:41,648 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 3.4464383125305176.
+2026-09-02 16:01:45,079 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 3.4280247688293457.
+2026-09-02 16:01:48,815 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.7314770221710205.
+2026-09-02 16:01:52,501 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.6762166023254395.
+2026-09-02 16:01:56,278 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 3.7538504600524902.
+2026-09-02 16:01:59,659 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 3.3778600692749023.
+2026-09-02 16:02:03,672 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 4.0102760791778564.
+2026-09-02 16:02:07,382 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.706223249435425.
+2026-09-02 16:02:10,817 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.4288439750671387.
+2026-09-02 16:02:14,261 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.434119701385498.
+2026-09-02 16:02:17,603 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.3389718532562256.
+2026-09-02 16:02:21,533 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 3.9045186042785645.
+2026-09-02 16:02:25,192 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 3.654939889907837.
+2026-09-02 16:02:29,030 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.8335793018341064.
+2026-09-02 16:02:32,486 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 3.4521422386169434.
+2026-09-02 16:02:36,207 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.7164738178253174.
+2026-09-02 16:02:39,671 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.437990665435791.
+2026-09-02 16:02:43,111 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.4362196922302246.
+2026-09-02 16:02:46,619 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.486955165863037.
+2026-09-02 16:02:50,104 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.469168186187744.
+2026-09-02 16:02:53,724 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 3.5980331897735596.
+2026-09-02 16:02:56,896 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.1620090007781982.
+2026-09-02 16:03:00,515 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.615051746368408.
+2026-09-02 16:03:03,731 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.2009963989257812.
+2026-09-02 16:03:07,196 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 3.4608781337738037.
+2026-09-02 16:03:10,361 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.161626100540161.
+2026-09-02 16:03:13,482 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.1170356273651123.
+2026-09-02 16:03:16,916 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 3.430002450942993.
+2026-09-02 16:03:20,326 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.3923892974853516.
+2026-09-02 16:03:23,765 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 3.4356744289398193.
+2026-09-02 16:03:26,908 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.1390910148620605.
+2026-09-02 16:03:30,741 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 3.816767454147339.
+2026-09-02 16:03:34,541 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 3.7939298152923584.
+2026-09-02 16:03:38,282 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.7345027923583984.
+2026-09-02 16:03:41,557 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.268240451812744.
+2026-09-02 16:03:44,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.146926164627075.
+2026-09-02 16:03:48,215 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.4853622913360596.
+2026-09-02 16:03:51,883 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.659130811691284.
+2026-09-02 16:03:55,317 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 3.427318572998047.
+2026-09-02 16:03:59,139 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 3.8136744499206543.
+2026-09-02 16:03:59,143 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 348.8970582485199
+2026-09-02 16:04:04,457 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 16:05:19,279 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 16:05:19,283 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 27.080557381867287, A = 0, alpha = 0.602
+2026-09-02 16:05:19,286 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 16:05:19,289 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 16:05:22,178 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 2.8863415718078613.
+2026-09-02 16:05:25,031 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 2.849111557006836.
+2026-09-02 16:05:27,880 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 2.845350742340088.
+2026-09-02 16:05:31,022 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 3.1328346729278564.
+2026-09-02 16:05:33,682 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 2.651381254196167.
+2026-09-02 16:05:36,751 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 3.065253973007202.
+2026-09-02 16:05:39,601 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 2.8457298278808594.
+2026-09-02 16:05:42,875 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 3.2444849014282227.
+2026-09-02 16:05:45,915 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 3.0357749462127686.
+2026-09-02 16:05:48,717 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 2.7865047454833984.
+2026-09-02 16:05:51,599 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 2.8686206340789795.
+2026-09-02 16:05:54,696 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 3.0696651935577393.
+2026-09-02 16:05:58,095 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 3.3559730052948.
+2026-09-02 16:06:00,722 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 2.6223862171173096.
+2026-09-02 16:06:03,632 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 2.884561538696289.
+2026-09-02 16:06:06,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 2.7099499702453613.
+2026-09-02 16:06:09,574 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 3.2196850776672363.
+2026-09-02 16:06:12,251 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 2.672720193862915.
+2026-09-02 16:06:15,566 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 3.311230421066284.
+2026-09-02 16:06:18,635 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 3.064539909362793.
+2026-09-02 16:06:21,482 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 2.842717409133911.
+2026-09-02 16:06:24,763 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 3.2754201889038086.
+2026-09-02 16:06:27,608 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 2.840759038925171.
+2026-09-02 16:06:30,931 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 3.282118558883667.
+2026-09-02 16:06:33,962 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 3.0262463092803955.
+2026-09-02 16:06:37,237 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 3.2687034606933594.
+2026-09-02 16:06:40,093 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 2.8483810424804688.
+2026-09-02 16:06:43,395 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 3.296177864074707.
+2026-09-02 16:06:46,187 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 2.7865817546844482.
+2026-09-02 16:06:48,757 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 2.56585693359375.
+2026-09-02 16:06:51,570 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 2.808161973953247.
+2026-09-02 16:06:54,649 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 3.0537991523742676.
+2026-09-02 16:06:57,923 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 3.268195152282715.
+2026-09-02 16:07:01,001 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 3.068537473678589.
+2026-09-02 16:07:04,167 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 3.1404731273651123.
+2026-09-02 16:07:07,235 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 3.057432174682617.
+2026-09-02 16:07:10,540 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 3.296825647354126.
+2026-09-02 16:07:13,673 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 3.1268017292022705.
+2026-09-02 16:07:16,709 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 3.030690908432007.
+2026-09-02 16:07:19,807 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 3.077822208404541.
+2026-09-02 16:07:22,663 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 2.8326454162597656.
+2026-09-02 16:07:25,733 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 3.0637009143829346.
+2026-09-02 16:07:28,370 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 2.632571220397949.
+2026-09-02 16:07:31,424 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 3.0499889850616455.
+2026-09-02 16:07:34,262 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 2.8306336402893066.
+2026-09-02 16:07:37,363 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 3.0813937187194824.
+2026-09-02 16:07:39,979 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 2.6104516983032227.
+2026-09-02 16:07:43,115 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 3.1278233528137207.
+2026-09-02 16:07:46,570 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 3.424584150314331.
+2026-09-02 16:07:49,602 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 3.0267550945281982.
+2026-09-02 16:07:52,951 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 3.304753541946411.
+2026-09-02 16:07:55,991 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 3.035489082336426.
+2026-09-02 16:07:59,215 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 3.2161552906036377.
+2026-09-02 16:08:01,870 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 2.633030652999878.
+2026-09-02 16:08:04,725 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 2.850827217102051.
+2026-09-02 16:08:07,379 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 2.643545627593994.
+2026-09-02 16:08:10,480 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 3.0969045162200928.
+2026-09-02 16:08:13,798 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 3.3129496574401855.
+2026-09-02 16:08:16,842 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 3.0407254695892334.
+2026-09-02 16:08:20,091 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 3.244058609008789.
+2026-09-02 16:08:22,713 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 2.6180102825164795.
+2026-09-02 16:08:25,608 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 2.8794596195220947.
+2026-09-02 16:08:28,746 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 3.120206117630005.
+2026-09-02 16:08:31,819 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 3.0653932094573975.
+2026-09-02 16:08:34,650 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 2.8192152976989746.
+2026-09-02 16:08:37,418 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 2.761995315551758.
+2026-09-02 16:08:40,748 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 3.3194775581359863.
+2026-09-02 16:08:43,752 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 3.0003504753112793.
+2026-09-02 16:08:47,018 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 3.2624919414520264.
+2026-09-02 16:08:50,107 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 3.081441879272461.
+2026-09-02 16:08:53,472 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 3.343351125717163.
+2026-09-02 16:08:56,547 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 3.069124460220337.
+2026-09-02 16:08:59,795 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 3.244584321975708.
+2026-09-02 16:09:02,579 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 2.77763032913208.
+2026-09-02 16:09:05,583 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 2.9968323707580566.
+2026-09-02 16:09:08,995 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 3.4058027267456055.
+2026-09-02 16:09:12,019 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 3.0164074897766113.
+2026-09-02 16:09:15,435 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 3.405836820602417.
+2026-09-02 16:09:18,472 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 3.0330076217651367.
+2026-09-02 16:09:21,682 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 3.205402374267578.
+2026-09-02 16:09:24,703 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 3.0172042846679688.
+2026-09-02 16:09:27,791 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 3.056835412979126.
+2026-09-02 16:09:30,659 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 2.862717866897583.
+2026-09-02 16:09:33,708 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 3.044250249862671.
+2026-09-02 16:09:36,750 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 3.015326738357544.
+2026-09-02 16:09:39,566 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 2.810786008834839.
+2026-09-02 16:09:42,821 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 3.2454428672790527.
+2026-09-02 16:09:45,821 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 2.9876725673675537.
+2026-09-02 16:09:48,931 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 3.0948641300201416.
+2026-09-02 16:09:51,918 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 2.9818248748779297.
+2026-09-02 16:09:55,185 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 3.2510299682617188.
+2026-09-02 16:09:57,808 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 2.616652727127075.
+2026-09-02 16:10:00,693 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 2.856602430343628.
+2026-09-02 16:10:03,800 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 3.103792428970337.
+2026-09-02 16:10:06,926 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 3.0951125621795654.
+2026-09-02 16:10:10,275 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 3.339660167694092.
+2026-09-02 16:10:13,320 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 3.035112142562866.
+2026-09-02 16:10:16,668 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 3.334536075592041.
+2026-09-02 16:10:19,618 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 2.9443705081939697.
+2026-09-02 16:10:23,086 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 3.4326348304748535.
+2026-09-02 16:10:23,090 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 303.7981562614441
+2026-09-02 16:10:27,529 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 16:12:17,743 | INFO | qiskit_algorithms.optimizers.spsa | Finished calibration:
+2026-09-02 16:12:17,761 | INFO | qiskit_algorithms.optimizers.spsa |  -- Learning rate: a / ((A + n) ^ alpha) with a = 15.061232072011558, A = 0, alpha = 0.602
+2026-09-02 16:12:17,764 | INFO | qiskit_algorithms.optimizers.spsa |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 16:12:17,766 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Starting optimization.
+2026-09-02 16:12:22,194 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 1/101 done in 4.4254114627838135.
+2026-09-02 16:12:26,458 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 2/101 done in 4.258997678756714.
+2026-09-02 16:12:31,408 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 3/101 done in 4.772074222564697.
+2026-09-02 16:12:35,781 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 4/101 done in 4.31055212020874.
+2026-09-02 16:12:40,168 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 5/101 done in 4.382467985153198.
+2026-09-02 16:12:44,686 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 6/101 done in 4.503420114517212.
+2026-09-02 16:12:48,929 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 7/101 done in 4.238768815994263.
+2026-09-02 16:12:53,801 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 8/101 done in 4.865057945251465.
+2026-09-02 16:12:58,047 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 9/101 done in 4.216634511947632.
+2026-09-02 16:13:02,963 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 10/101 done in 4.911524772644043.
+2026-09-02 16:13:07,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 11/101 done in 4.3824546337127686.
+2026-09-02 16:13:11,470 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 12/101 done in 4.11676025390625.
+2026-09-02 16:13:15,858 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 13/101 done in 4.3844544887542725.
+2026-09-02 16:13:20,237 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 14/101 done in 4.374303340911865.
+2026-09-02 16:13:24,805 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 15/101 done in 4.563901901245117.
+2026-09-02 16:13:29,427 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 16/101 done in 4.596394300460815.
+2026-09-02 16:13:34,504 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 17/101 done in 5.0687971115112305.
+2026-09-02 16:13:39,170 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 18/101 done in 4.64372706413269.
+2026-09-02 16:13:44,264 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 19/101 done in 5.086899995803833.
+2026-09-02 16:13:48,861 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 20/101 done in 4.579391241073608.
+2026-09-02 16:13:53,603 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 21/101 done in 4.736850023269653.
+2026-09-02 16:13:58,111 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 22/101 done in 4.476811408996582.
+2026-09-02 16:14:02,649 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 23/101 done in 4.520258188247681.
+2026-09-02 16:14:07,518 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 24/101 done in 4.857754945755005.
+2026-09-02 16:14:12,155 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 25/101 done in 4.620081186294556.
+2026-09-02 16:14:16,966 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 26/101 done in 4.806932687759399.
+2026-09-02 16:14:21,419 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 27/101 done in 4.446996212005615.
+2026-09-02 16:14:26,205 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 28/101 done in 4.776734113693237.
+2026-09-02 16:14:30,687 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 29/101 done in 4.451387882232666.
+2026-09-02 16:14:35,629 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 30/101 done in 4.937864303588867.
+2026-09-02 16:14:40,322 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 31/101 done in 4.683947563171387.
+2026-09-02 16:14:45,084 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 32/101 done in 4.751201152801514.
+2026-09-02 16:14:50,237 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 33/101 done in 5.144353151321411.
+2026-09-02 16:14:54,751 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 34/101 done in 4.506793260574341.
+2026-09-02 16:14:59,595 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 35/101 done in 4.821887016296387.
+2026-09-02 16:15:04,069 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 36/101 done in 4.466667652130127.
+2026-09-02 16:15:08,848 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 37/101 done in 4.775991678237915.
+2026-09-02 16:15:13,185 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 38/101 done in 4.333144903182983.
+2026-09-02 16:15:18,018 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 39/101 done in 4.82821798324585.
+2026-09-02 16:15:22,501 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 40/101 done in 4.465810060501099.
+2026-09-02 16:15:26,994 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 41/101 done in 4.461506366729736.
+2026-09-02 16:15:31,570 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 42/101 done in 4.573092460632324.
+2026-09-02 16:15:35,568 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 43/101 done in 3.9926602840423584.
+2026-09-02 16:15:39,975 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 44/101 done in 4.396193981170654.
+2026-09-02 16:15:44,392 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 45/101 done in 4.4115846157073975.
+2026-09-02 16:15:49,055 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 46/101 done in 4.659460544586182.
+2026-09-02 16:15:53,215 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 47/101 done in 4.154181718826294.
+2026-09-02 16:15:57,858 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 48/101 done in 4.608927249908447.
+2026-09-02 16:16:02,302 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 49/101 done in 4.441183090209961.
+2026-09-02 16:16:06,393 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 50/101 done in 4.066706895828247.
+2026-09-02 16:16:10,937 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 51/101 done in 4.541057825088501.
+2026-09-02 16:16:15,040 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 52/101 done in 4.098381996154785.
+2026-09-02 16:16:19,772 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 53/101 done in 4.727431058883667.
+2026-09-02 16:16:24,155 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 54/101 done in 4.376550674438477.
+2026-09-02 16:16:28,588 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 55/101 done in 4.4266486167907715.
+2026-09-02 16:16:33,243 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 56/101 done in 4.652223110198975.
+2026-09-02 16:16:38,625 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 57/101 done in 5.374454975128174.
+2026-09-02 16:16:43,340 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 58/101 done in 4.707704067230225.
+2026-09-02 16:16:47,925 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 59/101 done in 4.5789735317230225.
+2026-09-02 16:16:53,011 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 60/101 done in 5.077349901199341.
+2026-09-02 16:16:57,479 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 61/101 done in 4.451437950134277.
+2026-09-02 16:17:02,383 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 62/101 done in 4.896480083465576.
+2026-09-02 16:17:07,072 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 63/101 done in 4.685208797454834.
+2026-09-02 16:17:12,255 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 64/101 done in 5.175011396408081.
+2026-09-02 16:17:16,856 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 65/101 done in 4.594407796859741.
+2026-09-02 16:17:21,416 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 66/101 done in 4.554863929748535.
+2026-09-02 16:17:25,967 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 67/101 done in 4.522912979125977.
+2026-09-02 16:17:30,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 68/101 done in 4.374104022979736.
+2026-09-02 16:17:35,062 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 69/101 done in 4.7087788581848145.
+2026-09-02 16:17:39,295 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 70/101 done in 4.22486686706543.
+2026-09-02 16:17:43,664 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 71/101 done in 4.364722490310669.
+2026-09-02 16:17:47,853 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 72/101 done in 4.184680461883545.
+2026-09-02 16:17:52,333 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 73/101 done in 4.477745771408081.
+2026-09-02 16:17:56,093 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 74/101 done in 3.7564926147460938.
+2026-09-02 16:18:00,652 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 75/101 done in 4.555557489395142.
+2026-09-02 16:18:04,990 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 76/101 done in 4.330679655075073.
+2026-09-02 16:18:09,326 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 77/101 done in 4.330400466918945.
+2026-09-02 16:18:14,035 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 78/101 done in 4.701053619384766.
+2026-09-02 16:18:18,449 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 79/101 done in 4.409252166748047.
+2026-09-02 16:18:23,057 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 80/101 done in 4.606111764907837.
+2026-09-02 16:18:27,100 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 81/101 done in 4.039340019226074.
+2026-09-02 16:18:31,727 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 82/101 done in 4.601622819900513.
+2026-09-02 16:18:35,491 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 83/101 done in 3.7580301761627197.
+2026-09-02 16:18:39,544 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 84/101 done in 4.047541856765747.
+2026-09-02 16:18:43,899 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 85/101 done in 4.351293087005615.
+2026-09-02 16:18:47,726 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 86/101 done in 3.8071274757385254.
+2026-09-02 16:18:52,493 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 87/101 done in 4.752676963806152.
+2026-09-02 16:18:56,520 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 88/101 done in 4.022908687591553.
+2026-09-02 16:19:00,982 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 89/101 done in 4.455695152282715.
+2026-09-02 16:19:05,350 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 90/101 done in 4.364315032958984.
+2026-09-02 16:19:09,624 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 91/101 done in 4.270220994949341.
+2026-09-02 16:19:13,758 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 92/101 done in 4.114781618118286.
+2026-09-02 16:19:17,985 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 93/101 done in 4.223345756530762.
+2026-09-02 16:19:22,421 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 94/101 done in 4.429949760437012.
+2026-09-02 16:19:26,804 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 95/101 done in 4.373686075210571.
+2026-09-02 16:19:31,599 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 96/101 done in 4.772412538528442.
+2026-09-02 16:19:36,028 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 97/101 done in 4.3999717235565186.
+2026-09-02 16:19:40,679 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 98/101 done in 4.642261266708374.
+2026-09-02 16:19:44,924 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 99/101 done in 4.237603664398193.
+2026-09-02 16:19:49,294 | INFO | qiskit_algorithms.optimizers.spsa | Iteration 100/101 done in 4.364970684051514.
+2026-09-02 16:19:49,321 | INFO | qiskit_algorithms.optimizers.spsa | SPSA: Finished in 451.5531053543091
+2026-09-02 16:24:26,995 | INFO | astra_trade | [2m2026-09-02T16:24:26.995535Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_aggregate  [0m [[0m[1m[34mastra_trade[0m][0m [36mmax_drawdown_pct[0m=[35m{'mean': -0.6089276416000808, 'std': 0.20109716842480124, 'n': 18}[0m [36mn_folds[0m=[35m3[0m [36msharpe_ratio[0m=[35m{'mean': 1.7474989402336947, 'std': 3.905637063507436, 'n': 18}[0m [36mwin_rate[0m=[35m{'mean': 0.5496046836976626, 'std': 0.10088017749648107, 'n': 18}[0m
+2026-09-02 16:24:27,054 | INFO | astra_trade | [2m2026-09-02T16:24:27.053915Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.004695318930891701[0m [36mexpectancy[0m=[35mnp.float64(0.004695318930891704)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m1.4568414843208557[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m91[0m [36mwin_rate[0m=[35m0.5934065934065934[0m
+2026-09-02 16:24:27,092 | INFO | astra_trade | [2m2026-09-02T16:24:27.092309Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.03009680742352258[0m [36mexpectancy[0m=[35mnp.float64(0.03009680742352258)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m5.782333041356171[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m109[0m [36mwin_rate[0m=[35m0.6146788990825688[0m
+2026-09-02 16:24:27,132 | INFO | astra_trade | [2m2026-09-02T16:24:27.131964Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.02565451199095528[0m [36mexpectancy[0m=[35mnp.float64(0.02565451199095528)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m6.8675895066486286[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m110[0m [36mwin_rate[0m=[35m0.7090909090909091[0m
+2026-09-02 16:24:27,174 | INFO | astra_trade | [2m2026-09-02T16:24:27.174295Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.001726781315926124[0m [36mexpectancy[0m=[35mnp.float64(-0.0017267813159261257)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m-0.895201296056832[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m86[0m [36mwin_rate[0m=[35m0.5348837209302325[0m
+2026-09-02 16:24:27,211 | INFO | astra_trade | [2m2026-09-02T16:24:27.210821Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.00026988097435307274[0m [36mexpectancy[0m=[35mnp.float64(0.00026988097435307057)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m0.19298254713672125[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m121[0m [36mwin_rate[0m=[35m0.4793388429752066[0m
+2026-09-02 16:24:27,253 | INFO | astra_trade | [2m2026-09-02T16:24:27.252718Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.02254896830226792[0m [36mexpectancy[0m=[35mnp.float64(0.022548968302267925)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m8.450001503131967[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m117[0m [36mwin_rate[0m=[35m0.717948717948718[0m
+2026-09-02 16:24:27,304 | INFO | astra_trade | [2m2026-09-02T16:24:27.304462Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.011596382887250277[0m [36mexpectancy[0m=[35mnp.float64(0.011596382887250276)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m5.061928605397828[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m56[0m [36mwin_rate[0m=[35m0.625[0m
+2026-09-02 16:24:27,349 | INFO | astra_trade | [2m2026-09-02T16:24:27.349619Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.012361430180258816[0m [36mexpectancy[0m=[35mnp.float64(0.012361430180258828)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m1.728818564519746[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m29[0m [36mwin_rate[0m=[35m0.4827586206896552[0m
+2026-09-02 16:24:27,399 | INFO | astra_trade | [2m2026-09-02T16:24:27.399595Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.01655941273563115[0m [36mexpectancy[0m=[35mnp.float64(0.01655941273563115)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m3.4234800751694046[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m32[0m [36mwin_rate[0m=[35m0.53125[0m
+2026-09-02 16:24:27,459 | INFO | astra_trade | [2m2026-09-02T16:24:27.458725Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.03861667140377869[0m [36mexpectancy[0m=[35mnp.float64(0.0386166714037787)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m7.729954527331656[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m37[0m [36mwin_rate[0m=[35m0.7567567567567568[0m
+2026-09-02 16:24:27,474 | INFO | astra_trade | [2m2026-09-02T16:24:27.474554Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.01715407567723676[0m [36mexpectancy[0m=[35mnp.float64(0.017154075677236747)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m3.1534925989851312[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m37[0m [36mwin_rate[0m=[35m0.5135135135135135[0m
+2026-09-02 16:24:27,493 | INFO | astra_trade | [2m2026-09-02T16:24:27.493560Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.010566190576294857[0m [36mexpectancy[0m=[35mnp.float64(0.010566190576294855)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m3.591135086113282[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m70[0m [36mwin_rate[0m=[35m0.6142857142857143[0m
+2026-09-02 16:24:27,559 | INFO | astra_trade | [2m2026-09-02T16:24:27.558853Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.01466249787213674[0m [36mexpectancy[0m=[35mnp.float64(-0.014662497872136738)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-5.089831405610459[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m132[0m [36mwin_rate[0m=[35m0.4318181818181818[0m
+2026-09-02 16:24:27,582 | INFO | astra_trade | [2m2026-09-02T16:24:27.581709Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.0017059922567890947[0m [36mexpectancy[0m=[35mnp.float64(-0.0017059922567891003)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-0.5031972570121651[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m138[0m [36mwin_rate[0m=[35m0.4855072463768116[0m
+2026-09-02 16:24:27,631 | INFO | astra_trade | [2m2026-09-02T16:24:27.631159Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.008267091383881814[0m [36mexpectancy[0m=[35mnp.float64(-0.008267091383881812)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-2.655184190712462[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m149[0m [36mwin_rate[0m=[35m0.42953020134228187[0m
+2026-09-02 16:24:27,683 | INFO | astra_trade | [2m2026-09-02T16:24:27.683409Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.010442801470739333[0m [36mexpectancy[0m=[35mnp.float64(-0.010442801470739336)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-3.5337326590789333[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m129[0m [36mwin_rate[0m=[35m0.43410852713178294[0m
+2026-09-02 16:24:27,707 | INFO | astra_trade | [2m2026-09-02T16:24:27.706831Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.004487127848122472[0m [36mexpectancy[0m=[35mnp.float64(-0.004487127848122462)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-1.1589244656451267[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m124[0m [36mwin_rate[0m=[35m0.45161290322580644[0m
+2026-09-02 16:24:27,744 | INFO | astra_trade | [2m2026-09-02T16:24:27.744028Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.005460694729406858[0m [36mexpectancy[0m=[35mnp.float64(-0.005460694729406858)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-2.147505341788906[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m119[0m [36mwin_rate[0m=[35m0.48739495798319327[0m

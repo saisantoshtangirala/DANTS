@@ -1,16 +1,16 @@
 + echo '=== GPU diagnostics (pre-install) ==='
 === GPU diagnostics (pre-install) ===
 + nvidia-smi
-Wed Sep  2 12:02:59 2026       
+Wed Sep  2 13:02:12 2026       
 +-----------------------------------------------------------------------------------------+
-| NVIDIA-SMI 580.126.18             Driver Version: 580.126.18     CUDA Version: 13.0     |
+| NVIDIA-SMI 580.159.04             Driver Version: 580.159.04     CUDA Version: 13.0     |
 +-----------------------------------------+------------------------+----------------------+
 | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
 | Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
 |                                         |                        |               MIG M. |
 |=========================================+========================+======================|
-|   0  NVIDIA RTX A4500               On  |   00000000:02:00.0 Off |                  Off |
-| 30%   40C    P8             16W /  200W |       0MiB /  20470MiB |      0%      Default |
+|   0  NVIDIA RTX A5000               On  |   00000000:52:00.0 Off |                  Off |
+| 30%   28C    P8             20W /  230W |       1MiB /  24564MiB |      0%      Default |
 |                                         |                        |                  N/A |
 +-----------------------------------------+------------------------+----------------------+
 
@@ -24,6 +24,7 @@ Wed Sep  2 12:02:59 2026
 + ldconfig
 + set +x
 Cloning into 'repo'...
+Updating files:  50% (48/95)Updating files:  51% (49/95)Updating files:  52% (50/95)Updating files:  53% (51/95)Updating files:  54% (52/95)Updating files:  55% (53/95)Updating files:  56% (54/95)Updating files:  57% (55/95)Updating files:  58% (56/95)Updating files:  60% (57/95)Updating files:  61% (58/95)Updating files:  62% (59/95)Updating files:  63% (60/95)Updating files:  64% (61/95)Updating files:  65% (62/95)Updating files:  66% (63/95)Updating files:  67% (64/95)Updating files:  68% (65/95)Updating files:  69% (66/95)Updating files:  70% (67/95)Updating files:  71% (68/95)Updating files:  72% (69/95)Updating files:  73% (70/95)Updating files:  74% (71/95)Updating files:  75% (72/95)Updating files:  76% (73/95)Updating files:  77% (74/95)Updating files:  78% (75/95)Updating files:  80% (76/95)Updating files:  81% (77/95)Updating files:  82% (78/95)Updating files:  83% (79/95)Updating files:  84% (80/95)Updating files:  85% (81/95)Updating files:  86% (82/95)Updating files:  87% (83/95)Updating files:  88% (84/95)Updating files:  89% (85/95)Updating files:  90% (86/95)Updating files:  91% (87/95)Updating files:  92% (88/95)Updating files:  93% (89/95)Updating files:  94% (90/95)Updating files:  95% (91/95)Updating files:  96% (92/95)Updating files:  97% (93/95)Updating files:  98% (94/95)Updating files: 100% (95/95)Updating files: 100% (95/95), done.
 + cd repo/astra-trade-qml
 + pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
@@ -46,7 +47,7 @@ try:
 except: pass
 '
 PyTorch 2.4.1+cu124, CUDA available: True
-GPU: NVIDIA RTX A4500, VRAM: 21.0 GB
+GPU: NVIDIA RTX A5000, VRAM: 25.3 GB
 XGBoost 3.2.0
 + git config user.email runpod-bot@astra-trade-qml.local
 + git config user.name 'RunPod Training Bot'
@@ -55,176 +56,394 @@ XGBoost 3.2.0
 === Starting training ===
 + PYTHONUNBUFFERED=1
 + timeout 18000 python3 -u -m src.main --mode swing-walk-forward
-CUDA initialized: NVIDIA RTX A4500, VRAM: 21.0 GB
-2026-09-02 12:03:41,658 | INFO | [2m2026-09-02T12:03:41.658647Z[0m [[32m[1minfo     [0m] [1mkite_login_step1              [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
-2026-09-02 12:03:41,871 | INFO | [2m2026-09-02T12:03:41.871740Z[0m [[32m[1minfo     [0m] [1mkite_login_step2_twofa        [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
-2026-09-02 12:03:42,115 | INFO | [2m2026-09-02T12:03:42.115868Z[0m [[32m[1minfo     [0m] [1mkite_login_step3_request_token[0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
-2026-09-02 12:03:42,935 | INFO | [2m2026-09-02T12:03:42.935046Z[0m [[32m[1minfo     [0m] [1mkite_login_success            [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
-2026-09-02 12:03:42,935 | INFO | [2m2026-09-02T12:03:42.935491Z[0m [[32m[1minfo     [0m] [1mkite_session_ready_for_swing_walk_forward[0m [[0m[1m[34mastra_trade[0m][0m
-2026-09-02 12:03:42,996 | INFO | [2m2026-09-02T12:03:42.996246Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_started    [0m [[0m[1m[34mastra_trade[0m][0m [36msymbols[0m=[35m['INFY', 'PNB', 'BANKBARODA', 'TATAPOWER', 'CANBK', 'ITC'][0m
-2026-09-02 12:03:42,996 | INFO | [2m2026-09-02T12:03:42.996367Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m1/6[0m [36msymbol[0m=[35mINFY[0m
-2026-09-02 12:03:44,217 | INFO | [2m2026-09-02T12:03:44.217242Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mINFY[0m
-2026-09-02 12:03:44,217 | INFO | [2m2026-09-02T12:03:44.217701Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m2/6[0m [36msymbol[0m=[35mPNB[0m
-2026-09-02 12:03:44,632 | INFO | [2m2026-09-02T12:03:44.632094Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mPNB[0m
-2026-09-02 12:03:44,632 | INFO | [2m2026-09-02T12:03:44.632271Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m3/6[0m [36msymbol[0m=[35mBANKBARODA[0m
-2026-09-02 12:03:44,933 | INFO | [2m2026-09-02T12:03:44.933317Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mBANKBARODA[0m
-2026-09-02 12:03:44,933 | INFO | [2m2026-09-02T12:03:44.933471Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m4/6[0m [36msymbol[0m=[35mTATAPOWER[0m
-2026-09-02 12:03:45,264 | INFO | [2m2026-09-02T12:03:45.264199Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mTATAPOWER[0m
-2026-09-02 12:03:45,264 | INFO | [2m2026-09-02T12:03:45.264378Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m5/6[0m [36msymbol[0m=[35mCANBK[0m
-2026-09-02 12:03:45,562 | INFO | [2m2026-09-02T12:03:45.562451Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mCANBK[0m
-2026-09-02 12:03:45,562 | INFO | [2m2026-09-02T12:03:45.562644Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m6/6[0m [36msymbol[0m=[35mITC[0m
-2026-09-02 12:03:45,859 | INFO | [2m2026-09-02T12:03:45.859773Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mITC[0m
-2026-09-02 12:03:45,859 | INFO | [2m2026-09-02T12:03:45.859948Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_done     [0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m6[0m
-2026-09-02 12:03:46,000 | INFO | [2m2026-09-02T12:03:46.000444Z[0m [[32m[1minfo     [0m] [1mswing_feature_engineering_done[0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m6[0m
+CUDA initialized: NVIDIA RTX A5000, VRAM: 25.3 GB
+2026-09-02 13:03:15,540 | INFO | [2m2026-09-02T13:03:15.539944Z[0m [[32m[1minfo     [0m] [1mkite_login_step1              [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
+2026-09-02 13:03:15,809 | INFO | [2m2026-09-02T13:03:15.809718Z[0m [[32m[1minfo     [0m] [1mkite_login_step2_twofa        [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
+2026-09-02 13:03:16,059 | INFO | [2m2026-09-02T13:03:16.059407Z[0m [[32m[1minfo     [0m] [1mkite_login_step3_request_token[0m [[0m[1m[34mastra_trade.kite_auth[0m][0m
+2026-09-02 13:03:16,883 | INFO | [2m2026-09-02T13:03:16.883434Z[0m [[32m[1minfo     [0m] [1mkite_login_success            [0m [[0m[1m[34mastra_trade.kite_auth[0m][0m [36muser_id[0m=[35mTVQ435[0m
+2026-09-02 13:03:16,888 | INFO | [2m2026-09-02T13:03:16.888054Z[0m [[32m[1minfo     [0m] [1mkite_session_ready_for_swing_walk_forward[0m [[0m[1m[34mastra_trade[0m][0m
+2026-09-02 13:03:17,078 | INFO | [2m2026-09-02T13:03:17.078743Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_started    [0m [[0m[1m[34mastra_trade[0m][0m [36msymbols[0m=[35m['INFY', 'PNB', 'BANKBARODA', 'TATAPOWER', 'CANBK', 'ITC'][0m
+2026-09-02 13:03:17,081 | INFO | [2m2026-09-02T13:03:17.081261Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m1/6[0m [36msymbol[0m=[35mINFY[0m
+2026-09-02 13:03:18,656 | INFO | [2m2026-09-02T13:03:18.656154Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mINFY[0m
+2026-09-02 13:03:18,661 | INFO | [2m2026-09-02T13:03:18.661623Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m2/6[0m [36msymbol[0m=[35mPNB[0m
+2026-09-02 13:03:20,146 | INFO | [2m2026-09-02T13:03:20.146188Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mPNB[0m
+2026-09-02 13:03:20,149 | INFO | [2m2026-09-02T13:03:20.149572Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m3/6[0m [36msymbol[0m=[35mBANKBARODA[0m
+2026-09-02 13:03:20,877 | INFO | [2m2026-09-02T13:03:20.877050Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mBANKBARODA[0m
+2026-09-02 13:03:20,879 | INFO | [2m2026-09-02T13:03:20.879641Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m4/6[0m [36msymbol[0m=[35mTATAPOWER[0m
+2026-09-02 13:03:21,851 | INFO | [2m2026-09-02T13:03:21.851179Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mTATAPOWER[0m
+2026-09-02 13:03:22,452 | INFO | [2m2026-09-02T13:03:22.452406Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m5/6[0m [36msymbol[0m=[35mCANBK[0m
+2026-09-02 13:03:23,277 | INFO | [2m2026-09-02T13:03:23.277837Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mCANBK[0m
+2026-09-02 13:03:23,280 | INFO | [2m2026-09-02T13:03:23.280229Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_symbol   [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mprogress[0m=[35m6/6[0m [36msymbol[0m=[35mITC[0m
+2026-09-02 13:03:24,119 | INFO | [2m2026-09-02T13:03:24.119591Z[0m [[32m[1minfo     [0m] [1mswing_symbol_data_ready       [0m [[0m[1m[34mastra_trade.pipeline[0m][0m [36mrows[0m=[35m1240[0m [36msymbol[0m=[35mITC[0m
+2026-09-02 13:03:24,126 | INFO | [2m2026-09-02T13:03:24.125884Z[0m [[32m[1minfo     [0m] [1mswing_data_ingestion_done     [0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m6[0m
+2026-09-02 13:03:24,483 | INFO | [2m2026-09-02T13:03:24.483618Z[0m [[32m[1minfo     [0m] [1mswing_feature_engineering_done[0m [[0m[1m[34mastra_trade[0m][0m [36mn_symbols[0m=[35m6[0m
 ============================================================
 HYBRID QML TRAINING PIPELINE
-  Training samples: 1288, Validation samples: 0
-  Features: 56, Sequence length: 20
+  Training samples: 1095, Validation samples: 96
+  Features: 55, Sequence length: 20
 ============================================================
 
 [1/4] Training LSTM Sequence Model...
-Epoch 10/100 | Train Loss: 0.4080 | Train Acc: 0.8465
-Epoch 20/100 | Train Loss: 0.2335 | Train Acc: 0.9216
-Epoch 30/100 | Train Loss: 0.1840 | Train Acc: 0.9284
-Epoch 40/100 | Train Loss: 0.1516 | Train Acc: 0.9454
-Epoch 50/100 | Train Loss: 0.1398 | Train Acc: 0.9429
-Epoch 60/100 | Train Loss: 0.1098 | Train Acc: 0.9565
-Epoch 70/100 | Train Loss: 0.0942 | Train Acc: 0.9574
-Epoch 80/100 | Train Loss: 0.1156 | Train Acc: 0.9582
-Epoch 90/100 | Train Loss: 0.0898 | Train Acc: 0.9599
-Epoch 100/100 | Train Loss: 0.0792 | Train Acc: 0.9676
-  LSTM trained in 4.4s. Best val acc: 0.0000
+Epoch 10/100 | Train Loss: 0.4117 | Val Loss: 0.8865 | Val Acc: 0.4211
+Epoch 20/100 | Train Loss: 0.2429 | Val Loss: 1.8106 | Val Acc: 0.2632
+Early stopping at epoch 23
+  LSTM trained in 5.5s. Best val acc: 0.9737
 
 [2/4] Training XGBoost Classifier...
-  XGBoost trained in 0.3s. Val F1: 0.0000
+  XGBoost trained in 0.1s. Val F1: 0.5705
 
 [3/4] Training Quantum Kernel SVM...
 Quantum Kernel: using StatevectorSampler (V2, exact simulation)
   Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
-  Quantum Kernel: QSVC fit completed in 64.5s
-  Quantum Kernel trained in 194.6s. Train acc: 1.0000, Val acc: nan
+  Quantum Kernel: QSVC fit completed in 126.1s
+Quantum Kernel: using StatevectorSampler (V2, exact simulation)
+  Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
+  Quantum Kernel: QSVC fit completed in 98.4s
+Quantum Kernel: using StatevectorSampler (V2, exact simulation)
+  Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
+  Quantum Kernel: QSVC fit completed in 157.6s
+  Quantum depth adaptation: chose reps=1 (val_acc=0.6771)
+  Quantum Kernel trained in 1639.4s. Train acc: 1.0000, Val acc: 0.6771
 
 [4/4] Training Variational Quantum Circuit...
 VQC: using V1 Sampler (statevector, exact simulation)
   VQC: fitting on 300 samples, 48 parameters, optimizer=SPSA...
-2026-09-02 12:07:05,394 | INFO | SPSA: Starting calibration of learning rate and perturbation.
-2026-09-02 12:07:45,727 | INFO | Finished calibration:
-2026-09-02 12:07:45,728 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 15.659778522824567, A = 0, alpha = 0.602
-2026-09-02 12:07:45,728 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
-2026-09-02 12:07:45,728 | INFO | SPSA: Starting optimization.
-2026-09-02 12:07:47,219 | INFO | Iteration 1/101 done in 1.4912736415863037.
-2026-09-02 12:07:49,083 | INFO | Iteration 2/101 done in 1.8642165660858154.
-2026-09-02 12:07:50,594 | INFO | Iteration 3/101 done in 1.5100908279418945.
-2026-09-02 12:07:52,368 | INFO | Iteration 4/101 done in 1.7740893363952637.
-2026-09-02 12:07:53,855 | INFO | Iteration 5/101 done in 1.4865705966949463.
-2026-09-02 12:07:55,658 | INFO | Iteration 6/101 done in 1.8036057949066162.
-2026-09-02 12:07:57,156 | INFO | Iteration 7/101 done in 1.4971959590911865.
-2026-09-02 12:07:58,948 | INFO | Iteration 8/101 done in 1.7921257019042969.
-2026-09-02 12:08:00,458 | INFO | Iteration 9/101 done in 1.5094380378723145.
-2026-09-02 12:08:01,968 | INFO | Iteration 10/101 done in 1.5097789764404297.
-2026-09-02 12:08:03,835 | INFO | Iteration 11/101 done in 1.8675622940063477.
-2026-09-02 12:08:05,353 | INFO | Iteration 12/101 done in 1.5171222686767578.
-2026-09-02 12:08:07,110 | INFO | Iteration 13/101 done in 1.757382869720459.
-2026-09-02 12:08:08,629 | INFO | Iteration 14/101 done in 1.51820969581604.
-2026-09-02 12:08:10,448 | INFO | Iteration 15/101 done in 1.8190090656280518.
-2026-09-02 12:08:11,942 | INFO | Iteration 16/101 done in 1.4938111305236816.
-2026-09-02 12:08:13,684 | INFO | Iteration 17/101 done in 1.7425436973571777.
-2026-09-02 12:08:15,168 | INFO | Iteration 18/101 done in 1.4838602542877197.
-2026-09-02 12:08:16,654 | INFO | Iteration 19/101 done in 1.485813856124878.
-2026-09-02 12:08:18,457 | INFO | Iteration 20/101 done in 1.802886962890625.
-2026-09-02 12:08:19,993 | INFO | Iteration 21/101 done in 1.5353660583496094.
-2026-09-02 12:08:21,831 | INFO | Iteration 22/101 done in 1.837683916091919.
-2026-09-02 12:08:23,315 | INFO | Iteration 23/101 done in 1.484438419342041.
-2026-09-02 12:08:25,121 | INFO | Iteration 24/101 done in 1.8052985668182373.
-2026-09-02 12:08:26,615 | INFO | Iteration 25/101 done in 1.4935901165008545.
-2026-09-02 12:08:28,367 | INFO | Iteration 26/101 done in 1.7522199153900146.
-2026-09-02 12:08:29,889 | INFO | Iteration 27/101 done in 1.5218756198883057.
-2026-09-02 12:08:31,348 | INFO | Iteration 28/101 done in 1.4591164588928223.
-2026-09-02 12:08:33,140 | INFO | Iteration 29/101 done in 1.791621208190918.
-2026-09-02 12:08:34,683 | INFO | Iteration 30/101 done in 1.542539358139038.
-2026-09-02 12:08:36,540 | INFO | Iteration 31/101 done in 1.8575387001037598.
-2026-09-02 12:08:38,064 | INFO | Iteration 32/101 done in 1.5238714218139648.
-2026-09-02 12:08:39,832 | INFO | Iteration 33/101 done in 1.767759084701538.
-2026-09-02 12:08:41,332 | INFO | Iteration 34/101 done in 1.4994099140167236.
-2026-09-02 12:08:43,055 | INFO | Iteration 35/101 done in 1.7230432033538818.
-2026-09-02 12:08:44,544 | INFO | Iteration 36/101 done in 1.4887244701385498.
-2026-09-02 12:08:46,061 | INFO | Iteration 37/101 done in 1.51688814163208.
-2026-09-02 12:08:47,899 | INFO | Iteration 38/101 done in 1.8374722003936768.
-2026-09-02 12:08:49,407 | INFO | Iteration 39/101 done in 1.5083346366882324.
-2026-09-02 12:08:51,185 | INFO | Iteration 40/101 done in 1.7777903079986572.
-2026-09-02 12:08:52,666 | INFO | Iteration 41/101 done in 1.4805049896240234.
-2026-09-02 12:08:54,407 | INFO | Iteration 42/101 done in 1.7408733367919922.
-2026-09-02 12:08:55,887 | INFO | Iteration 43/101 done in 1.4798691272735596.
-2026-09-02 12:08:57,720 | INFO | Iteration 44/101 done in 1.8333308696746826.
-2026-09-02 12:08:59,257 | INFO | Iteration 45/101 done in 1.5368545055389404.
-2026-09-02 12:09:00,724 | INFO | Iteration 46/101 done in 1.4668831825256348.
-2026-09-02 12:09:02,620 | INFO | Iteration 47/101 done in 1.8949840068817139.
-2026-09-02 12:09:04,097 | INFO | Iteration 48/101 done in 1.4777684211730957.
-2026-09-02 12:09:05,862 | INFO | Iteration 49/101 done in 1.7645764350891113.
-2026-09-02 12:09:07,337 | INFO | Iteration 50/101 done in 1.4745557308197021.
-2026-09-02 12:09:09,158 | INFO | Iteration 51/101 done in 1.8208081722259521.
-2026-09-02 12:09:10,705 | INFO | Iteration 52/101 done in 1.546905755996704.
-2026-09-02 12:09:12,485 | INFO | Iteration 53/101 done in 1.779764175415039.
-2026-09-02 12:09:13,972 | INFO | Iteration 54/101 done in 1.4871149063110352.
-2026-09-02 12:09:15,454 | INFO | Iteration 55/101 done in 1.4820880889892578.
-2026-09-02 12:09:17,200 | INFO | Iteration 56/101 done in 1.7455754280090332.
-2026-09-02 12:09:18,701 | INFO | Iteration 57/101 done in 1.5007154941558838.
-2026-09-02 12:09:20,585 | INFO | Iteration 58/101 done in 1.8843159675598145.
-2026-09-02 12:09:22,063 | INFO | Iteration 59/101 done in 1.4770171642303467.
-2026-09-02 12:09:23,799 | INFO | Iteration 60/101 done in 1.7359633445739746.
-2026-09-02 12:09:25,308 | INFO | Iteration 61/101 done in 1.509171485900879.
-2026-09-02 12:09:27,065 | INFO | Iteration 62/101 done in 1.7567181587219238.
-2026-09-02 12:09:28,567 | INFO | Iteration 63/101 done in 1.5020389556884766.
-2026-09-02 12:09:30,072 | INFO | Iteration 64/101 done in 1.504542350769043.
-2026-09-02 12:09:31,849 | INFO | Iteration 65/101 done in 1.7772717475891113.
-2026-09-02 12:09:33,388 | INFO | Iteration 66/101 done in 1.5384752750396729.
-2026-09-02 12:09:35,226 | INFO | Iteration 67/101 done in 1.837611436843872.
-2026-09-02 12:09:36,724 | INFO | Iteration 68/101 done in 1.4982500076293945.
-2026-09-02 12:09:38,486 | INFO | Iteration 69/101 done in 1.7612357139587402.
-2026-09-02 12:09:39,997 | INFO | Iteration 70/101 done in 1.5109717845916748.
-2026-09-02 12:09:41,756 | INFO | Iteration 71/101 done in 1.7588653564453125.
-2026-09-02 12:09:43,262 | INFO | Iteration 72/101 done in 1.5062153339385986.
-2026-09-02 12:09:44,781 | INFO | Iteration 73/101 done in 1.5186879634857178.
-2026-09-02 12:09:46,629 | INFO | Iteration 74/101 done in 1.848146677017212.
-2026-09-02 12:09:48,120 | INFO | Iteration 75/101 done in 1.4903144836425781.
-2026-09-02 12:09:49,902 | INFO | Iteration 76/101 done in 1.7818796634674072.
-2026-09-02 12:09:51,409 | INFO | Iteration 77/101 done in 1.5073745250701904.
-2026-09-02 12:09:53,211 | INFO | Iteration 78/101 done in 1.8015830516815186.
-2026-09-02 12:09:54,766 | INFO | Iteration 79/101 done in 1.554898977279663.
-2026-09-02 12:09:56,536 | INFO | Iteration 80/101 done in 1.7699034214019775.
-2026-09-02 12:09:58,015 | INFO | Iteration 81/101 done in 1.4789388179779053.
-2026-09-02 12:09:59,481 | INFO | Iteration 82/101 done in 1.4659061431884766.
-2026-09-02 12:10:01,257 | INFO | Iteration 83/101 done in 1.7756719589233398.
-2026-09-02 12:10:02,766 | INFO | Iteration 84/101 done in 1.5086166858673096.
-2026-09-02 12:10:04,579 | INFO | Iteration 85/101 done in 1.812500238418579.
-2026-09-02 12:10:06,048 | INFO | Iteration 86/101 done in 1.4692497253417969.
-2026-09-02 12:10:07,850 | INFO | Iteration 87/101 done in 1.8022608757019043.
-2026-09-02 12:10:09,356 | INFO | Iteration 88/101 done in 1.5051283836364746.
-2026-09-02 12:10:11,115 | INFO | Iteration 89/101 done in 1.7594459056854248.
-2026-09-02 12:10:12,623 | INFO | Iteration 90/101 done in 1.5078771114349365.
-2026-09-02 12:10:14,159 | INFO | Iteration 91/101 done in 1.5352835655212402.
-2026-09-02 12:10:15,938 | INFO | Iteration 92/101 done in 1.7791557312011719.
-2026-09-02 12:10:17,411 | INFO | Iteration 93/101 done in 1.473067283630371.
-2026-09-02 12:10:19,168 | INFO | Iteration 94/101 done in 1.7563390731811523.
-2026-09-02 12:10:20,641 | INFO | Iteration 95/101 done in 1.4728517532348633.
-2026-09-02 12:10:22,460 | INFO | Iteration 96/101 done in 1.8188707828521729.
-2026-09-02 12:10:23,971 | INFO | Iteration 97/101 done in 1.5106463432312012.
-2026-09-02 12:10:25,713 | INFO | Iteration 98/101 done in 1.742138147354126.
-2026-09-02 12:10:27,190 | INFO | Iteration 99/101 done in 1.4770927429199219.
-2026-09-02 12:10:28,701 | INFO | Iteration 100/101 done in 1.5107064247131348.
-2026-09-02 12:10:28,701 | INFO | SPSA: Finished in 162.97368097305298
-  VQC: fit completed in 204.4s
-  VQC trained in 205.2s. Train acc: 0.6200, Val acc: nan
+2026-09-02 13:30:49,568 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 13:32:23,784 | INFO | Finished calibration:
+2026-09-02 13:32:23,788 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 26.29564260931808, A = 0, alpha = 0.602
+2026-09-02 13:32:23,794 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 13:32:23,796 | INFO | SPSA: Starting optimization.
+2026-09-02 13:32:27,833 | INFO | Iteration 1/101 done in 4.035937070846558.
+2026-09-02 13:32:31,518 | INFO | Iteration 2/101 done in 3.682011365890503.
+2026-09-02 13:32:34,925 | INFO | Iteration 3/101 done in 3.40067720413208.
+2026-09-02 13:32:38,856 | INFO | Iteration 4/101 done in 3.9271557331085205.
+2026-09-02 13:32:42,606 | INFO | Iteration 5/101 done in 3.745699405670166.
+2026-09-02 13:32:46,604 | INFO | Iteration 6/101 done in 3.980497360229492.
+2026-09-02 13:32:50,378 | INFO | Iteration 7/101 done in 3.757775068283081.
+2026-09-02 13:32:53,890 | INFO | Iteration 8/101 done in 3.5069148540496826.
+2026-09-02 13:32:57,464 | INFO | Iteration 9/101 done in 3.569439172744751.
+2026-09-02 13:33:01,520 | INFO | Iteration 10/101 done in 4.0522215366363525.
+2026-09-02 13:33:05,331 | INFO | Iteration 11/101 done in 3.800373077392578.
+2026-09-02 13:33:09,080 | INFO | Iteration 12/101 done in 3.7406458854675293.
+2026-09-02 13:33:13,190 | INFO | Iteration 13/101 done in 4.105461597442627.
+2026-09-02 13:33:16,923 | INFO | Iteration 14/101 done in 3.72880220413208.
+2026-09-02 13:33:20,970 | INFO | Iteration 15/101 done in 4.039272785186768.
+2026-09-02 13:33:24,683 | INFO | Iteration 16/101 done in 3.707594633102417.
+2026-09-02 13:33:28,600 | INFO | Iteration 17/101 done in 3.913731813430786.
+2026-09-02 13:33:32,442 | INFO | Iteration 18/101 done in 3.7933340072631836.
+2026-09-02 13:33:36,431 | INFO | Iteration 19/101 done in 3.9841673374176025.
+2026-09-02 13:33:40,049 | INFO | Iteration 20/101 done in 3.613633871078491.
+2026-09-02 13:33:43,235 | INFO | Iteration 21/101 done in 3.17179536819458.
+2026-09-02 13:33:46,691 | INFO | Iteration 22/101 done in 3.4463701248168945.
+2026-09-02 13:33:50,082 | INFO | Iteration 23/101 done in 3.3869118690490723.
+2026-09-02 13:33:53,677 | INFO | Iteration 24/101 done in 3.5911641120910645.
+2026-09-02 13:33:57,143 | INFO | Iteration 25/101 done in 3.4619193077087402.
+2026-09-02 13:34:01,205 | INFO | Iteration 26/101 done in 4.055917978286743.
+2026-09-02 13:34:04,979 | INFO | Iteration 27/101 done in 3.7389490604400635.
+2026-09-02 13:34:08,928 | INFO | Iteration 28/101 done in 3.9433658123016357.
+2026-09-02 13:34:12,795 | INFO | Iteration 29/101 done in 3.8617563247680664.
+2026-09-02 13:34:16,527 | INFO | Iteration 30/101 done in 3.7256019115448.
+2026-09-02 13:34:20,540 | INFO | Iteration 31/101 done in 4.009130954742432.
+2026-09-02 13:34:23,787 | INFO | Iteration 32/101 done in 3.2252509593963623.
+2026-09-02 13:34:27,261 | INFO | Iteration 33/101 done in 3.47023606300354.
+2026-09-02 13:34:30,403 | INFO | Iteration 34/101 done in 3.137171745300293.
+2026-09-02 13:34:33,869 | INFO | Iteration 35/101 done in 3.437645435333252.
+2026-09-02 13:34:37,291 | INFO | Iteration 36/101 done in 3.4180748462677.
+2026-09-02 13:34:40,795 | INFO | Iteration 37/101 done in 3.499161958694458.
+2026-09-02 13:34:44,231 | INFO | Iteration 38/101 done in 3.432117223739624.
+2026-09-02 13:34:47,402 | INFO | Iteration 39/101 done in 3.1663060188293457.
+2026-09-02 13:34:50,914 | INFO | Iteration 40/101 done in 3.48883318901062.
+2026-09-02 13:34:54,355 | INFO | Iteration 41/101 done in 3.4308972358703613.
+2026-09-02 13:34:57,842 | INFO | Iteration 42/101 done in 3.481241464614868.
+2026-09-02 13:35:01,573 | INFO | Iteration 43/101 done in 3.726262331008911.
+2026-09-02 13:35:05,292 | INFO | Iteration 44/101 done in 3.714500904083252.
+2026-09-02 13:35:09,019 | INFO | Iteration 45/101 done in 3.723498582839966.
+2026-09-02 13:35:12,693 | INFO | Iteration 46/101 done in 3.6689722537994385.
+2026-09-02 13:35:16,141 | INFO | Iteration 47/101 done in 3.444605588912964.
+2026-09-02 13:35:19,520 | INFO | Iteration 48/101 done in 3.374368667602539.
+2026-09-02 13:35:23,284 | INFO | Iteration 49/101 done in 3.759561538696289.
+2026-09-02 13:35:27,017 | INFO | Iteration 50/101 done in 3.7284491062164307.
+2026-09-02 13:35:30,762 | INFO | Iteration 51/101 done in 3.73376202583313.
+2026-09-02 13:35:33,934 | INFO | Iteration 52/101 done in 3.165360927581787.
+2026-09-02 13:35:37,868 | INFO | Iteration 53/101 done in 3.930037021636963.
+2026-09-02 13:35:41,027 | INFO | Iteration 54/101 done in 3.1519386768341064.
+2026-09-02 13:35:44,480 | INFO | Iteration 55/101 done in 3.443223714828491.
+2026-09-02 13:35:48,112 | INFO | Iteration 56/101 done in 3.627232074737549.
+2026-09-02 13:35:52,088 | INFO | Iteration 57/101 done in 3.95953106880188.
+2026-09-02 13:35:55,869 | INFO | Iteration 58/101 done in 3.7338907718658447.
+2026-09-02 13:35:59,526 | INFO | Iteration 59/101 done in 3.653221607208252.
+2026-09-02 13:36:03,470 | INFO | Iteration 60/101 done in 3.9392781257629395.
+2026-09-02 13:36:07,207 | INFO | Iteration 61/101 done in 3.7321159839630127.
+2026-09-02 13:36:11,273 | INFO | Iteration 62/101 done in 3.9972896575927734.
+2026-09-02 13:36:15,000 | INFO | Iteration 63/101 done in 3.7209761142730713.
+2026-09-02 13:36:18,907 | INFO | Iteration 64/101 done in 3.867588758468628.
+2026-09-02 13:36:22,504 | INFO | Iteration 65/101 done in 3.544638156890869.
+2026-09-02 13:36:26,192 | INFO | Iteration 66/101 done in 3.6521100997924805.
+2026-09-02 13:36:30,027 | INFO | Iteration 67/101 done in 3.8310697078704834.
+2026-09-02 13:36:33,811 | INFO | Iteration 68/101 done in 3.7711193561553955.
+2026-09-02 13:36:37,612 | INFO | Iteration 69/101 done in 3.775963306427002.
+2026-09-02 13:36:41,305 | INFO | Iteration 70/101 done in 3.6710619926452637.
+2026-09-02 13:36:45,031 | INFO | Iteration 71/101 done in 3.6863133907318115.
+2026-09-02 13:36:48,585 | INFO | Iteration 72/101 done in 3.5468764305114746.
+2026-09-02 13:36:52,672 | INFO | Iteration 73/101 done in 4.081841468811035.
+2026-09-02 13:36:56,403 | INFO | Iteration 74/101 done in 3.72483229637146.
+2026-09-02 13:37:00,561 | INFO | Iteration 75/101 done in 4.02950119972229.
+2026-09-02 13:37:03,929 | INFO | Iteration 76/101 done in 3.3624067306518555.
+2026-09-02 13:37:07,404 | INFO | Iteration 77/101 done in 3.435568332672119.
+2026-09-02 13:37:11,421 | INFO | Iteration 78/101 done in 3.976804733276367.
+2026-09-02 13:37:15,229 | INFO | Iteration 79/101 done in 3.796005964279175.
+2026-09-02 13:37:19,287 | INFO | Iteration 80/101 done in 4.027829885482788.
+2026-09-02 13:37:23,063 | INFO | Iteration 81/101 done in 3.772425413131714.
+2026-09-02 13:37:26,959 | INFO | Iteration 82/101 done in 3.8901283740997314.
+2026-09-02 13:37:30,683 | INFO | Iteration 83/101 done in 3.7184834480285645.
+2026-09-02 13:37:34,662 | INFO | Iteration 84/101 done in 3.975388765335083.
+2026-09-02 13:37:37,895 | INFO | Iteration 85/101 done in 3.2285094261169434.
+2026-09-02 13:37:41,524 | INFO | Iteration 86/101 done in 3.62576961517334.
+2026-09-02 13:37:45,231 | INFO | Iteration 87/101 done in 3.678269624710083.
+2026-09-02 13:37:48,427 | INFO | Iteration 88/101 done in 3.169182300567627.
+2026-09-02 13:37:51,877 | INFO | Iteration 89/101 done in 3.445892333984375.
+2026-09-02 13:37:55,053 | INFO | Iteration 90/101 done in 3.1715338230133057.
+2026-09-02 13:37:58,707 | INFO | Iteration 91/101 done in 3.6503567695617676.
+2026-09-02 13:38:02,395 | INFO | Iteration 92/101 done in 3.670227289199829.
+2026-09-02 13:38:06,177 | INFO | Iteration 93/101 done in 3.7776236534118652.
+2026-09-02 13:38:09,953 | INFO | Iteration 94/101 done in 3.769751787185669.
+2026-09-02 13:38:13,708 | INFO | Iteration 95/101 done in 3.751760959625244.
+2026-09-02 13:38:17,533 | INFO | Iteration 96/101 done in 3.805619239807129.
+2026-09-02 13:38:21,350 | INFO | Iteration 97/101 done in 3.8137216567993164.
+2026-09-02 13:38:25,447 | INFO | Iteration 98/101 done in 4.091599464416504.
+2026-09-02 13:38:29,416 | INFO | Iteration 99/101 done in 3.9631543159484863.
+2026-09-02 13:38:33,466 | INFO | Iteration 100/101 done in 4.037867784500122.
+2026-09-02 13:38:33,470 | INFO | SPSA: Finished in 369.67242193222046
+  VQC: fit completed in 465.8s
+VQC: using V1 Sampler (statevector, exact simulation)
+  VQC: fitting on 300 samples, 32 parameters, optimizer=SPSA...
+2026-09-02 13:38:37,901 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 13:39:55,684 | INFO | Finished calibration:
+2026-09-02 13:39:55,689 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 53.16447473409862, A = 0, alpha = 0.602
+2026-09-02 13:39:55,690 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 13:39:55,692 | INFO | SPSA: Starting optimization.
+2026-09-02 13:39:59,138 | INFO | Iteration 1/101 done in 3.4441657066345215.
+2026-09-02 13:40:02,219 | INFO | Iteration 2/101 done in 3.0758469104766846.
+2026-09-02 13:40:05,550 | INFO | Iteration 3/101 done in 3.3242948055267334.
+2026-09-02 13:40:08,593 | INFO | Iteration 4/101 done in 3.0391504764556885.
+2026-09-02 13:40:11,501 | INFO | Iteration 5/101 done in 2.9046525955200195.
+2026-09-02 13:40:14,477 | INFO | Iteration 6/101 done in 2.943098783493042.
+2026-09-02 13:40:17,576 | INFO | Iteration 7/101 done in 3.0923545360565186.
+2026-09-02 13:40:21,138 | INFO | Iteration 8/101 done in 3.553138256072998.
+2026-09-02 13:40:24,264 | INFO | Iteration 9/101 done in 3.123613119125366.
+2026-09-02 13:40:27,926 | INFO | Iteration 10/101 done in 3.637439250946045.
+2026-09-02 13:40:31,175 | INFO | Iteration 11/101 done in 3.2405765056610107.
+2026-09-02 13:40:34,563 | INFO | Iteration 12/101 done in 3.3823609352111816.
+2026-09-02 13:40:37,515 | INFO | Iteration 13/101 done in 2.946861743927002.
+2026-09-02 13:40:41,248 | INFO | Iteration 14/101 done in 3.7148995399475098.
+2026-09-02 13:40:44,383 | INFO | Iteration 15/101 done in 3.1281347274780273.
+2026-09-02 13:40:47,475 | INFO | Iteration 16/101 done in 3.081770658493042.
+2026-09-02 13:40:50,816 | INFO | Iteration 17/101 done in 3.335839033126831.
+2026-09-02 13:40:53,913 | INFO | Iteration 18/101 done in 3.0854499340057373.
+2026-09-02 13:40:57,330 | INFO | Iteration 19/101 done in 3.4081385135650635.
+2026-09-02 13:41:00,529 | INFO | Iteration 20/101 done in 3.195307970046997.
+2026-09-02 13:41:04,145 | INFO | Iteration 21/101 done in 3.611741304397583.
+2026-09-02 13:41:07,261 | INFO | Iteration 22/101 done in 3.111826181411743.
+2026-09-02 13:41:10,672 | INFO | Iteration 23/101 done in 3.406592845916748.
+2026-09-02 13:41:13,815 | INFO | Iteration 24/101 done in 3.1381659507751465.
+2026-09-02 13:41:16,923 | INFO | Iteration 25/101 done in 3.0999791622161865.
+2026-09-02 13:41:20,280 | INFO | Iteration 26/101 done in 3.353663682937622.
+2026-09-02 13:41:25,094 | INFO | Iteration 27/101 done in 3.1080517768859863.
+2026-09-02 13:41:28,375 | INFO | Iteration 28/101 done in 3.275245189666748.
+2026-09-02 13:41:31,412 | INFO | Iteration 29/101 done in 3.028780937194824.
+2026-09-02 13:41:34,893 | INFO | Iteration 30/101 done in 3.3928351402282715.
+2026-09-02 13:41:37,822 | INFO | Iteration 31/101 done in 2.9200398921966553.
+2026-09-02 13:41:41,317 | INFO | Iteration 32/101 done in 3.4769399166107178.
+2026-09-02 13:41:44,655 | INFO | Iteration 33/101 done in 3.310917854309082.
+2026-09-02 13:41:47,852 | INFO | Iteration 34/101 done in 3.1920013427734375.
+2026-09-02 13:41:51,601 | INFO | Iteration 35/101 done in 3.743990182876587.
+2026-09-02 13:41:54,754 | INFO | Iteration 36/101 done in 3.1108498573303223.
+2026-09-02 13:41:58,140 | INFO | Iteration 37/101 done in 3.37674617767334.
+2026-09-02 13:42:01,189 | INFO | Iteration 38/101 done in 3.0441477298736572.
+2026-09-02 13:42:04,467 | INFO | Iteration 39/101 done in 3.272613048553467.
+2026-09-02 13:42:07,555 | INFO | Iteration 40/101 done in 3.084439277648926.
+2026-09-02 13:42:10,984 | INFO | Iteration 41/101 done in 3.4242360591888428.
+2026-09-02 13:42:13,913 | INFO | Iteration 42/101 done in 2.913661479949951.
+2026-09-02 13:42:17,168 | INFO | Iteration 43/101 done in 3.222710609436035.
+2026-09-02 13:42:20,605 | INFO | Iteration 44/101 done in 3.431372880935669.
+2026-09-02 13:42:23,704 | INFO | Iteration 45/101 done in 3.077889919281006.
+2026-09-02 13:42:27,215 | INFO | Iteration 46/101 done in 3.4901959896087646.
+2026-09-02 13:42:30,308 | INFO | Iteration 47/101 done in 3.08416748046875.
+2026-09-02 13:42:33,687 | INFO | Iteration 48/101 done in 3.3638792037963867.
+2026-09-02 13:42:36,796 | INFO | Iteration 49/101 done in 3.1050899028778076.
+2026-09-02 13:42:39,775 | INFO | Iteration 50/101 done in 2.9528231620788574.
+2026-09-02 13:42:42,643 | INFO | Iteration 51/101 done in 2.864206075668335.
+2026-09-02 13:42:45,500 | INFO | Iteration 52/101 done in 2.852191209793091.
+2026-09-02 13:42:48,646 | INFO | Iteration 53/101 done in 3.1225478649139404.
+2026-09-02 13:42:51,324 | INFO | Iteration 54/101 done in 2.6742172241210938.
+2026-09-02 13:42:54,706 | INFO | Iteration 55/101 done in 3.3774588108062744.
+2026-09-02 13:42:57,676 | INFO | Iteration 56/101 done in 2.9504992961883545.
+2026-09-02 13:43:01,003 | INFO | Iteration 57/101 done in 3.322885751724243.
+2026-09-02 13:43:04,105 | INFO | Iteration 58/101 done in 3.063305377960205.
+2026-09-02 13:43:07,027 | INFO | Iteration 59/101 done in 2.9041407108306885.
+2026-09-02 13:43:09,857 | INFO | Iteration 60/101 done in 2.8233957290649414.
+2026-09-02 13:43:12,693 | INFO | Iteration 61/101 done in 2.8325493335723877.
+2026-09-02 13:43:15,850 | INFO | Iteration 62/101 done in 3.1521553993225098.
+2026-09-02 13:43:18,971 | INFO | Iteration 63/101 done in 3.1175944805145264.
+2026-09-02 13:43:22,097 | INFO | Iteration 64/101 done in 3.112457275390625.
+2026-09-02 13:43:25,047 | INFO | Iteration 65/101 done in 2.9017045497894287.
+2026-09-02 13:43:28,381 | INFO | Iteration 66/101 done in 3.3294689655303955.
+2026-09-02 13:43:31,452 | INFO | Iteration 67/101 done in 3.0668857097625732.
+2026-09-02 13:43:34,799 | INFO | Iteration 68/101 done in 3.343017816543579.
+2026-09-02 13:43:37,886 | INFO | Iteration 69/101 done in 3.0617847442626953.
+2026-09-02 13:43:40,963 | INFO | Iteration 70/101 done in 3.0355398654937744.
+2026-09-02 13:43:44,260 | INFO | Iteration 71/101 done in 3.292071580886841.
+2026-09-02 13:43:47,309 | INFO | Iteration 72/101 done in 3.0451467037200928.
+2026-09-02 13:43:50,748 | INFO | Iteration 73/101 done in 3.409083366394043.
+2026-09-02 13:43:53,851 | INFO | Iteration 74/101 done in 3.0920767784118652.
+2026-09-02 13:43:57,216 | INFO | Iteration 75/101 done in 3.344874620437622.
+2026-09-02 13:44:00,304 | INFO | Iteration 76/101 done in 3.0692570209503174.
+2026-09-02 13:44:03,671 | INFO | Iteration 77/101 done in 3.3266842365264893.
+2026-09-02 13:44:06,744 | INFO | Iteration 78/101 done in 3.0684916973114014.
+2026-09-02 13:44:09,744 | INFO | Iteration 79/101 done in 2.9950032234191895.
+2026-09-02 13:44:13,163 | INFO | Iteration 80/101 done in 3.413969039916992.
+2026-09-02 13:44:16,277 | INFO | Iteration 81/101 done in 3.1076343059539795.
+2026-09-02 13:44:19,645 | INFO | Iteration 82/101 done in 3.364637613296509.
+2026-09-02 13:44:22,657 | INFO | Iteration 83/101 done in 3.005704879760742.
+2026-09-02 13:44:25,916 | INFO | Iteration 84/101 done in 3.2558813095092773.
+2026-09-02 13:44:28,794 | INFO | Iteration 85/101 done in 2.866826057434082.
+2026-09-02 13:44:32,114 | INFO | Iteration 86/101 done in 3.3130574226379395.
+2026-09-02 13:44:35,232 | INFO | Iteration 87/101 done in 3.10597825050354.
+2026-09-02 13:44:38,278 | INFO | Iteration 88/101 done in 3.042710065841675.
+2026-09-02 13:44:41,532 | INFO | Iteration 89/101 done in 3.2495486736297607.
+2026-09-02 13:44:44,613 | INFO | Iteration 90/101 done in 3.0756726264953613.
+2026-09-02 13:44:47,745 | INFO | Iteration 91/101 done in 3.1216816902160645.
+2026-09-02 13:44:50,852 | INFO | Iteration 92/101 done in 3.1029443740844727.
+2026-09-02 13:44:54,330 | INFO | Iteration 93/101 done in 3.474231243133545.
+2026-09-02 13:44:57,397 | INFO | Iteration 94/101 done in 3.063009262084961.
+2026-09-02 13:45:00,589 | INFO | Iteration 95/101 done in 3.1705315113067627.
+2026-09-02 13:45:03,251 | INFO | Iteration 96/101 done in 2.6537153720855713.
+2026-09-02 13:45:06,360 | INFO | Iteration 97/101 done in 3.1044678688049316.
+2026-09-02 13:45:09,632 | INFO | Iteration 98/101 done in 3.266223430633545.
+2026-09-02 13:45:12,264 | INFO | Iteration 99/101 done in 2.6260361671447754.
+2026-09-02 13:45:15,152 | INFO | Iteration 100/101 done in 2.8802430629730225.
+2026-09-02 13:45:15,158 | INFO | SPSA: Finished in 319.4633960723877
+  VQC: fit completed in 398.6s
+VQC: using V1 Sampler (statevector, exact simulation)
+  VQC: fitting on 300 samples, 64 parameters, optimizer=SPSA...
+2026-09-02 13:45:18,466 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 13:47:10,626 | INFO | Finished calibration:
+2026-09-02 13:47:10,632 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 30.472016801088056, A = 0, alpha = 0.602
+2026-09-02 13:47:10,634 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 13:47:10,636 | INFO | SPSA: Starting optimization.
+2026-09-02 13:47:15,386 | INFO | Iteration 1/101 done in 4.7475361824035645.
+2026-09-02 13:47:19,780 | INFO | Iteration 2/101 done in 4.389257431030273.
+2026-09-02 13:47:24,483 | INFO | Iteration 3/101 done in 4.696868181228638.
+2026-09-02 13:47:28,792 | INFO | Iteration 4/101 done in 4.305304765701294.
+2026-09-02 13:47:33,389 | INFO | Iteration 5/101 done in 4.591778993606567.
+2026-09-02 13:47:37,747 | INFO | Iteration 6/101 done in 4.348199129104614.
+2026-09-02 13:47:42,070 | INFO | Iteration 7/101 done in 4.320049285888672.
+2026-09-02 13:47:46,123 | INFO | Iteration 8/101 done in 4.044919967651367.
+2026-09-02 13:47:50,126 | INFO | Iteration 9/101 done in 3.994415044784546.
+2026-09-02 13:47:54,972 | INFO | Iteration 10/101 done in 4.842097043991089.
+2026-09-02 13:47:59,263 | INFO | Iteration 11/101 done in 4.281734943389893.
+2026-09-02 13:48:04,074 | INFO | Iteration 12/101 done in 4.8075079917907715.
+2026-09-02 13:48:08,498 | INFO | Iteration 13/101 done in 4.41957426071167.
+2026-09-02 13:48:13,186 | INFO | Iteration 14/101 done in 4.6851747035980225.
+2026-09-02 13:48:17,786 | INFO | Iteration 15/101 done in 4.593308925628662.
+2026-09-02 13:48:22,426 | INFO | Iteration 16/101 done in 4.636054515838623.
+2026-09-02 13:48:26,970 | INFO | Iteration 17/101 done in 4.539324998855591.
+2026-09-02 13:48:31,384 | INFO | Iteration 18/101 done in 4.409837245941162.
+2026-09-02 13:48:36,099 | INFO | Iteration 19/101 done in 4.710853338241577.
+2026-09-02 13:48:40,167 | INFO | Iteration 20/101 done in 4.036928653717041.
+2026-09-02 13:48:44,907 | INFO | Iteration 21/101 done in 4.7355499267578125.
+2026-09-02 13:48:49,389 | INFO | Iteration 22/101 done in 4.453790903091431.
+2026-09-02 13:48:53,804 | INFO | Iteration 23/101 done in 4.409447193145752.
+2026-09-02 13:48:58,285 | INFO | Iteration 24/101 done in 4.4440085887908936.
+2026-09-02 13:49:02,985 | INFO | Iteration 25/101 done in 4.696707487106323.
+2026-09-02 13:49:07,241 | INFO | Iteration 26/101 done in 4.252808094024658.
+2026-09-02 13:49:11,637 | INFO | Iteration 27/101 done in 4.390501260757446.
+2026-09-02 13:49:16,341 | INFO | Iteration 28/101 done in 4.700187683105469.
+2026-09-02 13:49:20,447 | INFO | Iteration 29/101 done in 4.101778507232666.
+2026-09-02 13:49:24,682 | INFO | Iteration 30/101 done in 4.231125354766846.
+2026-09-02 13:49:28,811 | INFO | Iteration 31/101 done in 4.125400066375732.
+2026-09-02 13:49:33,622 | INFO | Iteration 32/101 done in 4.7961180210113525.
+2026-09-02 13:49:38,116 | INFO | Iteration 33/101 done in 4.489762306213379.
+2026-09-02 13:49:42,717 | INFO | Iteration 34/101 done in 4.5826616287231445.
+2026-09-02 13:49:47,055 | INFO | Iteration 35/101 done in 4.326753377914429.
+2026-09-02 13:49:51,110 | INFO | Iteration 36/101 done in 4.051332473754883.
+2026-09-02 13:49:56,020 | INFO | Iteration 37/101 done in 4.836487531661987.
+2026-09-02 13:50:00,440 | INFO | Iteration 38/101 done in 4.413946151733398.
+2026-09-02 13:50:05,059 | INFO | Iteration 39/101 done in 4.61529278755188.
+2026-09-02 13:50:09,026 | INFO | Iteration 40/101 done in 3.890479803085327.
+2026-09-02 13:50:13,717 | INFO | Iteration 41/101 done in 4.686599016189575.
+2026-09-02 13:50:18,277 | INFO | Iteration 42/101 done in 4.5508198738098145.
+2026-09-02 13:50:22,918 | INFO | Iteration 43/101 done in 4.636560440063477.
+2026-09-02 13:50:26,788 | INFO | Iteration 44/101 done in 3.853790283203125.
+2026-09-02 13:50:31,112 | INFO | Iteration 45/101 done in 4.3191916942596436.
+2026-09-02 13:50:35,985 | INFO | Iteration 46/101 done in 4.86004900932312.
+2026-09-02 13:50:40,592 | INFO | Iteration 47/101 done in 4.60141658782959.
+2026-09-02 13:50:45,663 | INFO | Iteration 48/101 done in 5.063490152359009.
+2026-09-02 13:50:50,105 | INFO | Iteration 49/101 done in 4.437265157699585.
+2026-09-02 13:50:54,791 | INFO | Iteration 50/101 done in 4.655436754226685.
+2026-09-02 13:50:58,943 | INFO | Iteration 51/101 done in 4.146945476531982.
+2026-09-02 13:51:03,662 | INFO | Iteration 52/101 done in 4.7151007652282715.
+2026-09-02 13:51:08,108 | INFO | Iteration 53/101 done in 4.441632509231567.
+2026-09-02 13:51:12,291 | INFO | Iteration 54/101 done in 4.132693529129028.
+2026-09-02 13:51:17,159 | INFO | Iteration 55/101 done in 4.859301567077637.
+2026-09-02 13:51:21,871 | INFO | Iteration 56/101 done in 4.610846519470215.
+2026-09-02 13:51:26,624 | INFO | Iteration 57/101 done in 4.740458250045776.
+2026-09-02 13:51:31,002 | INFO | Iteration 58/101 done in 4.3441245555877686.
+2026-09-02 13:51:35,177 | INFO | Iteration 59/101 done in 4.143528699874878.
+2026-09-02 13:51:39,732 | INFO | Iteration 60/101 done in 4.551267385482788.
+2026-09-02 13:51:44,512 | INFO | Iteration 61/101 done in 4.748236894607544.
+2026-09-02 13:51:48,856 | INFO | Iteration 62/101 done in 4.328524112701416.
+2026-09-02 13:51:53,363 | INFO | Iteration 63/101 done in 4.502791166305542.
+2026-09-02 13:51:57,456 | INFO | Iteration 64/101 done in 4.089861631393433.
+2026-09-02 13:52:01,996 | INFO | Iteration 65/101 done in 4.454540491104126.
+2026-09-02 13:52:06,909 | INFO | Iteration 66/101 done in 4.908169746398926.
+2026-09-02 13:52:11,057 | INFO | Iteration 67/101 done in 4.128643274307251.
+2026-09-02 13:52:15,114 | INFO | Iteration 68/101 done in 4.052399158477783.
+2026-09-02 13:52:19,384 | INFO | Iteration 69/101 done in 4.259350776672363.
+2026-09-02 13:52:24,077 | INFO | Iteration 70/101 done in 4.685633182525635.
+2026-09-02 13:52:28,464 | INFO | Iteration 71/101 done in 4.3826727867126465.
+2026-09-02 13:52:32,854 | INFO | Iteration 72/101 done in 4.370313882827759.
+2026-09-02 13:52:36,907 | INFO | Iteration 73/101 done in 4.047948837280273.
+2026-09-02 13:52:40,708 | INFO | Iteration 74/101 done in 3.7826104164123535.
+2026-09-02 13:52:45,150 | INFO | Iteration 75/101 done in 4.424832582473755.
+2026-09-02 13:52:49,624 | INFO | Iteration 76/101 done in 4.46800684928894.
+2026-09-02 13:52:54,432 | INFO | Iteration 77/101 done in 4.803382635116577.
+2026-09-02 13:52:58,924 | INFO | Iteration 78/101 done in 4.444721698760986.
+2026-09-02 13:53:03,684 | INFO | Iteration 79/101 done in 4.7522125244140625.
+2026-09-02 13:53:08,127 | INFO | Iteration 80/101 done in 4.437769651412964.
+2026-09-02 13:53:12,661 | INFO | Iteration 81/101 done in 4.530100584030151.
+2026-09-02 13:53:17,397 | INFO | Iteration 82/101 done in 4.729000568389893.
+2026-09-02 13:53:21,808 | INFO | Iteration 83/101 done in 4.37583589553833.
+2026-09-02 13:53:26,365 | INFO | Iteration 84/101 done in 4.531239748001099.
+2026-09-02 13:53:30,474 | INFO | Iteration 85/101 done in 4.102489233016968.
+2026-09-02 13:53:34,836 | INFO | Iteration 86/101 done in 4.356919050216675.
+2026-09-02 13:53:38,917 | INFO | Iteration 87/101 done in 4.071733474731445.
+2026-09-02 13:53:43,311 | INFO | Iteration 88/101 done in 4.3123619556427.
+2026-09-02 13:53:47,788 | INFO | Iteration 89/101 done in 4.429852724075317.
+2026-09-02 13:53:53,094 | INFO | Iteration 90/101 done in 4.143859386444092.
+2026-09-02 13:53:57,466 | INFO | Iteration 91/101 done in 4.367942810058594.
+2026-09-02 13:54:01,824 | INFO | Iteration 92/101 done in 4.353403568267822.
+2026-09-02 13:54:06,467 | INFO | Iteration 93/101 done in 4.630233526229858.
+2026-09-02 13:54:10,892 | INFO | Iteration 94/101 done in 4.41759467124939.
+2026-09-02 13:54:15,691 | INFO | Iteration 95/101 done in 4.75435209274292.
+2026-09-02 13:54:19,520 | INFO | Iteration 96/101 done in 3.821547269821167.
+2026-09-02 13:54:23,990 | INFO | Iteration 97/101 done in 4.441559553146362.
+2026-09-02 13:54:28,434 | INFO | Iteration 98/101 done in 4.43932032585144.
+2026-09-02 13:54:32,754 | INFO | Iteration 99/101 done in 4.315289497375488.
+2026-09-02 13:54:36,871 | INFO | Iteration 100/101 done in 4.107319593429565.
+2026-09-02 13:54:36,877 | INFO | SPSA: Finished in 446.2389905452728
+  VQC: fit completed in 560.3s
+  VQC depth adaptation: chose reps=1 (val_acc=0.6771)
+  VQC trained in 1431.7s. Train acc: 0.5867, Val acc: 0.6771
 
 [5/5] Training Meta-Learner Ensemble...
-  Subsampled to 1000 samples for meta-learner
-  lstm predict_proba: 0.0s (1000 samples)
-  xgboost predict_proba: 0.0s (1000 samples)
+  lstm predict_proba: 0.0s (97 samples)
+  xgboost predict_proba: 0.0s (97 samples)
   qkernel predict_proba timed out after 30s — skipping
   qkernel predict_proba timed out after 30s — excluding from ensemble weight
-  vqc predict_proba: 2.8s (1000 samples)
-  Meta-learner trained with weights: {'lstm': 0.3093662366797532, 'xgboost': 0.3906337633202467, 'qkernel': 0.0, 'vqc': 0.3}
-  Meta-learner trained in 32.8s
+  vqc predict_proba: 1.2s (97 samples)
+  Meta-learner trained with weights: {'lstm': 0.45794392523364486, 'xgboost': 0.2420560747663551, 'qkernel': 0.0, 'vqc': 0.3}
+  Meta-learner trained in 31.2s
 
 ============================================================
 TRAINING COMPLETE
@@ -237,153 +456,370 @@ TRAINING COMPLETE
   qkernel predict_proba timed out after 30s — skipping
 ============================================================
 HYBRID QML TRAINING PIPELINE
-  Training samples: 2469, Validation samples: 0
-  Features: 56, Sequence length: 20
+  Training samples: 2116, Validation samples: 176
+  Features: 55, Sequence length: 20
 ============================================================
 
 [1/4] Training LSTM Sequence Model...
-Epoch 10/100 | Train Loss: 0.3352 | Train Acc: 0.8636
-Epoch 20/100 | Train Loss: 0.1980 | Train Acc: 0.9227
-Epoch 30/100 | Train Loss: 0.1737 | Train Acc: 0.9342
-Epoch 40/100 | Train Loss: 0.1316 | Train Acc: 0.9520
-Epoch 50/100 | Train Loss: 0.1183 | Train Acc: 0.9528
-Epoch 60/100 | Train Loss: 0.0980 | Train Acc: 0.9596
-Epoch 70/100 | Train Loss: 0.0919 | Train Acc: 0.9626
-Epoch 80/100 | Train Loss: 0.0767 | Train Acc: 0.9694
-Epoch 90/100 | Train Loss: 0.0721 | Train Acc: 0.9741
-Epoch 100/100 | Train Loss: 0.0634 | Train Acc: 0.9737
-  LSTM trained in 17.6s. Best val acc: 0.0000
+Epoch 10/100 | Train Loss: 0.3723 | Val Loss: 0.7336 | Val Acc: 0.6610
+Early stopping at epoch 17
+  LSTM trained in 33.1s. Best val acc: 0.6610
 
 [2/4] Training XGBoost Classifier...
-  XGBoost trained in 0.5s. Val F1: 0.0000
+  XGBoost trained in 0.4s. Val F1: 0.5614
 
 [3/4] Training Quantum Kernel SVM...
 Quantum Kernel: using StatevectorSampler (V2, exact simulation)
   Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
-  Quantum Kernel: QSVC fit completed in 66.2s
-  Quantum Kernel trained in 200.5s. Train acc: 1.0000, Val acc: nan
+  Quantum Kernel: QSVC fit completed in 681.7s
+Quantum Kernel: using StatevectorSampler (V2, exact simulation)
+  Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
+  Quantum Kernel: QSVC fit completed in 94.5s
+Quantum Kernel: using StatevectorSampler (V2, exact simulation)
+  Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
+  Quantum Kernel: QSVC fit completed in 155.6s
+  Quantum depth adaptation: chose reps=1 (val_acc=0.6533)
+  Quantum Kernel trained in 2578.6s. Train acc: 1.0000, Val acc: 0.6533
 
 [4/4] Training Variational Quantum Circuit...
 VQC: using V1 Sampler (statevector, exact simulation)
   VQC: fitting on 300 samples, 48 parameters, optimizer=SPSA...
-2026-09-02 12:17:48,902 | INFO | SPSA: Starting calibration of learning rate and perturbation.
-2026-09-02 12:18:29,659 | INFO | Finished calibration:
-2026-09-02 12:18:29,659 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 14.492567369612361, A = 0, alpha = 0.602
-2026-09-02 12:18:29,659 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
-2026-09-02 12:18:29,660 | INFO | SPSA: Starting optimization.
-2026-09-02 12:18:31,160 | INFO | Iteration 1/101 done in 1.5004329681396484.
-2026-09-02 12:18:32,921 | INFO | Iteration 2/101 done in 1.760706901550293.
-2026-09-02 12:18:34,435 | INFO | Iteration 3/101 done in 1.5141613483428955.
-2026-09-02 12:18:36,233 | INFO | Iteration 4/101 done in 1.797914743423462.
-2026-09-02 12:18:37,709 | INFO | Iteration 5/101 done in 1.4753999710083008.
-2026-09-02 12:18:39,165 | INFO | Iteration 6/101 done in 1.4557995796203613.
-2026-09-02 12:18:40,944 | INFO | Iteration 7/101 done in 1.7789874076843262.
-2026-09-02 12:18:42,406 | INFO | Iteration 8/101 done in 1.4614064693450928.
-2026-09-02 12:18:44,176 | INFO | Iteration 9/101 done in 1.7703747749328613.
-2026-09-02 12:18:45,636 | INFO | Iteration 10/101 done in 1.459610939025879.
-2026-09-02 12:18:47,436 | INFO | Iteration 11/101 done in 1.7999885082244873.
-2026-09-02 12:18:48,905 | INFO | Iteration 12/101 done in 1.4693448543548584.
-2026-09-02 12:18:50,628 | INFO | Iteration 13/101 done in 1.7226159572601318.
-2026-09-02 12:18:52,163 | INFO | Iteration 14/101 done in 1.5347464084625244.
-2026-09-02 12:18:53,661 | INFO | Iteration 15/101 done in 1.4981420040130615.
-2026-09-02 12:18:55,474 | INFO | Iteration 16/101 done in 1.8122622966766357.
-2026-09-02 12:18:56,943 | INFO | Iteration 17/101 done in 1.4692609310150146.
-2026-09-02 12:18:58,709 | INFO | Iteration 18/101 done in 1.7659187316894531.
-2026-09-02 12:19:00,213 | INFO | Iteration 19/101 done in 1.5033559799194336.
-2026-09-02 12:19:02,020 | INFO | Iteration 20/101 done in 1.8069946765899658.
-2026-09-02 12:19:03,500 | INFO | Iteration 21/101 done in 1.480072259902954.
-2026-09-02 12:19:05,245 | INFO | Iteration 22/101 done in 1.7444398403167725.
-2026-09-02 12:19:06,731 | INFO | Iteration 23/101 done in 1.486100435256958.
-2026-09-02 12:19:08,191 | INFO | Iteration 24/101 done in 1.4594929218292236.
-2026-09-02 12:19:09,957 | INFO | Iteration 25/101 done in 1.7659947872161865.
-2026-09-02 12:19:11,437 | INFO | Iteration 26/101 done in 1.479682207107544.
-2026-09-02 12:19:13,257 | INFO | Iteration 27/101 done in 1.8202974796295166.
-2026-09-02 12:19:14,730 | INFO | Iteration 28/101 done in 1.473142385482788.
-2026-09-02 12:19:16,520 | INFO | Iteration 29/101 done in 1.7889807224273682.
-2026-09-02 12:19:17,989 | INFO | Iteration 30/101 done in 1.4696240425109863.
-2026-09-02 12:19:19,744 | INFO | Iteration 31/101 done in 1.7543175220489502.
-2026-09-02 12:19:21,258 | INFO | Iteration 32/101 done in 1.513855218887329.
-2026-09-02 12:19:22,808 | INFO | Iteration 33/101 done in 1.5498864650726318.
-2026-09-02 12:19:24,658 | INFO | Iteration 34/101 done in 1.8494296073913574.
-2026-09-02 12:19:26,148 | INFO | Iteration 35/101 done in 1.4907102584838867.
-2026-09-02 12:19:27,909 | INFO | Iteration 36/101 done in 1.760634422302246.
-2026-09-02 12:19:29,387 | INFO | Iteration 37/101 done in 1.4776370525360107.
-2026-09-02 12:19:31,218 | INFO | Iteration 38/101 done in 1.8308100700378418.
-2026-09-02 12:19:32,699 | INFO | Iteration 39/101 done in 1.4808237552642822.
-2026-09-02 12:19:34,454 | INFO | Iteration 40/101 done in 1.7551569938659668.
-2026-09-02 12:19:35,961 | INFO | Iteration 41/101 done in 1.5066537857055664.
-2026-09-02 12:19:37,426 | INFO | Iteration 42/101 done in 1.4652507305145264.
-2026-09-02 12:19:39,221 | INFO | Iteration 43/101 done in 1.794837236404419.
-2026-09-02 12:19:40,733 | INFO | Iteration 44/101 done in 1.511549711227417.
-2026-09-02 12:19:42,556 | INFO | Iteration 45/101 done in 1.8230457305908203.
-2026-09-02 12:19:44,051 | INFO | Iteration 46/101 done in 1.4947104454040527.
-2026-09-02 12:19:45,853 | INFO | Iteration 47/101 done in 1.801192045211792.
-2026-09-02 12:19:47,347 | INFO | Iteration 48/101 done in 1.4938769340515137.
-2026-09-02 12:19:49,100 | INFO | Iteration 49/101 done in 1.7532694339752197.
-2026-09-02 12:19:50,604 | INFO | Iteration 50/101 done in 1.504103183746338.
-2026-09-02 12:19:52,146 | INFO | Iteration 51/101 done in 1.5416340827941895.
-2026-09-02 12:19:53,951 | INFO | Iteration 52/101 done in 1.8046987056732178.
-2026-09-02 12:19:55,463 | INFO | Iteration 53/101 done in 1.5115869045257568.
-2026-09-02 12:19:57,283 | INFO | Iteration 54/101 done in 1.8196775913238525.
-2026-09-02 12:19:58,776 | INFO | Iteration 55/101 done in 1.4934368133544922.
-2026-09-02 12:20:00,548 | INFO | Iteration 56/101 done in 1.7719089984893799.
-2026-09-02 12:20:02,052 | INFO | Iteration 57/101 done in 1.503826379776001.
-2026-09-02 12:20:03,885 | INFO | Iteration 58/101 done in 1.8329448699951172.
-2026-09-02 12:20:05,408 | INFO | Iteration 59/101 done in 1.5221810340881348.
-2026-09-02 12:20:06,885 | INFO | Iteration 60/101 done in 1.4767334461212158.
-2026-09-02 12:20:08,714 | INFO | Iteration 61/101 done in 1.8292498588562012.
-2026-09-02 12:20:10,197 | INFO | Iteration 62/101 done in 1.4826838970184326.
-2026-09-02 12:20:12,008 | INFO | Iteration 63/101 done in 1.8114314079284668.
-2026-09-02 12:20:13,513 | INFO | Iteration 64/101 done in 1.5039269924163818.
-2026-09-02 12:20:15,252 | INFO | Iteration 65/101 done in 1.738879919052124.
-2026-09-02 12:20:16,721 | INFO | Iteration 66/101 done in 1.4693419933319092.
-2026-09-02 12:20:18,490 | INFO | Iteration 67/101 done in 1.7683601379394531.
-2026-09-02 12:20:19,993 | INFO | Iteration 68/101 done in 1.5027883052825928.
-2026-09-02 12:20:21,451 | INFO | Iteration 69/101 done in 1.4584264755249023.
-2026-09-02 12:20:23,243 | INFO | Iteration 70/101 done in 1.7921669483184814.
-2026-09-02 12:20:24,759 | INFO | Iteration 71/101 done in 1.5156686305999756.
-2026-09-02 12:20:26,647 | INFO | Iteration 72/101 done in 1.8873438835144043.
-2026-09-02 12:20:28,124 | INFO | Iteration 73/101 done in 1.4770393371582031.
-2026-09-02 12:20:29,896 | INFO | Iteration 74/101 done in 1.7717325687408447.
-2026-09-02 12:20:31,371 | INFO | Iteration 75/101 done in 1.4748380184173584.
-2026-09-02 12:20:33,179 | INFO | Iteration 76/101 done in 1.807736873626709.
-2026-09-02 12:20:34,716 | INFO | Iteration 77/101 done in 1.5373198986053467.
-2026-09-02 12:20:36,214 | INFO | Iteration 78/101 done in 1.4975745677947998.
-2026-09-02 12:20:38,037 | INFO | Iteration 79/101 done in 1.822932481765747.
-2026-09-02 12:20:39,528 | INFO | Iteration 80/101 done in 1.490788459777832.
-2026-09-02 12:20:41,313 | INFO | Iteration 81/101 done in 1.7851793766021729.
-2026-09-02 12:20:42,832 | INFO | Iteration 82/101 done in 1.5183451175689697.
-2026-09-02 12:20:44,638 | INFO | Iteration 83/101 done in 1.8056995868682861.
-2026-09-02 12:20:46,148 | INFO | Iteration 84/101 done in 1.5102059841156006.
-2026-09-02 12:20:47,920 | INFO | Iteration 85/101 done in 1.771376132965088.
-2026-09-02 12:20:49,410 | INFO | Iteration 86/101 done in 1.4907159805297852.
-2026-09-02 12:20:50,919 | INFO | Iteration 87/101 done in 1.5086150169372559.
-2026-09-02 12:20:52,712 | INFO | Iteration 88/101 done in 1.7927491664886475.
-2026-09-02 12:20:54,192 | INFO | Iteration 89/101 done in 1.4796416759490967.
-2026-09-02 12:20:55,986 | INFO | Iteration 90/101 done in 1.7937321662902832.
-2026-09-02 12:20:57,482 | INFO | Iteration 91/101 done in 1.4958109855651855.
-2026-09-02 12:20:59,244 | INFO | Iteration 92/101 done in 1.7622346878051758.
-2026-09-02 12:21:00,726 | INFO | Iteration 93/101 done in 1.4820268154144287.
-2026-09-02 12:21:02,541 | INFO | Iteration 94/101 done in 1.8145418167114258.
-2026-09-02 12:21:04,020 | INFO | Iteration 95/101 done in 1.4785614013671875.
-2026-09-02 12:21:05,503 | INFO | Iteration 96/101 done in 1.4834058284759521.
-2026-09-02 12:21:07,336 | INFO | Iteration 97/101 done in 1.8324873447418213.
-2026-09-02 12:21:08,823 | INFO | Iteration 98/101 done in 1.487257957458496.
-2026-09-02 12:21:10,601 | INFO | Iteration 99/101 done in 1.7770411968231201.
-2026-09-02 12:21:12,130 | INFO | Iteration 100/101 done in 1.5294976234436035.
-2026-09-02 12:21:12,131 | INFO | SPSA: Finished in 162.47093081474304
-  VQC: fit completed in 204.3s
-  VQC trained in 205.1s. Train acc: 0.5967, Val acc: nan
+2026-09-02 14:42:02,647 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 14:43:36,263 | INFO | Finished calibration:
+2026-09-02 14:43:36,269 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 55.29868842767531, A = 0, alpha = 0.602
+2026-09-02 14:43:36,272 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 14:43:36,275 | INFO | SPSA: Starting optimization.
+2026-09-02 14:43:40,007 | INFO | Iteration 1/101 done in 3.7285149097442627.
+2026-09-02 14:43:44,157 | INFO | Iteration 2/101 done in 4.118618726730347.
+2026-09-02 14:43:47,890 | INFO | Iteration 3/101 done in 3.7258083820343018.
+2026-09-02 14:43:51,965 | INFO | Iteration 4/101 done in 4.070093393325806.
+2026-09-02 14:43:55,730 | INFO | Iteration 5/101 done in 3.760420560836792.
+2026-09-02 14:43:59,518 | INFO | Iteration 6/101 done in 3.7631702423095703.
+2026-09-02 14:44:03,566 | INFO | Iteration 7/101 done in 4.032081127166748.
+2026-09-02 14:44:07,356 | INFO | Iteration 8/101 done in 3.7827467918395996.
+2026-09-02 14:44:11,432 | INFO | Iteration 9/101 done in 4.0719733238220215.
+2026-09-02 14:44:14,931 | INFO | Iteration 10/101 done in 3.4950997829437256.
+2026-09-02 14:44:18,960 | INFO | Iteration 11/101 done in 4.024980545043945.
+2026-09-02 14:44:22,708 | INFO | Iteration 12/101 done in 3.7433111667633057.
+2026-09-02 14:44:26,727 | INFO | Iteration 13/101 done in 3.9698076248168945.
+2026-09-02 14:44:30,473 | INFO | Iteration 14/101 done in 3.7398664951324463.
+2026-09-02 14:44:34,170 | INFO | Iteration 15/101 done in 3.6938424110412598.
+2026-09-02 14:44:38,257 | INFO | Iteration 16/101 done in 4.082568645477295.
+2026-09-02 14:44:42,048 | INFO | Iteration 17/101 done in 3.7828924655914307.
+2026-09-02 14:44:46,146 | INFO | Iteration 18/101 done in 4.095086097717285.
+2026-09-02 14:44:49,856 | INFO | Iteration 19/101 done in 3.7065608501434326.
+2026-09-02 14:44:53,794 | INFO | Iteration 20/101 done in 3.934534788131714.
+2026-09-02 14:44:57,593 | INFO | Iteration 21/101 done in 3.794278860092163.
+2026-09-02 14:45:01,606 | INFO | Iteration 22/101 done in 4.008991241455078.
+2026-09-02 14:45:05,572 | INFO | Iteration 23/101 done in 3.948594093322754.
+2026-09-02 14:45:09,301 | INFO | Iteration 24/101 done in 3.722553253173828.
+2026-09-02 14:45:13,331 | INFO | Iteration 25/101 done in 4.007138729095459.
+2026-09-02 14:45:16,995 | INFO | Iteration 26/101 done in 3.6601991653442383.
+2026-09-02 14:45:21,020 | INFO | Iteration 27/101 done in 4.019562244415283.
+2026-09-02 14:45:24,832 | INFO | Iteration 28/101 done in 3.8042824268341064.
+2026-09-02 14:45:28,934 | INFO | Iteration 29/101 done in 4.099640130996704.
+2026-09-02 14:45:32,662 | INFO | Iteration 30/101 done in 3.723848581314087.
+2026-09-02 14:45:36,945 | INFO | Iteration 31/101 done in 4.2786781787872314.
+2026-09-02 14:45:40,497 | INFO | Iteration 32/101 done in 3.5471198558807373.
+2026-09-02 14:45:44,275 | INFO | Iteration 33/101 done in 3.744584083557129.
+2026-09-02 14:45:48,156 | INFO | Iteration 34/101 done in 3.875319480895996.
+2026-09-02 14:45:51,765 | INFO | Iteration 35/101 done in 3.60134220123291.
+2026-09-02 14:45:55,584 | INFO | Iteration 36/101 done in 3.8141231536865234.
+2026-09-02 14:45:59,024 | INFO | Iteration 37/101 done in 3.435492992401123.
+2026-09-02 14:46:02,472 | INFO | Iteration 38/101 done in 3.4372026920318604.
+2026-09-02 14:46:06,273 | INFO | Iteration 39/101 done in 3.794602155685425.
+2026-09-02 14:46:10,378 | INFO | Iteration 40/101 done in 4.100217580795288.
+2026-09-02 14:46:14,120 | INFO | Iteration 41/101 done in 3.737185001373291.
+2026-09-02 14:46:17,853 | INFO | Iteration 42/101 done in 3.718830108642578.
+2026-09-02 14:46:21,865 | INFO | Iteration 43/101 done in 3.990330696105957.
+2026-09-02 14:46:25,551 | INFO | Iteration 44/101 done in 3.681919574737549.
+2026-09-02 14:46:29,767 | INFO | Iteration 45/101 done in 4.209722995758057.
+2026-09-02 14:46:33,555 | INFO | Iteration 46/101 done in 3.7840356826782227.
+2026-09-02 14:46:37,693 | INFO | Iteration 47/101 done in 4.13371729850769.
+2026-09-02 14:46:41,347 | INFO | Iteration 48/101 done in 3.6496596336364746.
+2026-09-02 14:46:45,039 | INFO | Iteration 49/101 done in 3.685941219329834.
+2026-09-02 14:46:48,838 | INFO | Iteration 50/101 done in 3.794400930404663.
+2026-09-02 14:46:52,529 | INFO | Iteration 51/101 done in 3.6860971450805664.
+2026-09-02 14:46:56,612 | INFO | Iteration 52/101 done in 4.079392671585083.
+2026-09-02 14:47:00,451 | INFO | Iteration 53/101 done in 3.815704822540283.
+2026-09-02 14:47:04,535 | INFO | Iteration 54/101 done in 4.076796770095825.
+2026-09-02 14:47:08,432 | INFO | Iteration 55/101 done in 3.890322685241699.
+2026-09-02 14:47:12,771 | INFO | Iteration 56/101 done in 4.334089517593384.
+2026-09-02 14:47:16,931 | INFO | Iteration 57/101 done in 4.1523332595825195.
+2026-09-02 14:47:20,953 | INFO | Iteration 58/101 done in 4.016665935516357.
+2026-09-02 14:47:24,526 | INFO | Iteration 59/101 done in 3.570272207260132.
+2026-09-02 14:47:28,305 | INFO | Iteration 60/101 done in 3.77118182182312.
+2026-09-02 14:47:32,400 | INFO | Iteration 61/101 done in 4.068909645080566.
+2026-09-02 14:47:36,265 | INFO | Iteration 62/101 done in 3.8356106281280518.
+2026-09-02 14:47:40,272 | INFO | Iteration 63/101 done in 3.9993512630462646.
+2026-09-02 14:47:44,005 | INFO | Iteration 64/101 done in 3.7282047271728516.
+2026-09-02 14:47:47,720 | INFO | Iteration 65/101 done in 3.6942734718322754.
+2026-09-02 14:47:51,120 | INFO | Iteration 66/101 done in 3.3936071395874023.
+2026-09-02 14:47:54,918 | INFO | Iteration 67/101 done in 3.7930357456207275.
+2026-09-02 14:47:58,475 | INFO | Iteration 68/101 done in 3.5504932403564453.
+2026-09-02 14:48:02,256 | INFO | Iteration 69/101 done in 3.7780556678771973.
+2026-09-02 14:48:06,395 | INFO | Iteration 70/101 done in 4.135932445526123.
+2026-09-02 14:48:10,111 | INFO | Iteration 71/101 done in 3.710052490234375.
+2026-09-02 14:48:14,213 | INFO | Iteration 72/101 done in 4.0890350341796875.
+2026-09-02 14:48:18,046 | INFO | Iteration 73/101 done in 3.8218700885772705.
+2026-09-02 14:48:22,308 | INFO | Iteration 74/101 done in 4.249783992767334.
+2026-09-02 14:48:26,184 | INFO | Iteration 75/101 done in 3.853013753890991.
+2026-09-02 14:48:30,176 | INFO | Iteration 76/101 done in 3.986765146255493.
+2026-09-02 14:48:34,085 | INFO | Iteration 77/101 done in 3.905057907104492.
+2026-09-02 14:48:37,937 | INFO | Iteration 78/101 done in 3.8474631309509277.
+2026-09-02 14:48:41,649 | INFO | Iteration 79/101 done in 3.709648370742798.
+2026-09-02 14:48:45,401 | INFO | Iteration 80/101 done in 3.748359441757202.
+2026-09-02 14:48:49,468 | INFO | Iteration 81/101 done in 4.038746118545532.
+2026-09-02 14:48:53,300 | INFO | Iteration 82/101 done in 3.827955484390259.
+2026-09-02 14:48:57,498 | INFO | Iteration 83/101 done in 4.1652915477752686.
+2026-09-02 14:49:01,342 | INFO | Iteration 84/101 done in 3.8110313415527344.
+2026-09-02 14:49:05,384 | INFO | Iteration 85/101 done in 4.015866279602051.
+2026-09-02 14:49:09,292 | INFO | Iteration 86/101 done in 3.855239152908325.
+2026-09-02 14:49:13,079 | INFO | Iteration 87/101 done in 3.7835261821746826.
+2026-09-02 14:49:17,129 | INFO | Iteration 88/101 done in 4.0442705154418945.
+2026-09-02 14:49:20,983 | INFO | Iteration 89/101 done in 3.841740369796753.
+2026-09-02 14:49:24,899 | INFO | Iteration 90/101 done in 3.903604507446289.
+2026-09-02 14:49:28,671 | INFO | Iteration 91/101 done in 3.7354342937469482.
+2026-09-02 14:49:32,817 | INFO | Iteration 92/101 done in 4.121179580688477.
+2026-09-02 14:49:36,619 | INFO | Iteration 93/101 done in 3.77799391746521.
+2026-09-02 14:49:40,489 | INFO | Iteration 94/101 done in 3.8518989086151123.
+2026-09-02 14:49:44,342 | INFO | Iteration 95/101 done in 3.8465664386749268.
+2026-09-02 14:49:48,063 | INFO | Iteration 96/101 done in 3.7175674438476562.
+2026-09-02 14:49:51,989 | INFO | Iteration 97/101 done in 3.923032760620117.
+2026-09-02 14:49:55,644 | INFO | Iteration 98/101 done in 3.649210214614868.
+2026-09-02 14:49:59,760 | INFO | Iteration 99/101 done in 4.110918045043945.
+2026-09-02 14:50:03,405 | INFO | Iteration 100/101 done in 3.6406593322753906.
+2026-09-02 14:50:03,433 | INFO | SPSA: Finished in 387.15497851371765
+  VQC: fit completed in 482.7s
+VQC: using V1 Sampler (statevector, exact simulation)
+  VQC: fitting on 300 samples, 32 parameters, optimizer=SPSA...
+2026-09-02 14:50:08,611 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 14:51:28,163 | INFO | Finished calibration:
+2026-09-02 14:51:28,200 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 63.77456539600392, A = 0, alpha = 0.602
+2026-09-02 14:51:28,267 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 14:51:28,271 | INFO | SPSA: Starting optimization.
+2026-09-02 14:51:31,404 | INFO | Iteration 1/101 done in 3.1291897296905518.
+2026-09-02 14:51:34,787 | INFO | Iteration 2/101 done in 3.353830099105835.
+2026-09-02 14:51:37,864 | INFO | Iteration 3/101 done in 3.0642752647399902.
+2026-09-02 14:51:41,176 | INFO | Iteration 4/101 done in 3.306556224822998.
+2026-09-02 14:51:44,065 | INFO | Iteration 5/101 done in 2.8838820457458496.
+2026-09-02 14:51:47,421 | INFO | Iteration 6/101 done in 3.349696636199951.
+2026-09-02 14:51:50,210 | INFO | Iteration 7/101 done in 2.734645128250122.
+2026-09-02 14:51:53,455 | INFO | Iteration 8/101 done in 3.185917854309082.
+2026-09-02 14:51:56,608 | INFO | Iteration 9/101 done in 3.1371283531188965.
+2026-09-02 14:51:59,882 | INFO | Iteration 10/101 done in 3.238288640975952.
+2026-09-02 14:52:03,266 | INFO | Iteration 11/101 done in 3.370877265930176.
+2026-09-02 14:52:06,247 | INFO | Iteration 12/101 done in 2.973482131958008.
+2026-09-02 14:52:09,744 | INFO | Iteration 13/101 done in 3.469820022583008.
+2026-09-02 14:52:12,906 | INFO | Iteration 14/101 done in 3.1571197509765625.
+2026-09-02 14:52:16,376 | INFO | Iteration 15/101 done in 3.4304420948028564.
+2026-09-02 14:52:19,483 | INFO | Iteration 16/101 done in 3.1011059284210205.
+2026-09-02 14:52:22,716 | INFO | Iteration 17/101 done in 3.2253851890563965.
+2026-09-02 14:52:25,772 | INFO | Iteration 18/101 done in 3.033946990966797.
+2026-09-02 14:52:28,825 | INFO | Iteration 19/101 done in 3.0453901290893555.
+2026-09-02 14:52:32,173 | INFO | Iteration 20/101 done in 3.3346941471099854.
+2026-09-02 14:52:35,235 | INFO | Iteration 21/101 done in 3.0553483963012695.
+2026-09-02 14:52:38,523 | INFO | Iteration 22/101 done in 3.2809345722198486.
+2026-09-02 14:52:41,409 | INFO | Iteration 23/101 done in 2.8597493171691895.
+2026-09-02 14:52:44,772 | INFO | Iteration 24/101 done in 3.3393867015838623.
+2026-09-02 14:52:47,598 | INFO | Iteration 25/101 done in 2.822523355484009.
+2026-09-02 14:52:50,913 | INFO | Iteration 26/101 done in 3.285872220993042.
+2026-09-02 14:52:53,594 | INFO | Iteration 27/101 done in 2.6671109199523926.
+2026-09-02 14:52:56,652 | INFO | Iteration 28/101 done in 3.0273003578186035.
+2026-09-02 14:52:59,953 | INFO | Iteration 29/101 done in 3.2986080646514893.
+2026-09-02 14:53:03,005 | INFO | Iteration 30/101 done in 3.0485775470733643.
+2026-09-02 14:53:06,312 | INFO | Iteration 31/101 done in 3.281920909881592.
+2026-09-02 14:53:09,472 | INFO | Iteration 32/101 done in 3.089080572128296.
+2026-09-02 14:53:12,600 | INFO | Iteration 33/101 done in 3.1249585151672363.
+2026-09-02 14:53:15,476 | INFO | Iteration 34/101 done in 2.8535428047180176.
+2026-09-02 14:53:18,323 | INFO | Iteration 35/101 done in 2.8441426753997803.
+2026-09-02 14:53:21,177 | INFO | Iteration 36/101 done in 2.8507847785949707.
+2026-09-02 14:53:23,798 | INFO | Iteration 37/101 done in 2.6171488761901855.
+2026-09-02 14:53:26,701 | INFO | Iteration 38/101 done in 2.900214433670044.
+2026-09-02 14:53:29,827 | INFO | Iteration 39/101 done in 3.1039021015167236.
+2026-09-02 14:53:33,128 | INFO | Iteration 40/101 done in 3.297185182571411.
+2026-09-02 14:53:36,180 | INFO | Iteration 41/101 done in 3.0484492778778076.
+2026-09-02 14:53:39,518 | INFO | Iteration 42/101 done in 3.3330399990081787.
+2026-09-02 14:53:42,361 | INFO | Iteration 43/101 done in 2.839036703109741.
+2026-09-02 14:53:45,465 | INFO | Iteration 44/101 done in 3.096587896347046.
+2026-09-02 14:53:48,350 | INFO | Iteration 45/101 done in 2.8812143802642822.
+2026-09-02 14:53:51,004 | INFO | Iteration 46/101 done in 2.6499948501586914.
+2026-09-02 14:53:53,960 | INFO | Iteration 47/101 done in 2.9341509342193604.
+2026-09-02 14:53:56,566 | INFO | Iteration 48/101 done in 2.6014063358306885.
+2026-09-02 14:53:59,419 | INFO | Iteration 49/101 done in 2.850302219390869.
+2026-09-02 14:54:02,257 | INFO | Iteration 50/101 done in 2.831226348876953.
+2026-09-02 14:54:05,306 | INFO | Iteration 51/101 done in 3.0448641777038574.
+2026-09-02 14:54:08,195 | INFO | Iteration 52/101 done in 2.866868019104004.
+2026-09-02 14:54:11,280 | INFO | Iteration 53/101 done in 3.0559353828430176.
+2026-09-02 14:54:13,941 | INFO | Iteration 54/101 done in 2.6564173698425293.
+2026-09-02 14:54:16,561 | INFO | Iteration 55/101 done in 2.614368200302124.
+2026-09-02 14:54:19,475 | INFO | Iteration 56/101 done in 2.8848793506622314.
+2026-09-02 14:54:22,092 | INFO | Iteration 57/101 done in 2.6125330924987793.
+2026-09-02 14:54:25,053 | INFO | Iteration 58/101 done in 2.9048032760620117.
+2026-09-02 14:54:27,861 | INFO | Iteration 59/101 done in 2.8035383224487305.
+2026-09-02 14:54:30,965 | INFO | Iteration 60/101 done in 3.099717378616333.
+2026-09-02 14:54:33,670 | INFO | Iteration 61/101 done in 2.6687803268432617.
+2026-09-02 14:54:36,747 | INFO | Iteration 62/101 done in 3.0729660987854004.
+2026-09-02 14:54:39,561 | INFO | Iteration 63/101 done in 2.8109424114227295.
+2026-09-02 14:54:42,576 | INFO | Iteration 64/101 done in 3.0112428665161133.
+2026-09-02 14:54:45,515 | INFO | Iteration 65/101 done in 2.9344170093536377.
+2026-09-02 14:54:48,283 | INFO | Iteration 66/101 done in 2.7439141273498535.
+2026-09-02 14:54:51,390 | INFO | Iteration 67/101 done in 3.103693723678589.
+2026-09-02 14:54:54,456 | INFO | Iteration 68/101 done in 3.0611064434051514.
+2026-09-02 14:54:57,766 | INFO | Iteration 69/101 done in 3.3057754039764404.
+2026-09-02 14:55:00,794 | INFO | Iteration 70/101 done in 3.0121910572052.
+2026-09-02 14:55:04,107 | INFO | Iteration 71/101 done in 3.309664011001587.
+2026-09-02 14:55:07,087 | INFO | Iteration 72/101 done in 2.955073595046997.
+2026-09-02 14:55:09,711 | INFO | Iteration 73/101 done in 2.6179683208465576.
+2026-09-02 14:55:12,866 | INFO | Iteration 74/101 done in 3.135931968688965.
+2026-09-02 14:55:15,819 | INFO | Iteration 75/101 done in 2.9496636390686035.
+2026-09-02 14:55:19,299 | INFO | Iteration 76/101 done in 3.468752145767212.
+2026-09-02 14:55:22,528 | INFO | Iteration 77/101 done in 3.1976959705352783.
+2026-09-02 14:55:25,916 | INFO | Iteration 78/101 done in 3.3589398860931396.
+2026-09-02 14:55:28,977 | INFO | Iteration 79/101 done in 3.0425972938537598.
+2026-09-02 14:55:32,296 | INFO | Iteration 80/101 done in 3.315918445587158.
+2026-09-02 14:55:35,236 | INFO | Iteration 81/101 done in 2.935689926147461.
+2026-09-02 14:55:38,066 | INFO | Iteration 82/101 done in 2.8272712230682373.
+2026-09-02 14:55:41,202 | INFO | Iteration 83/101 done in 3.132098436355591.
+2026-09-02 14:55:44,098 | INFO | Iteration 84/101 done in 2.869168281555176.
+2026-09-02 14:55:47,213 | INFO | Iteration 85/101 done in 3.1123199462890625.
+2026-09-02 14:55:50,057 | INFO | Iteration 86/101 done in 2.8328146934509277.
+2026-09-02 14:55:53,403 | INFO | Iteration 87/101 done in 3.3413593769073486.
+2026-09-02 14:55:56,293 | INFO | Iteration 88/101 done in 2.867219924926758.
+2026-09-02 14:55:59,380 | INFO | Iteration 89/101 done in 3.0808310508728027.
+2026-09-02 14:56:02,509 | INFO | Iteration 90/101 done in 3.0909173488616943.
+2026-09-02 14:56:05,542 | INFO | Iteration 91/101 done in 3.0171959400177.
+2026-09-02 14:56:08,856 | INFO | Iteration 92/101 done in 3.310671091079712.
+2026-09-02 14:56:12,060 | INFO | Iteration 93/101 done in 3.2008867263793945.
+2026-09-02 14:56:15,677 | INFO | Iteration 94/101 done in 3.611316204071045.
+2026-09-02 14:56:18,882 | INFO | Iteration 95/101 done in 3.1913161277770996.
+2026-09-02 14:56:22,283 | INFO | Iteration 96/101 done in 3.3983819484710693.
+2026-09-02 14:56:25,404 | INFO | Iteration 97/101 done in 3.1165616512298584.
+2026-09-02 14:56:28,803 | INFO | Iteration 98/101 done in 3.3761844635009766.
+2026-09-02 14:56:31,918 | INFO | Iteration 99/101 done in 3.0892739295959473.
+2026-09-02 14:56:35,027 | INFO | Iteration 100/101 done in 3.0985844135284424.
+2026-09-02 14:56:35,059 | INFO | SPSA: Finished in 306.78398513793945
+  VQC: fit completed in 388.3s
+VQC: using V1 Sampler (statevector, exact simulation)
+  VQC: fitting on 300 samples, 64 parameters, optimizer=SPSA...
+2026-09-02 14:56:39,463 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 14:58:27,615 | INFO | Finished calibration:
+2026-09-02 14:58:27,627 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 58.51932033571256, A = 0, alpha = 0.602
+2026-09-02 14:58:27,629 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 14:58:27,631 | INFO | SPSA: Starting optimization.
+2026-09-02 14:58:31,840 | INFO | Iteration 1/101 done in 4.2067108154296875.
+2026-09-02 14:58:36,195 | INFO | Iteration 2/101 done in 4.352287292480469.
+2026-09-02 14:58:39,948 | INFO | Iteration 3/101 done in 3.7498321533203125.
+2026-09-02 14:58:44,021 | INFO | Iteration 4/101 done in 4.070950031280518.
+2026-09-02 14:58:48,137 | INFO | Iteration 5/101 done in 4.108283996582031.
+2026-09-02 14:58:52,730 | INFO | Iteration 6/101 done in 4.580846071243286.
+2026-09-02 14:58:56,759 | INFO | Iteration 7/101 done in 4.022705316543579.
+2026-09-02 14:59:01,008 | INFO | Iteration 8/101 done in 4.2448484897613525.
+2026-09-02 14:59:05,704 | INFO | Iteration 9/101 done in 4.6437201499938965.
+2026-09-02 14:59:10,231 | INFO | Iteration 10/101 done in 4.5046515464782715.
+2026-09-02 14:59:15,025 | INFO | Iteration 11/101 done in 4.790796518325806.
+2026-09-02 14:59:19,339 | INFO | Iteration 12/101 done in 4.305094242095947.
+2026-09-02 14:59:24,133 | INFO | Iteration 13/101 done in 4.789681673049927.
+2026-09-02 14:59:28,743 | INFO | Iteration 14/101 done in 4.607099533081055.
+2026-09-02 14:59:33,122 | INFO | Iteration 15/101 done in 4.3764050006866455.
+2026-09-02 14:59:37,790 | INFO | Iteration 16/101 done in 4.654425859451294.
+2026-09-02 14:59:42,535 | INFO | Iteration 17/101 done in 4.737621545791626.
+2026-09-02 14:59:47,094 | INFO | Iteration 18/101 done in 4.555216550827026.
+2026-09-02 14:59:51,645 | INFO | Iteration 19/101 done in 4.544492721557617.
+2026-09-02 14:59:56,692 | INFO | Iteration 20/101 done in 5.020288467407227.
+2026-09-02 15:00:01,268 | INFO | Iteration 21/101 done in 4.5669379234313965.
+2026-09-02 15:00:06,339 | INFO | Iteration 22/101 done in 5.040344953536987.
+2026-09-02 15:00:10,852 | INFO | Iteration 23/101 done in 4.498669385910034.
+2026-09-02 15:00:15,909 | INFO | Iteration 24/101 done in 5.039977312088013.
+2026-09-02 15:00:20,608 | INFO | Iteration 25/101 done in 4.643165588378906.
+2026-09-02 15:00:25,876 | INFO | Iteration 26/101 done in 5.229192733764648.
+2026-09-02 15:00:30,566 | INFO | Iteration 27/101 done in 4.681986093521118.
+2026-09-02 15:00:35,123 | INFO | Iteration 28/101 done in 4.543208122253418.
+2026-09-02 15:00:39,855 | INFO | Iteration 29/101 done in 4.704474449157715.
+2026-09-02 15:00:44,214 | INFO | Iteration 30/101 done in 4.346158266067505.
+2026-09-02 15:00:48,573 | INFO | Iteration 31/101 done in 4.330191373825073.
+2026-09-02 15:00:52,701 | INFO | Iteration 32/101 done in 4.1253697872161865.
+2026-09-02 15:00:57,251 | INFO | Iteration 33/101 done in 4.521291732788086.
+2026-09-02 15:01:01,444 | INFO | Iteration 34/101 done in 4.186689376831055.
+2026-09-02 15:01:06,802 | INFO | Iteration 35/101 done in 5.353164911270142.
+2026-09-02 15:01:11,279 | INFO | Iteration 36/101 done in 4.446351051330566.
+2026-09-02 15:01:15,640 | INFO | Iteration 37/101 done in 4.355526685714722.
+2026-09-02 15:01:20,502 | INFO | Iteration 38/101 done in 4.857199430465698.
+2026-09-02 15:01:24,896 | INFO | Iteration 39/101 done in 4.365160703659058.
+2026-09-02 15:01:29,638 | INFO | Iteration 40/101 done in 4.715046167373657.
+2026-09-02 15:01:33,771 | INFO | Iteration 41/101 done in 4.126267433166504.
+2026-09-02 15:01:37,824 | INFO | Iteration 42/101 done in 4.045426368713379.
+2026-09-02 15:01:41,931 | INFO | Iteration 43/101 done in 4.100284099578857.
+2026-09-02 15:01:46,438 | INFO | Iteration 44/101 done in 4.5017173290252686.
+2026-09-02 15:01:50,842 | INFO | Iteration 45/101 done in 4.399874448776245.
+2026-09-02 15:01:54,649 | INFO | Iteration 46/101 done in 3.801365852355957.
+2026-09-02 15:01:59,366 | INFO | Iteration 47/101 done in 4.697759628295898.
+2026-09-02 15:02:03,814 | INFO | Iteration 48/101 done in 4.439884424209595.
+2026-09-02 15:02:08,707 | INFO | Iteration 49/101 done in 4.876960277557373.
+2026-09-02 15:02:13,343 | INFO | Iteration 50/101 done in 4.565346717834473.
+2026-09-02 15:02:17,721 | INFO | Iteration 51/101 done in 4.371858358383179.
+2026-09-02 15:02:22,207 | INFO | Iteration 52/101 done in 4.338777542114258.
+2026-09-02 15:02:26,938 | INFO | Iteration 53/101 done in 4.678586959838867.
+2026-09-02 15:02:31,123 | INFO | Iteration 54/101 done in 4.173892021179199.
+2026-09-02 15:02:35,531 | INFO | Iteration 55/101 done in 4.391409873962402.
+2026-09-02 15:02:40,321 | INFO | Iteration 56/101 done in 4.7680182456970215.
+2026-09-02 15:02:44,846 | INFO | Iteration 57/101 done in 4.486072778701782.
+2026-09-02 15:02:49,678 | INFO | Iteration 58/101 done in 4.824196100234985.
+2026-09-02 15:02:54,123 | INFO | Iteration 59/101 done in 4.442002296447754.
+2026-09-02 15:02:58,605 | INFO | Iteration 60/101 done in 4.4736106395721436.
+2026-09-02 15:03:02,775 | INFO | Iteration 61/101 done in 4.130284786224365.
+2026-09-02 15:03:06,850 | INFO | Iteration 62/101 done in 4.0649943351745605.
+2026-09-02 15:03:11,309 | INFO | Iteration 63/101 done in 4.449042558670044.
+2026-09-02 15:03:15,757 | INFO | Iteration 64/101 done in 4.421570062637329.
+2026-09-02 15:03:20,550 | INFO | Iteration 65/101 done in 4.789340019226074.
+2026-09-02 15:03:25,017 | INFO | Iteration 66/101 done in 4.4636147022247314.
+2026-09-02 15:03:29,726 | INFO | Iteration 67/101 done in 4.6962034702301025.
+2026-09-02 15:03:33,489 | INFO | Iteration 68/101 done in 3.759814739227295.
+2026-09-02 15:03:38,104 | INFO | Iteration 69/101 done in 4.612138986587524.
+2026-09-02 15:03:42,469 | INFO | Iteration 70/101 done in 4.341923475265503.
+2026-09-02 15:03:47,111 | INFO | Iteration 71/101 done in 4.638460636138916.
+2026-09-02 15:03:51,346 | INFO | Iteration 72/101 done in 4.223204135894775.
+2026-09-02 15:03:55,518 | INFO | Iteration 73/101 done in 4.144724607467651.
+2026-09-02 15:04:00,268 | INFO | Iteration 74/101 done in 4.7440783977508545.
+2026-09-02 15:04:04,678 | INFO | Iteration 75/101 done in 4.407407760620117.
+2026-09-02 15:04:09,164 | INFO | Iteration 76/101 done in 4.47970724105835.
+2026-09-02 15:04:13,650 | INFO | Iteration 77/101 done in 4.480409622192383.
+2026-09-02 15:04:18,215 | INFO | Iteration 78/101 done in 4.558341026306152.
+2026-09-02 15:04:22,267 | INFO | Iteration 79/101 done in 4.043147563934326.
+2026-09-02 15:04:26,902 | INFO | Iteration 80/101 done in 4.627323150634766.
+2026-09-02 15:04:31,320 | INFO | Iteration 81/101 done in 4.396114826202393.
+2026-09-02 15:04:35,511 | INFO | Iteration 82/101 done in 4.185378789901733.
+2026-09-02 15:04:40,385 | INFO | Iteration 83/101 done in 4.857449769973755.
+2026-09-02 15:04:44,696 | INFO | Iteration 84/101 done in 4.307936429977417.
+2026-09-02 15:04:48,798 | INFO | Iteration 85/101 done in 4.098954677581787.
+2026-09-02 15:04:53,295 | INFO | Iteration 86/101 done in 4.493654489517212.
+2026-09-02 15:04:58,150 | INFO | Iteration 87/101 done in 4.851458549499512.
+2026-09-02 15:05:02,605 | INFO | Iteration 88/101 done in 4.449752330780029.
+2026-09-02 15:05:07,362 | INFO | Iteration 89/101 done in 4.73332405090332.
+2026-09-02 15:05:11,664 | INFO | Iteration 90/101 done in 4.29721212387085.
+2026-09-02 15:05:15,530 | INFO | Iteration 91/101 done in 3.8590219020843506.
+2026-09-02 15:05:20,037 | INFO | Iteration 92/101 done in 4.5021936893463135.
+2026-09-02 15:05:24,359 | INFO | Iteration 93/101 done in 4.318544626235962.
+2026-09-02 15:05:29,107 | INFO | Iteration 94/101 done in 4.738858938217163.
+2026-09-02 15:05:33,526 | INFO | Iteration 95/101 done in 4.400121450424194.
+2026-09-02 15:05:38,251 | INFO | Iteration 96/101 done in 4.71530294418335.
+2026-09-02 15:05:42,724 | INFO | Iteration 97/101 done in 4.467862606048584.
+2026-09-02 15:05:47,425 | INFO | Iteration 98/101 done in 4.684819459915161.
+2026-09-02 15:05:51,855 | INFO | Iteration 99/101 done in 4.425401449203491.
+2026-09-02 15:05:56,206 | INFO | Iteration 100/101 done in 4.3466410636901855.
+2026-09-02 15:05:56,225 | INFO | SPSA: Finished in 448.59249448776245
+  VQC: fit completed in 559.4s
+  VQC depth adaptation: chose reps=3 (val_acc=0.5966)
+  VQC trained in 1439.8s. Train acc: 0.5533, Val acc: 0.5966
 
 [5/5] Training Meta-Learner Ensemble...
-  Subsampled to 1000 samples for meta-learner
-  lstm predict_proba: 0.0s (1000 samples)
-  xgboost predict_proba: 0.0s (1000 samples)
+  lstm predict_proba: 0.0s (177 samples)
+  xgboost predict_proba: 0.0s (177 samples)
   qkernel predict_proba timed out after 30s — skipping
   qkernel predict_proba timed out after 30s — excluding from ensemble weight
-  vqc predict_proba: 2.8s (1000 samples)
-  Meta-learner trained with weights: {'lstm': 0.2664996869129618, 'xgboost': 0.4335003130870382, 'qkernel': 0.0, 'vqc': 0.3}
-  Meta-learner trained in 32.8s
+  vqc predict_proba: 4.0s (177 samples)
+  Meta-learner trained with weights: {'lstm': 0.34450261780104713, 'xgboost': 0.3554973821989529, 'qkernel': 0.0, 'vqc': 0.3}
+  Meta-learner trained in 34.3s
 
 ============================================================
 TRAINING COMPLETE
@@ -396,153 +832,370 @@ TRAINING COMPLETE
   qkernel predict_proba timed out after 30s — skipping
 ============================================================
 HYBRID QML TRAINING PIPELINE
-  Training samples: 3663, Validation samples: 0
-  Features: 56, Sequence length: 20
+  Training samples: 3128, Validation samples: 267
+  Features: 55, Sequence length: 20
 ============================================================
 
 [1/4] Training LSTM Sequence Model...
-Epoch 10/100 | Train Loss: 0.3399 | Train Acc: 0.8701
-Epoch 20/100 | Train Loss: 0.2202 | Train Acc: 0.9140
-Epoch 30/100 | Train Loss: 0.1733 | Train Acc: 0.9343
-Epoch 40/100 | Train Loss: 0.1390 | Train Acc: 0.9431
-Epoch 50/100 | Train Loss: 0.1229 | Train Acc: 0.9498
-Epoch 60/100 | Train Loss: 0.1141 | Train Acc: 0.9532
-Epoch 70/100 | Train Loss: 0.1059 | Train Acc: 0.9586
-Epoch 80/100 | Train Loss: 0.0903 | Train Acc: 0.9614
-Epoch 90/100 | Train Loss: 0.0783 | Train Acc: 0.9667
-Epoch 100/100 | Train Loss: 0.0718 | Train Acc: 0.9682
-  LSTM trained in 10.8s. Best val acc: 0.0000
+Epoch 10/100 | Train Loss: 0.4065 | Val Loss: 1.1572 | Val Acc: 0.4737
+Early stopping at epoch 16
+  LSTM trained in 219.5s. Best val acc: 0.5215
 
 [2/4] Training XGBoost Classifier...
-  XGBoost trained in 0.5s. Val F1: 0.0000
+  XGBoost trained in 0.3s. Val F1: 0.4159
 
 [3/4] Training Quantum Kernel SVM...
 Quantum Kernel: using StatevectorSampler (V2, exact simulation)
   Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
-  Quantum Kernel: QSVC fit completed in 65.7s
-  Quantum Kernel trained in 195.8s. Train acc: 1.0000, Val acc: nan
+  Quantum Kernel: QSVC fit completed in 589.4s
+Quantum Kernel: using StatevectorSampler (V2, exact simulation)
+  Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
+  Quantum Kernel: QSVC fit completed in 94.6s
+Quantum Kernel: using StatevectorSampler (V2, exact simulation)
+  Quantum Kernel: fitting QSVC on 150 samples (150x150 kernel matrix)...
+  Quantum Kernel: QSVC fit completed in 162.7s
+  Quantum depth adaptation: chose reps=2 (val_acc=0.5133)
+  Quantum Kernel trained in 2569.2s. Train acc: 1.0000, Val acc: 0.5133
 
 [4/4] Training Variational Quantum Circuit...
 VQC: using V1 Sampler (statevector, exact simulation)
   VQC: fitting on 300 samples, 48 parameters, optimizer=SPSA...
-2026-09-02 12:28:21,605 | INFO | SPSA: Starting calibration of learning rate and perturbation.
-2026-09-02 12:29:02,036 | INFO | Finished calibration:
-2026-09-02 12:29:02,036 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 24.54714659424311, A = 0, alpha = 0.602
-2026-09-02 12:29:02,036 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
-2026-09-02 12:29:02,036 | INFO | SPSA: Starting optimization.
-2026-09-02 12:29:03,502 | INFO | Iteration 1/101 done in 1.4663779735565186.
-2026-09-02 12:29:05,307 | INFO | Iteration 2/101 done in 1.8044369220733643.
-2026-09-02 12:29:06,809 | INFO | Iteration 3/101 done in 1.5019574165344238.
-2026-09-02 12:29:08,606 | INFO | Iteration 4/101 done in 1.7966234683990479.
-2026-09-02 12:29:10,112 | INFO | Iteration 5/101 done in 1.5056214332580566.
-2026-09-02 12:29:11,575 | INFO | Iteration 6/101 done in 1.4636156558990479.
-2026-09-02 12:29:13,371 | INFO | Iteration 7/101 done in 1.7955446243286133.
-2026-09-02 12:29:14,880 | INFO | Iteration 8/101 done in 1.5089483261108398.
-2026-09-02 12:29:16,636 | INFO | Iteration 9/101 done in 1.7557332515716553.
-2026-09-02 12:29:18,112 | INFO | Iteration 10/101 done in 1.4758813381195068.
-2026-09-02 12:29:19,872 | INFO | Iteration 11/101 done in 1.759502649307251.
-2026-09-02 12:29:21,333 | INFO | Iteration 12/101 done in 1.4607806205749512.
-2026-09-02 12:29:23,158 | INFO | Iteration 13/101 done in 1.8252599239349365.
-2026-09-02 12:29:24,702 | INFO | Iteration 14/101 done in 1.544133186340332.
-2026-09-02 12:29:26,199 | INFO | Iteration 15/101 done in 1.496211290359497.
-2026-09-02 12:29:27,987 | INFO | Iteration 16/101 done in 1.7880477905273438.
-2026-09-02 12:29:29,484 | INFO | Iteration 17/101 done in 1.496612310409546.
-2026-09-02 12:29:31,291 | INFO | Iteration 18/101 done in 1.8069243431091309.
-2026-09-02 12:29:32,769 | INFO | Iteration 19/101 done in 1.4783835411071777.
-2026-09-02 12:29:34,546 | INFO | Iteration 20/101 done in 1.7768068313598633.
-2026-09-02 12:29:36,041 | INFO | Iteration 21/101 done in 1.4946582317352295.
-2026-09-02 12:29:37,857 | INFO | Iteration 22/101 done in 1.8155732154846191.
-2026-09-02 12:29:39,377 | INFO | Iteration 23/101 done in 1.5196003913879395.
-2026-09-02 12:29:40,862 | INFO | Iteration 24/101 done in 1.4854838848114014.
-2026-09-02 12:29:42,662 | INFO | Iteration 25/101 done in 1.799617052078247.
-2026-09-02 12:29:44,155 | INFO | Iteration 26/101 done in 1.4925193786621094.
-2026-09-02 12:29:45,957 | INFO | Iteration 27/101 done in 1.8023254871368408.
-2026-09-02 12:29:47,481 | INFO | Iteration 28/101 done in 1.5232808589935303.
-2026-09-02 12:29:49,243 | INFO | Iteration 29/101 done in 1.7618517875671387.
-2026-09-02 12:29:50,731 | INFO | Iteration 30/101 done in 1.488184928894043.
-2026-09-02 12:29:52,508 | INFO | Iteration 31/101 done in 1.7763721942901611.
-2026-09-02 12:29:54,029 | INFO | Iteration 32/101 done in 1.5209369659423828.
-2026-09-02 12:29:55,533 | INFO | Iteration 33/101 done in 1.5036499500274658.
-2026-09-02 12:29:57,320 | INFO | Iteration 34/101 done in 1.787498950958252.
-2026-09-02 12:29:58,828 | INFO | Iteration 35/101 done in 1.5081489086151123.
-2026-09-02 12:30:00,632 | INFO | Iteration 36/101 done in 1.8033099174499512.
-2026-09-02 12:30:02,107 | INFO | Iteration 37/101 done in 1.4750440120697021.
-2026-09-02 12:30:03,870 | INFO | Iteration 38/101 done in 1.7626347541809082.
-2026-09-02 12:30:05,359 | INFO | Iteration 39/101 done in 1.4887776374816895.
-2026-09-02 12:30:07,139 | INFO | Iteration 40/101 done in 1.7799692153930664.
-2026-09-02 12:30:08,683 | INFO | Iteration 41/101 done in 1.5435206890106201.
-2026-09-02 12:30:10,460 | INFO | Iteration 42/101 done in 1.7768166065216064.
-2026-09-02 12:30:11,970 | INFO | Iteration 43/101 done in 1.5106770992279053.
-2026-09-02 12:30:13,455 | INFO | Iteration 44/101 done in 1.4841859340667725.
-2026-09-02 12:30:15,289 | INFO | Iteration 45/101 done in 1.8335049152374268.
-2026-09-02 12:30:16,767 | INFO | Iteration 46/101 done in 1.477881908416748.
-2026-09-02 12:30:18,573 | INFO | Iteration 47/101 done in 1.8063783645629883.
-2026-09-02 12:30:20,099 | INFO | Iteration 48/101 done in 1.525287389755249.
-2026-09-02 12:30:21,911 | INFO | Iteration 49/101 done in 1.8119547367095947.
-2026-09-02 12:30:23,401 | INFO | Iteration 50/101 done in 1.49021577835083.
-2026-09-02 12:30:24,907 | INFO | Iteration 51/101 done in 1.5053739547729492.
-2026-09-02 12:30:26,701 | INFO | Iteration 52/101 done in 1.7944583892822266.
-2026-09-02 12:30:28,229 | INFO | Iteration 53/101 done in 1.5280141830444336.
-2026-09-02 12:30:29,993 | INFO | Iteration 54/101 done in 1.7637946605682373.
-2026-09-02 12:30:31,471 | INFO | Iteration 55/101 done in 1.4774067401885986.
-2026-09-02 12:30:33,250 | INFO | Iteration 56/101 done in 1.7789404392242432.
-2026-09-02 12:30:34,745 | INFO | Iteration 57/101 done in 1.4945356845855713.
-2026-09-02 12:30:36,506 | INFO | Iteration 58/101 done in 1.7608413696289062.
-2026-09-02 12:30:37,994 | INFO | Iteration 59/101 done in 1.488530158996582.
-2026-09-02 12:30:39,754 | INFO | Iteration 60/101 done in 1.759331226348877.
-2026-09-02 12:30:41,310 | INFO | Iteration 61/101 done in 1.5559756755828857.
-2026-09-02 12:30:42,796 | INFO | Iteration 62/101 done in 1.4855902194976807.
-2026-09-02 12:30:44,569 | INFO | Iteration 63/101 done in 1.7735786437988281.
-2026-09-02 12:30:46,051 | INFO | Iteration 64/101 done in 1.481044054031372.
-2026-09-02 12:30:47,828 | INFO | Iteration 65/101 done in 1.7769837379455566.
-2026-09-02 12:30:49,344 | INFO | Iteration 66/101 done in 1.5165362358093262.
-2026-09-02 12:30:51,149 | INFO | Iteration 67/101 done in 1.8045988082885742.
-2026-09-02 12:30:52,675 | INFO | Iteration 68/101 done in 1.5259323120117188.
-2026-09-02 12:30:54,454 | INFO | Iteration 69/101 done in 1.7783513069152832.
-2026-09-02 12:30:55,988 | INFO | Iteration 70/101 done in 1.5343997478485107.
-2026-09-02 12:30:57,771 | INFO | Iteration 71/101 done in 1.7824842929840088.
-2026-09-02 12:30:59,280 | INFO | Iteration 72/101 done in 1.508488655090332.
-2026-09-02 12:31:00,751 | INFO | Iteration 73/101 done in 1.4712567329406738.
-2026-09-02 12:31:02,514 | INFO | Iteration 74/101 done in 1.7627894878387451.
-2026-09-02 12:31:04,021 | INFO | Iteration 75/101 done in 1.5066840648651123.
-2026-09-02 12:31:05,838 | INFO | Iteration 76/101 done in 1.8164801597595215.
-2026-09-02 12:31:07,359 | INFO | Iteration 77/101 done in 1.521637201309204.
-2026-09-02 12:31:09,180 | INFO | Iteration 78/101 done in 1.8205745220184326.
-2026-09-02 12:31:10,689 | INFO | Iteration 79/101 done in 1.5085783004760742.
-2026-09-02 12:31:12,502 | INFO | Iteration 80/101 done in 1.8130736351013184.
-2026-09-02 12:31:14,021 | INFO | Iteration 81/101 done in 1.519073247909546.
-2026-09-02 12:31:15,507 | INFO | Iteration 82/101 done in 1.4852356910705566.
-2026-09-02 12:31:17,280 | INFO | Iteration 83/101 done in 1.7733728885650635.
-2026-09-02 12:31:18,782 | INFO | Iteration 84/101 done in 1.501049518585205.
-2026-09-02 12:31:20,574 | INFO | Iteration 85/101 done in 1.7924940586090088.
-2026-09-02 12:31:22,064 | INFO | Iteration 86/101 done in 1.489269733428955.
-2026-09-02 12:31:23,916 | INFO | Iteration 87/101 done in 1.8522281646728516.
-2026-09-02 12:31:25,451 | INFO | Iteration 88/101 done in 1.5346636772155762.
-2026-09-02 12:31:27,213 | INFO | Iteration 89/101 done in 1.7616775035858154.
-2026-09-02 12:31:28,707 | INFO | Iteration 90/101 done in 1.4937987327575684.
-2026-09-02 12:31:30,213 | INFO | Iteration 91/101 done in 1.5058698654174805.
-2026-09-02 12:31:32,000 | INFO | Iteration 92/101 done in 1.7872121334075928.
-2026-09-02 12:31:33,542 | INFO | Iteration 93/101 done in 1.5417776107788086.
-2026-09-02 12:31:35,421 | INFO | Iteration 94/101 done in 1.8785686492919922.
-2026-09-02 12:31:36,942 | INFO | Iteration 95/101 done in 1.5208535194396973.
-2026-09-02 12:31:38,718 | INFO | Iteration 96/101 done in 1.7763893604278564.
-2026-09-02 12:31:40,227 | INFO | Iteration 97/101 done in 1.5087146759033203.
-2026-09-02 12:31:42,004 | INFO | Iteration 98/101 done in 1.7765145301818848.
-2026-09-02 12:31:43,554 | INFO | Iteration 99/101 done in 1.5499320030212402.
-2026-09-02 12:31:45,065 | INFO | Iteration 100/101 done in 1.5106689929962158.
-2026-09-02 12:31:45,065 | INFO | SPSA: Finished in 163.02892875671387
-  VQC: fit completed in 204.5s
-  VQC trained in 205.3s. Train acc: 0.5667, Val acc: nan
+2026-09-02 15:56:40,637 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 15:58:10,226 | INFO | Finished calibration:
+2026-09-02 15:58:10,237 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 18.64717088667458, A = 0, alpha = 0.602
+2026-09-02 15:58:10,240 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 15:58:10,243 | INFO | SPSA: Starting optimization.
+2026-09-02 15:58:13,987 | INFO | Iteration 1/101 done in 3.7413811683654785.
+2026-09-02 15:58:18,030 | INFO | Iteration 2/101 done in 4.038251161575317.
+2026-09-02 15:58:21,727 | INFO | Iteration 3/101 done in 3.6888644695281982.
+2026-09-02 15:58:25,229 | INFO | Iteration 4/101 done in 3.497514247894287.
+2026-09-02 15:58:28,413 | INFO | Iteration 5/101 done in 3.180957078933716.
+2026-09-02 15:58:31,560 | INFO | Iteration 6/101 done in 3.132002353668213.
+2026-09-02 15:58:34,990 | INFO | Iteration 7/101 done in 3.425853967666626.
+2026-09-02 15:58:38,435 | INFO | Iteration 8/101 done in 3.4418840408325195.
+2026-09-02 15:58:41,910 | INFO | Iteration 9/101 done in 3.470766067504883.
+2026-09-02 15:58:45,120 | INFO | Iteration 10/101 done in 3.1935763359069824.
+2026-09-02 15:58:48,794 | INFO | Iteration 11/101 done in 3.6675190925598145.
+2026-09-02 15:58:51,994 | INFO | Iteration 12/101 done in 3.195441961288452.
+2026-09-02 15:58:55,474 | INFO | Iteration 13/101 done in 3.4759273529052734.
+2026-09-02 15:58:58,660 | INFO | Iteration 14/101 done in 3.1812455654144287.
+2026-09-02 15:59:01,833 | INFO | Iteration 15/101 done in 3.1695103645324707.
+2026-09-02 15:59:05,547 | INFO | Iteration 16/101 done in 3.708533525466919.
+2026-09-02 15:59:08,756 | INFO | Iteration 17/101 done in 3.2048494815826416.
+2026-09-02 15:59:12,230 | INFO | Iteration 18/101 done in 3.470050811767578.
+2026-09-02 15:59:15,436 | INFO | Iteration 19/101 done in 3.2012393474578857.
+2026-09-02 15:59:19,094 | INFO | Iteration 20/101 done in 3.6525509357452393.
+2026-09-02 15:59:22,512 | INFO | Iteration 21/101 done in 3.41339373588562.
+2026-09-02 15:59:26,446 | INFO | Iteration 22/101 done in 3.923300266265869.
+2026-09-02 15:59:30,032 | INFO | Iteration 23/101 done in 3.581198215484619.
+2026-09-02 15:59:33,623 | INFO | Iteration 24/101 done in 3.5869126319885254.
+2026-09-02 15:59:37,341 | INFO | Iteration 25/101 done in 3.7127373218536377.
+2026-09-02 15:59:40,566 | INFO | Iteration 26/101 done in 3.221146821975708.
+2026-09-02 15:59:44,070 | INFO | Iteration 27/101 done in 3.4995017051696777.
+2026-09-02 15:59:47,448 | INFO | Iteration 28/101 done in 3.373807907104492.
+2026-09-02 15:59:51,137 | INFO | Iteration 29/101 done in 3.6853528022766113.
+2026-09-02 15:59:54,327 | INFO | Iteration 30/101 done in 3.1865646839141846.
+2026-09-02 15:59:58,056 | INFO | Iteration 31/101 done in 3.7248921394348145.
+2026-09-02 16:00:01,260 | INFO | Iteration 32/101 done in 3.2015559673309326.
+2026-09-02 16:00:04,742 | INFO | Iteration 33/101 done in 3.4776053428649902.
+2026-09-02 16:00:08,718 | INFO | Iteration 34/101 done in 3.9696526527404785.
+2026-09-02 16:00:12,470 | INFO | Iteration 35/101 done in 3.7437212467193604.
+2026-09-02 16:00:16,147 | INFO | Iteration 36/101 done in 3.670618772506714.
+2026-09-02 16:00:19,317 | INFO | Iteration 37/101 done in 3.166449785232544.
+2026-09-02 16:00:23,170 | INFO | Iteration 38/101 done in 3.8453831672668457.
+2026-09-02 16:00:26,503 | INFO | Iteration 39/101 done in 3.3287038803100586.
+2026-09-02 16:00:30,140 | INFO | Iteration 40/101 done in 3.6110448837280273.
+2026-09-02 16:00:33,513 | INFO | Iteration 41/101 done in 3.368443250656128.
+2026-09-02 16:00:36,719 | INFO | Iteration 42/101 done in 3.1901485919952393.
+2026-09-02 16:00:40,452 | INFO | Iteration 43/101 done in 3.724766254425049.
+2026-09-02 16:00:43,621 | INFO | Iteration 44/101 done in 3.1651792526245117.
+2026-09-02 16:00:47,088 | INFO | Iteration 45/101 done in 3.460343599319458.
+2026-09-02 16:00:50,729 | INFO | Iteration 46/101 done in 3.6367483139038086.
+2026-09-02 16:00:54,427 | INFO | Iteration 47/101 done in 3.693718433380127.
+2026-09-02 16:00:57,835 | INFO | Iteration 48/101 done in 3.402721643447876.
+2026-09-02 16:01:01,280 | INFO | Iteration 49/101 done in 3.442002773284912.
+2026-09-02 16:01:04,498 | INFO | Iteration 50/101 done in 3.2141921520233154.
+2026-09-02 16:01:07,677 | INFO | Iteration 51/101 done in 3.174557685852051.
+2026-09-02 16:01:11,136 | INFO | Iteration 52/101 done in 3.455516815185547.
+2026-09-02 16:01:14,538 | INFO | Iteration 53/101 done in 3.398606061935425.
+2026-09-02 16:01:18,008 | INFO | Iteration 54/101 done in 3.4667704105377197.
+2026-09-02 16:01:21,492 | INFO | Iteration 55/101 done in 3.463076591491699.
+2026-09-02 16:01:25,145 | INFO | Iteration 56/101 done in 3.6491808891296387.
+2026-09-02 16:01:28,323 | INFO | Iteration 57/101 done in 3.1740987300872803.
+2026-09-02 16:01:31,754 | INFO | Iteration 58/101 done in 3.4276819229125977.
+2026-09-02 16:01:34,931 | INFO | Iteration 59/101 done in 3.1742045879364014.
+2026-09-02 16:01:38,198 | INFO | Iteration 60/101 done in 3.262890577316284.
+2026-09-02 16:01:41,648 | INFO | Iteration 61/101 done in 3.4464383125305176.
+2026-09-02 16:01:45,079 | INFO | Iteration 62/101 done in 3.4280247688293457.
+2026-09-02 16:01:48,815 | INFO | Iteration 63/101 done in 3.7314770221710205.
+2026-09-02 16:01:52,501 | INFO | Iteration 64/101 done in 3.6762166023254395.
+2026-09-02 16:01:56,278 | INFO | Iteration 65/101 done in 3.7538504600524902.
+2026-09-02 16:01:59,659 | INFO | Iteration 66/101 done in 3.3778600692749023.
+2026-09-02 16:02:03,672 | INFO | Iteration 67/101 done in 4.0102760791778564.
+2026-09-02 16:02:07,382 | INFO | Iteration 68/101 done in 3.706223249435425.
+2026-09-02 16:02:10,817 | INFO | Iteration 69/101 done in 3.4288439750671387.
+2026-09-02 16:02:14,261 | INFO | Iteration 70/101 done in 3.434119701385498.
+2026-09-02 16:02:17,603 | INFO | Iteration 71/101 done in 3.3389718532562256.
+2026-09-02 16:02:21,533 | INFO | Iteration 72/101 done in 3.9045186042785645.
+2026-09-02 16:02:25,192 | INFO | Iteration 73/101 done in 3.654939889907837.
+2026-09-02 16:02:29,030 | INFO | Iteration 74/101 done in 3.8335793018341064.
+2026-09-02 16:02:32,486 | INFO | Iteration 75/101 done in 3.4521422386169434.
+2026-09-02 16:02:36,207 | INFO | Iteration 76/101 done in 3.7164738178253174.
+2026-09-02 16:02:39,671 | INFO | Iteration 77/101 done in 3.437990665435791.
+2026-09-02 16:02:43,111 | INFO | Iteration 78/101 done in 3.4362196922302246.
+2026-09-02 16:02:46,619 | INFO | Iteration 79/101 done in 3.486955165863037.
+2026-09-02 16:02:50,104 | INFO | Iteration 80/101 done in 3.469168186187744.
+2026-09-02 16:02:53,724 | INFO | Iteration 81/101 done in 3.5980331897735596.
+2026-09-02 16:02:56,896 | INFO | Iteration 82/101 done in 3.1620090007781982.
+2026-09-02 16:03:00,515 | INFO | Iteration 83/101 done in 3.615051746368408.
+2026-09-02 16:03:03,731 | INFO | Iteration 84/101 done in 3.2009963989257812.
+2026-09-02 16:03:07,196 | INFO | Iteration 85/101 done in 3.4608781337738037.
+2026-09-02 16:03:10,361 | INFO | Iteration 86/101 done in 3.161626100540161.
+2026-09-02 16:03:13,482 | INFO | Iteration 87/101 done in 3.1170356273651123.
+2026-09-02 16:03:16,916 | INFO | Iteration 88/101 done in 3.430002450942993.
+2026-09-02 16:03:20,326 | INFO | Iteration 89/101 done in 3.3923892974853516.
+2026-09-02 16:03:23,765 | INFO | Iteration 90/101 done in 3.4356744289398193.
+2026-09-02 16:03:26,908 | INFO | Iteration 91/101 done in 3.1390910148620605.
+2026-09-02 16:03:30,741 | INFO | Iteration 92/101 done in 3.816767454147339.
+2026-09-02 16:03:34,541 | INFO | Iteration 93/101 done in 3.7939298152923584.
+2026-09-02 16:03:38,282 | INFO | Iteration 94/101 done in 3.7345027923583984.
+2026-09-02 16:03:41,557 | INFO | Iteration 95/101 done in 3.268240451812744.
+2026-09-02 16:03:44,708 | INFO | Iteration 96/101 done in 3.146926164627075.
+2026-09-02 16:03:48,215 | INFO | Iteration 97/101 done in 3.4853622913360596.
+2026-09-02 16:03:51,883 | INFO | Iteration 98/101 done in 3.659130811691284.
+2026-09-02 16:03:55,317 | INFO | Iteration 99/101 done in 3.427318572998047.
+2026-09-02 16:03:59,139 | INFO | Iteration 100/101 done in 3.8136744499206543.
+2026-09-02 16:03:59,143 | INFO | SPSA: Finished in 348.8970582485199
+  VQC: fit completed in 440.5s
+VQC: using V1 Sampler (statevector, exact simulation)
+  VQC: fitting on 300 samples, 32 parameters, optimizer=SPSA...
+2026-09-02 16:04:04,457 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 16:05:19,279 | INFO | Finished calibration:
+2026-09-02 16:05:19,283 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 27.080557381867287, A = 0, alpha = 0.602
+2026-09-02 16:05:19,286 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 16:05:19,289 | INFO | SPSA: Starting optimization.
+2026-09-02 16:05:22,178 | INFO | Iteration 1/101 done in 2.8863415718078613.
+2026-09-02 16:05:25,031 | INFO | Iteration 2/101 done in 2.849111557006836.
+2026-09-02 16:05:27,880 | INFO | Iteration 3/101 done in 2.845350742340088.
+2026-09-02 16:05:31,022 | INFO | Iteration 4/101 done in 3.1328346729278564.
+2026-09-02 16:05:33,682 | INFO | Iteration 5/101 done in 2.651381254196167.
+2026-09-02 16:05:36,751 | INFO | Iteration 6/101 done in 3.065253973007202.
+2026-09-02 16:05:39,601 | INFO | Iteration 7/101 done in 2.8457298278808594.
+2026-09-02 16:05:42,875 | INFO | Iteration 8/101 done in 3.2444849014282227.
+2026-09-02 16:05:45,915 | INFO | Iteration 9/101 done in 3.0357749462127686.
+2026-09-02 16:05:48,717 | INFO | Iteration 10/101 done in 2.7865047454833984.
+2026-09-02 16:05:51,599 | INFO | Iteration 11/101 done in 2.8686206340789795.
+2026-09-02 16:05:54,696 | INFO | Iteration 12/101 done in 3.0696651935577393.
+2026-09-02 16:05:58,095 | INFO | Iteration 13/101 done in 3.3559730052948.
+2026-09-02 16:06:00,722 | INFO | Iteration 14/101 done in 2.6223862171173096.
+2026-09-02 16:06:03,632 | INFO | Iteration 15/101 done in 2.884561538696289.
+2026-09-02 16:06:06,350 | INFO | Iteration 16/101 done in 2.7099499702453613.
+2026-09-02 16:06:09,574 | INFO | Iteration 17/101 done in 3.2196850776672363.
+2026-09-02 16:06:12,251 | INFO | Iteration 18/101 done in 2.672720193862915.
+2026-09-02 16:06:15,566 | INFO | Iteration 19/101 done in 3.311230421066284.
+2026-09-02 16:06:18,635 | INFO | Iteration 20/101 done in 3.064539909362793.
+2026-09-02 16:06:21,482 | INFO | Iteration 21/101 done in 2.842717409133911.
+2026-09-02 16:06:24,763 | INFO | Iteration 22/101 done in 3.2754201889038086.
+2026-09-02 16:06:27,608 | INFO | Iteration 23/101 done in 2.840759038925171.
+2026-09-02 16:06:30,931 | INFO | Iteration 24/101 done in 3.282118558883667.
+2026-09-02 16:06:33,962 | INFO | Iteration 25/101 done in 3.0262463092803955.
+2026-09-02 16:06:37,237 | INFO | Iteration 26/101 done in 3.2687034606933594.
+2026-09-02 16:06:40,093 | INFO | Iteration 27/101 done in 2.8483810424804688.
+2026-09-02 16:06:43,395 | INFO | Iteration 28/101 done in 3.296177864074707.
+2026-09-02 16:06:46,187 | INFO | Iteration 29/101 done in 2.7865817546844482.
+2026-09-02 16:06:48,757 | INFO | Iteration 30/101 done in 2.56585693359375.
+2026-09-02 16:06:51,570 | INFO | Iteration 31/101 done in 2.808161973953247.
+2026-09-02 16:06:54,649 | INFO | Iteration 32/101 done in 3.0537991523742676.
+2026-09-02 16:06:57,923 | INFO | Iteration 33/101 done in 3.268195152282715.
+2026-09-02 16:07:01,001 | INFO | Iteration 34/101 done in 3.068537473678589.
+2026-09-02 16:07:04,167 | INFO | Iteration 35/101 done in 3.1404731273651123.
+2026-09-02 16:07:07,235 | INFO | Iteration 36/101 done in 3.057432174682617.
+2026-09-02 16:07:10,540 | INFO | Iteration 37/101 done in 3.296825647354126.
+2026-09-02 16:07:13,673 | INFO | Iteration 38/101 done in 3.1268017292022705.
+2026-09-02 16:07:16,709 | INFO | Iteration 39/101 done in 3.030690908432007.
+2026-09-02 16:07:19,807 | INFO | Iteration 40/101 done in 3.077822208404541.
+2026-09-02 16:07:22,663 | INFO | Iteration 41/101 done in 2.8326454162597656.
+2026-09-02 16:07:25,733 | INFO | Iteration 42/101 done in 3.0637009143829346.
+2026-09-02 16:07:28,370 | INFO | Iteration 43/101 done in 2.632571220397949.
+2026-09-02 16:07:31,424 | INFO | Iteration 44/101 done in 3.0499889850616455.
+2026-09-02 16:07:34,262 | INFO | Iteration 45/101 done in 2.8306336402893066.
+2026-09-02 16:07:37,363 | INFO | Iteration 46/101 done in 3.0813937187194824.
+2026-09-02 16:07:39,979 | INFO | Iteration 47/101 done in 2.6104516983032227.
+2026-09-02 16:07:43,115 | INFO | Iteration 48/101 done in 3.1278233528137207.
+2026-09-02 16:07:46,570 | INFO | Iteration 49/101 done in 3.424584150314331.
+2026-09-02 16:07:49,602 | INFO | Iteration 50/101 done in 3.0267550945281982.
+2026-09-02 16:07:52,951 | INFO | Iteration 51/101 done in 3.304753541946411.
+2026-09-02 16:07:55,991 | INFO | Iteration 52/101 done in 3.035489082336426.
+2026-09-02 16:07:59,215 | INFO | Iteration 53/101 done in 3.2161552906036377.
+2026-09-02 16:08:01,870 | INFO | Iteration 54/101 done in 2.633030652999878.
+2026-09-02 16:08:04,725 | INFO | Iteration 55/101 done in 2.850827217102051.
+2026-09-02 16:08:07,379 | INFO | Iteration 56/101 done in 2.643545627593994.
+2026-09-02 16:08:10,480 | INFO | Iteration 57/101 done in 3.0969045162200928.
+2026-09-02 16:08:13,798 | INFO | Iteration 58/101 done in 3.3129496574401855.
+2026-09-02 16:08:16,842 | INFO | Iteration 59/101 done in 3.0407254695892334.
+2026-09-02 16:08:20,091 | INFO | Iteration 60/101 done in 3.244058609008789.
+2026-09-02 16:08:22,713 | INFO | Iteration 61/101 done in 2.6180102825164795.
+2026-09-02 16:08:25,608 | INFO | Iteration 62/101 done in 2.8794596195220947.
+2026-09-02 16:08:28,746 | INFO | Iteration 63/101 done in 3.120206117630005.
+2026-09-02 16:08:31,819 | INFO | Iteration 64/101 done in 3.0653932094573975.
+2026-09-02 16:08:34,650 | INFO | Iteration 65/101 done in 2.8192152976989746.
+2026-09-02 16:08:37,418 | INFO | Iteration 66/101 done in 2.761995315551758.
+2026-09-02 16:08:40,748 | INFO | Iteration 67/101 done in 3.3194775581359863.
+2026-09-02 16:08:43,752 | INFO | Iteration 68/101 done in 3.0003504753112793.
+2026-09-02 16:08:47,018 | INFO | Iteration 69/101 done in 3.2624919414520264.
+2026-09-02 16:08:50,107 | INFO | Iteration 70/101 done in 3.081441879272461.
+2026-09-02 16:08:53,472 | INFO | Iteration 71/101 done in 3.343351125717163.
+2026-09-02 16:08:56,547 | INFO | Iteration 72/101 done in 3.069124460220337.
+2026-09-02 16:08:59,795 | INFO | Iteration 73/101 done in 3.244584321975708.
+2026-09-02 16:09:02,579 | INFO | Iteration 74/101 done in 2.77763032913208.
+2026-09-02 16:09:05,583 | INFO | Iteration 75/101 done in 2.9968323707580566.
+2026-09-02 16:09:08,995 | INFO | Iteration 76/101 done in 3.4058027267456055.
+2026-09-02 16:09:12,019 | INFO | Iteration 77/101 done in 3.0164074897766113.
+2026-09-02 16:09:15,435 | INFO | Iteration 78/101 done in 3.405836820602417.
+2026-09-02 16:09:18,472 | INFO | Iteration 79/101 done in 3.0330076217651367.
+2026-09-02 16:09:21,682 | INFO | Iteration 80/101 done in 3.205402374267578.
+2026-09-02 16:09:24,703 | INFO | Iteration 81/101 done in 3.0172042846679688.
+2026-09-02 16:09:27,791 | INFO | Iteration 82/101 done in 3.056835412979126.
+2026-09-02 16:09:30,659 | INFO | Iteration 83/101 done in 2.862717866897583.
+2026-09-02 16:09:33,708 | INFO | Iteration 84/101 done in 3.044250249862671.
+2026-09-02 16:09:36,750 | INFO | Iteration 85/101 done in 3.015326738357544.
+2026-09-02 16:09:39,566 | INFO | Iteration 86/101 done in 2.810786008834839.
+2026-09-02 16:09:42,821 | INFO | Iteration 87/101 done in 3.2454428672790527.
+2026-09-02 16:09:45,821 | INFO | Iteration 88/101 done in 2.9876725673675537.
+2026-09-02 16:09:48,931 | INFO | Iteration 89/101 done in 3.0948641300201416.
+2026-09-02 16:09:51,918 | INFO | Iteration 90/101 done in 2.9818248748779297.
+2026-09-02 16:09:55,185 | INFO | Iteration 91/101 done in 3.2510299682617188.
+2026-09-02 16:09:57,808 | INFO | Iteration 92/101 done in 2.616652727127075.
+2026-09-02 16:10:00,693 | INFO | Iteration 93/101 done in 2.856602430343628.
+2026-09-02 16:10:03,800 | INFO | Iteration 94/101 done in 3.103792428970337.
+2026-09-02 16:10:06,926 | INFO | Iteration 95/101 done in 3.0951125621795654.
+2026-09-02 16:10:10,275 | INFO | Iteration 96/101 done in 3.339660167694092.
+2026-09-02 16:10:13,320 | INFO | Iteration 97/101 done in 3.035112142562866.
+2026-09-02 16:10:16,668 | INFO | Iteration 98/101 done in 3.334536075592041.
+2026-09-02 16:10:19,618 | INFO | Iteration 99/101 done in 2.9443705081939697.
+2026-09-02 16:10:23,086 | INFO | Iteration 100/101 done in 3.4326348304748535.
+2026-09-02 16:10:23,090 | INFO | SPSA: Finished in 303.7981562614441
+  VQC: fit completed in 380.2s
+VQC: using V1 Sampler (statevector, exact simulation)
+  VQC: fitting on 300 samples, 64 parameters, optimizer=SPSA...
+2026-09-02 16:10:27,529 | INFO | SPSA: Starting calibration of learning rate and perturbation.
+2026-09-02 16:12:17,743 | INFO | Finished calibration:
+2026-09-02 16:12:17,761 | INFO |  -- Learning rate: a / ((A + n) ^ alpha) with a = 15.061232072011558, A = 0, alpha = 0.602
+2026-09-02 16:12:17,764 | INFO |  -- Perturbation: c / (n ^ gamma) with c = 0.2, gamma = 0.101
+2026-09-02 16:12:17,766 | INFO | SPSA: Starting optimization.
+2026-09-02 16:12:22,194 | INFO | Iteration 1/101 done in 4.4254114627838135.
+2026-09-02 16:12:26,458 | INFO | Iteration 2/101 done in 4.258997678756714.
+2026-09-02 16:12:31,408 | INFO | Iteration 3/101 done in 4.772074222564697.
+2026-09-02 16:12:35,781 | INFO | Iteration 4/101 done in 4.31055212020874.
+2026-09-02 16:12:40,168 | INFO | Iteration 5/101 done in 4.382467985153198.
+2026-09-02 16:12:44,686 | INFO | Iteration 6/101 done in 4.503420114517212.
+2026-09-02 16:12:48,929 | INFO | Iteration 7/101 done in 4.238768815994263.
+2026-09-02 16:12:53,801 | INFO | Iteration 8/101 done in 4.865057945251465.
+2026-09-02 16:12:58,047 | INFO | Iteration 9/101 done in 4.216634511947632.
+2026-09-02 16:13:02,963 | INFO | Iteration 10/101 done in 4.911524772644043.
+2026-09-02 16:13:07,350 | INFO | Iteration 11/101 done in 4.3824546337127686.
+2026-09-02 16:13:11,470 | INFO | Iteration 12/101 done in 4.11676025390625.
+2026-09-02 16:13:15,858 | INFO | Iteration 13/101 done in 4.3844544887542725.
+2026-09-02 16:13:20,237 | INFO | Iteration 14/101 done in 4.374303340911865.
+2026-09-02 16:13:24,805 | INFO | Iteration 15/101 done in 4.563901901245117.
+2026-09-02 16:13:29,427 | INFO | Iteration 16/101 done in 4.596394300460815.
+2026-09-02 16:13:34,504 | INFO | Iteration 17/101 done in 5.0687971115112305.
+2026-09-02 16:13:39,170 | INFO | Iteration 18/101 done in 4.64372706413269.
+2026-09-02 16:13:44,264 | INFO | Iteration 19/101 done in 5.086899995803833.
+2026-09-02 16:13:48,861 | INFO | Iteration 20/101 done in 4.579391241073608.
+2026-09-02 16:13:53,603 | INFO | Iteration 21/101 done in 4.736850023269653.
+2026-09-02 16:13:58,111 | INFO | Iteration 22/101 done in 4.476811408996582.
+2026-09-02 16:14:02,649 | INFO | Iteration 23/101 done in 4.520258188247681.
+2026-09-02 16:14:07,518 | INFO | Iteration 24/101 done in 4.857754945755005.
+2026-09-02 16:14:12,155 | INFO | Iteration 25/101 done in 4.620081186294556.
+2026-09-02 16:14:16,966 | INFO | Iteration 26/101 done in 4.806932687759399.
+2026-09-02 16:14:21,419 | INFO | Iteration 27/101 done in 4.446996212005615.
+2026-09-02 16:14:26,205 | INFO | Iteration 28/101 done in 4.776734113693237.
+2026-09-02 16:14:30,687 | INFO | Iteration 29/101 done in 4.451387882232666.
+2026-09-02 16:14:35,629 | INFO | Iteration 30/101 done in 4.937864303588867.
+2026-09-02 16:14:40,322 | INFO | Iteration 31/101 done in 4.683947563171387.
+2026-09-02 16:14:45,084 | INFO | Iteration 32/101 done in 4.751201152801514.
+2026-09-02 16:14:50,237 | INFO | Iteration 33/101 done in 5.144353151321411.
+2026-09-02 16:14:54,751 | INFO | Iteration 34/101 done in 4.506793260574341.
+2026-09-02 16:14:59,595 | INFO | Iteration 35/101 done in 4.821887016296387.
+2026-09-02 16:15:04,069 | INFO | Iteration 36/101 done in 4.466667652130127.
+2026-09-02 16:15:08,848 | INFO | Iteration 37/101 done in 4.775991678237915.
+2026-09-02 16:15:13,185 | INFO | Iteration 38/101 done in 4.333144903182983.
+2026-09-02 16:15:18,018 | INFO | Iteration 39/101 done in 4.82821798324585.
+2026-09-02 16:15:22,501 | INFO | Iteration 40/101 done in 4.465810060501099.
+2026-09-02 16:15:26,994 | INFO | Iteration 41/101 done in 4.461506366729736.
+2026-09-02 16:15:31,570 | INFO | Iteration 42/101 done in 4.573092460632324.
+2026-09-02 16:15:35,568 | INFO | Iteration 43/101 done in 3.9926602840423584.
+2026-09-02 16:15:39,975 | INFO | Iteration 44/101 done in 4.396193981170654.
+2026-09-02 16:15:44,392 | INFO | Iteration 45/101 done in 4.4115846157073975.
+2026-09-02 16:15:49,055 | INFO | Iteration 46/101 done in 4.659460544586182.
+2026-09-02 16:15:53,215 | INFO | Iteration 47/101 done in 4.154181718826294.
+2026-09-02 16:15:57,858 | INFO | Iteration 48/101 done in 4.608927249908447.
+2026-09-02 16:16:02,302 | INFO | Iteration 49/101 done in 4.441183090209961.
+2026-09-02 16:16:06,393 | INFO | Iteration 50/101 done in 4.066706895828247.
+2026-09-02 16:16:10,937 | INFO | Iteration 51/101 done in 4.541057825088501.
+2026-09-02 16:16:15,040 | INFO | Iteration 52/101 done in 4.098381996154785.
+2026-09-02 16:16:19,772 | INFO | Iteration 53/101 done in 4.727431058883667.
+2026-09-02 16:16:24,155 | INFO | Iteration 54/101 done in 4.376550674438477.
+2026-09-02 16:16:28,588 | INFO | Iteration 55/101 done in 4.4266486167907715.
+2026-09-02 16:16:33,243 | INFO | Iteration 56/101 done in 4.652223110198975.
+2026-09-02 16:16:38,625 | INFO | Iteration 57/101 done in 5.374454975128174.
+2026-09-02 16:16:43,340 | INFO | Iteration 58/101 done in 4.707704067230225.
+2026-09-02 16:16:47,925 | INFO | Iteration 59/101 done in 4.5789735317230225.
+2026-09-02 16:16:53,011 | INFO | Iteration 60/101 done in 5.077349901199341.
+2026-09-02 16:16:57,479 | INFO | Iteration 61/101 done in 4.451437950134277.
+2026-09-02 16:17:02,383 | INFO | Iteration 62/101 done in 4.896480083465576.
+2026-09-02 16:17:07,072 | INFO | Iteration 63/101 done in 4.685208797454834.
+2026-09-02 16:17:12,255 | INFO | Iteration 64/101 done in 5.175011396408081.
+2026-09-02 16:17:16,856 | INFO | Iteration 65/101 done in 4.594407796859741.
+2026-09-02 16:17:21,416 | INFO | Iteration 66/101 done in 4.554863929748535.
+2026-09-02 16:17:25,967 | INFO | Iteration 67/101 done in 4.522912979125977.
+2026-09-02 16:17:30,350 | INFO | Iteration 68/101 done in 4.374104022979736.
+2026-09-02 16:17:35,062 | INFO | Iteration 69/101 done in 4.7087788581848145.
+2026-09-02 16:17:39,295 | INFO | Iteration 70/101 done in 4.22486686706543.
+2026-09-02 16:17:43,664 | INFO | Iteration 71/101 done in 4.364722490310669.
+2026-09-02 16:17:47,853 | INFO | Iteration 72/101 done in 4.184680461883545.
+2026-09-02 16:17:52,333 | INFO | Iteration 73/101 done in 4.477745771408081.
+2026-09-02 16:17:56,093 | INFO | Iteration 74/101 done in 3.7564926147460938.
+2026-09-02 16:18:00,652 | INFO | Iteration 75/101 done in 4.555557489395142.
+2026-09-02 16:18:04,990 | INFO | Iteration 76/101 done in 4.330679655075073.
+2026-09-02 16:18:09,326 | INFO | Iteration 77/101 done in 4.330400466918945.
+2026-09-02 16:18:14,035 | INFO | Iteration 78/101 done in 4.701053619384766.
+2026-09-02 16:18:18,449 | INFO | Iteration 79/101 done in 4.409252166748047.
+2026-09-02 16:18:23,057 | INFO | Iteration 80/101 done in 4.606111764907837.
+2026-09-02 16:18:27,100 | INFO | Iteration 81/101 done in 4.039340019226074.
+2026-09-02 16:18:31,727 | INFO | Iteration 82/101 done in 4.601622819900513.
+2026-09-02 16:18:35,491 | INFO | Iteration 83/101 done in 3.7580301761627197.
+2026-09-02 16:18:39,544 | INFO | Iteration 84/101 done in 4.047541856765747.
+2026-09-02 16:18:43,899 | INFO | Iteration 85/101 done in 4.351293087005615.
+2026-09-02 16:18:47,726 | INFO | Iteration 86/101 done in 3.8071274757385254.
+2026-09-02 16:18:52,493 | INFO | Iteration 87/101 done in 4.752676963806152.
+2026-09-02 16:18:56,520 | INFO | Iteration 88/101 done in 4.022908687591553.
+2026-09-02 16:19:00,982 | INFO | Iteration 89/101 done in 4.455695152282715.
+2026-09-02 16:19:05,350 | INFO | Iteration 90/101 done in 4.364315032958984.
+2026-09-02 16:19:09,624 | INFO | Iteration 91/101 done in 4.270220994949341.
+2026-09-02 16:19:13,758 | INFO | Iteration 92/101 done in 4.114781618118286.
+2026-09-02 16:19:17,985 | INFO | Iteration 93/101 done in 4.223345756530762.
+2026-09-02 16:19:22,421 | INFO | Iteration 94/101 done in 4.429949760437012.
+2026-09-02 16:19:26,804 | INFO | Iteration 95/101 done in 4.373686075210571.
+2026-09-02 16:19:31,599 | INFO | Iteration 96/101 done in 4.772412538528442.
+2026-09-02 16:19:36,028 | INFO | Iteration 97/101 done in 4.3999717235565186.
+2026-09-02 16:19:40,679 | INFO | Iteration 98/101 done in 4.642261266708374.
+2026-09-02 16:19:44,924 | INFO | Iteration 99/101 done in 4.237603664398193.
+2026-09-02 16:19:49,294 | INFO | Iteration 100/101 done in 4.364970684051514.
+2026-09-02 16:19:49,321 | INFO | SPSA: Finished in 451.5531053543091
+  VQC: fit completed in 563.8s
+  VQC depth adaptation: chose reps=3 (val_acc=0.4607)
+  VQC trained in 1394.6s. Train acc: 0.6533, Val acc: 0.4607
 
 [5/5] Training Meta-Learner Ensemble...
-  Subsampled to 1000 samples for meta-learner
-  lstm predict_proba: 0.0s (1000 samples)
-  xgboost predict_proba: 0.0s (1000 samples)
+  lstm predict_proba: 0.0s (268 samples)
+  xgboost predict_proba: 0.0s (268 samples)
   qkernel predict_proba timed out after 30s — skipping
   qkernel predict_proba timed out after 30s — excluding from ensemble weight
-  vqc predict_proba: 2.8s (1000 samples)
-  Meta-learner trained with weights: {'lstm': 0.25724543080939943, 'xgboost': 0.44275456919060047, 'qkernel': 0.0, 'vqc': 0.3}
-  Meta-learner trained in 32.8s
+  vqc predict_proba: 4.8s (268 samples)
+  Meta-learner trained with weights: {'lstm': 0.38230769230769224, 'xgboost': 0.31769230769230766, 'qkernel': 0.0, 'vqc': 0.3}
+  Meta-learner trained in 35.0s
 
 ============================================================
 TRAINING COMPLETE
@@ -553,28 +1206,28 @@ TRAINING COMPLETE
   qkernel predict_proba timed out after 30s — skipping
   qkernel predict_proba timed out after 30s — skipping
   qkernel predict_proba timed out after 30s — skipping
-2026-09-02 12:35:24,785 | INFO | [2m2026-09-02T12:35:24.785445Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_aggregate  [0m [[0m[1m[34mastra_trade[0m][0m [36mmax_drawdown_pct[0m=[35m{'mean': -0.6652462632686611, 'std': 0.1896831748165967, 'n': 18}[0m [36mn_folds[0m=[35m3[0m [36msharpe_ratio[0m=[35m{'mean': 1.6879876056793406, 'std': 3.632706095215115, 'n': 18}[0m [36mwin_rate[0m=[35m{'mean': 0.5646817083132157, 'std': 0.08796868561417762, 'n': 18}[0m
-2026-09-02 12:35:24,790 | INFO | [2m2026-09-02T12:35:24.790206Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.006629773168831463[0m [36mexpectancy[0m=[35mnp.float64(0.006629773168831468)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m2.0754622634595274[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m149[0m [36mwin_rate[0m=[35m0.6375838926174496[0m
-2026-09-02 12:35:24,790 | INFO | [2m2026-09-02T12:35:24.790321Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.03195760575188343[0m [36mexpectancy[0m=[35mnp.float64(0.031957605751883444)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m5.91471590877227[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m141[0m [36mwin_rate[0m=[35m0.6312056737588653[0m
-2026-09-02 12:35:24,791 | INFO | [2m2026-09-02T12:35:24.791518Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.016069681790891938[0m [36mexpectancy[0m=[35mnp.float64(0.016069681790891934)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m3.921208767966286[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m136[0m [36mwin_rate[0m=[35m0.6176470588235294[0m
-2026-09-02 12:35:24,795 | INFO | [2m2026-09-02T12:35:24.795903Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.00012163062475378352[0m [36mexpectancy[0m=[35mnp.float64(-0.00012163062475377753)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m-0.15295766393615595[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m151[0m [36mwin_rate[0m=[35m0.5496688741721855[0m
-2026-09-02 12:35:24,796 | INFO | [2m2026-09-02T12:35:24.796007Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.0117288430561309[0m [36mexpectancy[0m=[35mnp.float64(0.011728843056130898)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m3.085550466832187[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m136[0m [36mwin_rate[0m=[35m0.5441176470588235[0m
-2026-09-02 12:35:24,797 | INFO | [2m2026-09-02T12:35:24.797197Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.019972017224245284[0m [36mexpectancy[0m=[35mnp.float64(0.019972017224245284)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m8.016283981505325[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m133[0m [36mwin_rate[0m=[35m0.6992481203007519[0m
-2026-09-02 12:35:24,801 | INFO | [2m2026-09-02T12:35:24.801811Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.010123303395783182[0m [36mexpectancy[0m=[35mnp.float64(-0.010123303395783184)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m-2.689222635188324[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m115[0m [36mwin_rate[0m=[35m0.4782608695652174[0m
-2026-09-02 12:35:24,801 | INFO | [2m2026-09-02T12:35:24.801918Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.013011517137704692[0m [36mexpectancy[0m=[35mnp.float64(-0.013011517137704692)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m-3.4846374092730112[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m121[0m [36mwin_rate[0m=[35m0.38016528925619836[0m
-2026-09-02 12:35:24,805 | INFO | [2m2026-09-02T12:35:24.805001Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.021335954348332898[0m [36mexpectancy[0m=[35mnp.float64(0.0213359543483329)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m6.400723201154785[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m100[0m [36mwin_rate[0m=[35m0.65[0m
-2026-09-02 12:35:24,805 | INFO | [2m2026-09-02T12:35:24.805387Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.02842409776281528[0m [36mexpectancy[0m=[35mnp.float64(0.028424097762815285)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m6.607019167534737[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m131[0m [36mwin_rate[0m=[35m0.7175572519083969[0m
-2026-09-02 12:35:24,805 | INFO | [2m2026-09-02T12:35:24.805806Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.00012393831198210682[0m [36mexpectancy[0m=[35mnp.float64(-0.00012393831198210734)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m-0.14687180482363002[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m123[0m [36mwin_rate[0m=[35m0.5365853658536586[0m
-2026-09-02 12:35:24,808 | INFO | [2m2026-09-02T12:35:24.808045Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.005630285923393884[0m [36mexpectancy[0m=[35mnp.float64(0.005630285923393888)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m1.9730138593354305[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m105[0m [36mwin_rate[0m=[35m0.6095238095238096[0m
-2026-09-02 12:35:24,808 | INFO | [2m2026-09-02T12:35:24.808127Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.011055560260611929[0m [36mexpectancy[0m=[35mnp.float64(-0.011055560260611927)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-3.4884502247192253[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m157[0m [36mwin_rate[0m=[35m0.49044585987261147[0m
-2026-09-02 12:35:24,813 | INFO | [2m2026-09-02T12:35:24.813748Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.01923609573957224[0m [36mexpectancy[0m=[35mnp.float64(0.01923609573957224)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m5.565688329892242[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m116[0m [36mwin_rate[0m=[35m0.603448275862069[0m
-2026-09-02 12:35:24,814 | INFO | [2m2026-09-02T12:35:24.814885Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.0033968412458058725[0m [36mexpectancy[0m=[35mnp.float64(-0.003396841245805877)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-1.1395017269945742[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m139[0m [36mwin_rate[0m=[35m0.4460431654676259[0m
-2026-09-02 12:35:24,817 | INFO | [2m2026-09-02T12:35:24.817944Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.009401742967806744[0m [36mexpectancy[0m=[35mnp.float64(-0.009401742967806742)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-2.781782896431813[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m122[0m [36mwin_rate[0m=[35m0.48360655737704916[0m
-2026-09-02 12:35:24,820 | INFO | [2m2026-09-02T12:35:24.820063Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.0015695414728277765[0m [36mexpectancy[0m=[35mnp.float64(0.0015695414728277707)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m0.42123795069093484[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m159[0m [36mwin_rate[0m=[35m0.4968553459119497[0m
-2026-09-02 12:35:24,820 | INFO | [2m2026-09-02T12:35:24.820145Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.000749393232439682[0m [36mexpectancy[0m=[35mnp.float64(0.0007493932324396813)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m0.28629736645114023[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m130[0m [36mwin_rate[0m=[35m0.5923076923076923[0m
+2026-09-02 16:24:26,995 | INFO | [2m2026-09-02T16:24:26.995535Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_aggregate  [0m [[0m[1m[34mastra_trade[0m][0m [36mmax_drawdown_pct[0m=[35m{'mean': -0.6089276416000808, 'std': 0.20109716842480124, 'n': 18}[0m [36mn_folds[0m=[35m3[0m [36msharpe_ratio[0m=[35m{'mean': 1.7474989402336947, 'std': 3.905637063507436, 'n': 18}[0m [36mwin_rate[0m=[35m{'mean': 0.5496046836976626, 'std': 0.10088017749648107, 'n': 18}[0m
+2026-09-02 16:24:27,054 | INFO | [2m2026-09-02T16:24:27.053915Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.004695318930891701[0m [36mexpectancy[0m=[35mnp.float64(0.004695318930891704)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m1.4568414843208557[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m91[0m [36mwin_rate[0m=[35m0.5934065934065934[0m
+2026-09-02 16:24:27,092 | INFO | [2m2026-09-02T16:24:27.092309Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.03009680742352258[0m [36mexpectancy[0m=[35mnp.float64(0.03009680742352258)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m5.782333041356171[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m109[0m [36mwin_rate[0m=[35m0.6146788990825688[0m
+2026-09-02 16:24:27,132 | INFO | [2m2026-09-02T16:24:27.131964Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.02565451199095528[0m [36mexpectancy[0m=[35mnp.float64(0.02565451199095528)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m6.8675895066486286[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m110[0m [36mwin_rate[0m=[35m0.7090909090909091[0m
+2026-09-02 16:24:27,174 | INFO | [2m2026-09-02T16:24:27.174295Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.001726781315926124[0m [36mexpectancy[0m=[35mnp.float64(-0.0017267813159261257)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m-0.895201296056832[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m86[0m [36mwin_rate[0m=[35m0.5348837209302325[0m
+2026-09-02 16:24:27,211 | INFO | [2m2026-09-02T16:24:27.210821Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.00026988097435307274[0m [36mexpectancy[0m=[35mnp.float64(0.00026988097435307057)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m0.19298254713672125[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m121[0m [36mwin_rate[0m=[35m0.4793388429752066[0m
+2026-09-02 16:24:27,253 | INFO | [2m2026-09-02T16:24:27.252718Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.02254896830226792[0m [36mexpectancy[0m=[35mnp.float64(0.022548968302267925)[0m [36mfold[0m=[35m0[0m [36msharpe_ratio[0m=[35m8.450001503131967[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2022-10-28 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m117[0m [36mwin_rate[0m=[35m0.717948717948718[0m
+2026-09-02 16:24:27,304 | INFO | [2m2026-09-02T16:24:27.304462Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.011596382887250277[0m [36mexpectancy[0m=[35mnp.float64(0.011596382887250276)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m5.061928605397828[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m56[0m [36mwin_rate[0m=[35m0.625[0m
+2026-09-02 16:24:27,349 | INFO | [2m2026-09-02T16:24:27.349619Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.012361430180258816[0m [36mexpectancy[0m=[35mnp.float64(0.012361430180258828)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m1.728818564519746[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m29[0m [36mwin_rate[0m=[35m0.4827586206896552[0m
+2026-09-02 16:24:27,399 | INFO | [2m2026-09-02T16:24:27.399595Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.01655941273563115[0m [36mexpectancy[0m=[35mnp.float64(0.01655941273563115)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m3.4234800751694046[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m32[0m [36mwin_rate[0m=[35m0.53125[0m
+2026-09-02 16:24:27,459 | INFO | [2m2026-09-02T16:24:27.458725Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.03861667140377869[0m [36mexpectancy[0m=[35mnp.float64(0.0386166714037787)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m7.729954527331656[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m37[0m [36mwin_rate[0m=[35m0.7567567567567568[0m
+2026-09-02 16:24:27,474 | INFO | [2m2026-09-02T16:24:27.474554Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.01715407567723676[0m [36mexpectancy[0m=[35mnp.float64(0.017154075677236747)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m3.1534925989851312[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m37[0m [36mwin_rate[0m=[35m0.5135135135135135[0m
+2026-09-02 16:24:27,493 | INFO | [2m2026-09-02T16:24:27.493560Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m0.010566190576294857[0m [36mexpectancy[0m=[35mnp.float64(0.010566190576294855)[0m [36mfold[0m=[35m1[0m [36msharpe_ratio[0m=[35m3.591135086113282[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2023-10-11 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m70[0m [36mwin_rate[0m=[35m0.6142857142857143[0m
+2026-09-02 16:24:27,559 | INFO | [2m2026-09-02T16:24:27.558853Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.01466249787213674[0m [36mexpectancy[0m=[35mnp.float64(-0.014662497872136738)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-5.089831405610459[0m [36msymbol[0m=[35mINFY[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m132[0m [36mwin_rate[0m=[35m0.4318181818181818[0m
+2026-09-02 16:24:27,582 | INFO | [2m2026-09-02T16:24:27.581709Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.0017059922567890947[0m [36mexpectancy[0m=[35mnp.float64(-0.0017059922567891003)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-0.5031972570121651[0m [36msymbol[0m=[35mPNB[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m138[0m [36mwin_rate[0m=[35m0.4855072463768116[0m
+2026-09-02 16:24:27,631 | INFO | [2m2026-09-02T16:24:27.631159Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.008267091383881814[0m [36mexpectancy[0m=[35mnp.float64(-0.008267091383881812)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-2.655184190712462[0m [36msymbol[0m=[35mBANKBARODA[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m149[0m [36mwin_rate[0m=[35m0.42953020134228187[0m
+2026-09-02 16:24:27,683 | INFO | [2m2026-09-02T16:24:27.683409Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.010442801470739333[0m [36mexpectancy[0m=[35mnp.float64(-0.010442801470739336)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-3.5337326590789333[0m [36msymbol[0m=[35mTATAPOWER[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m129[0m [36mwin_rate[0m=[35m0.43410852713178294[0m
+2026-09-02 16:24:27,707 | INFO | [2m2026-09-02T16:24:27.706831Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.004487127848122472[0m [36mexpectancy[0m=[35mnp.float64(-0.004487127848122462)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-1.1589244656451267[0m [36msymbol[0m=[35mCANBK[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m124[0m [36mwin_rate[0m=[35m0.45161290322580644[0m
+2026-09-02 16:24:27,744 | INFO | [2m2026-09-02T16:24:27.744028Z[0m [[32m[1minfo     [0m] [1mswing_walk_forward_fold_result[0m [[0m[1m[34mastra_trade[0m][0m [36mavg_trade_return_pct[0m=[35m-0.005460694729406858[0m [36mexpectancy[0m=[35mnp.float64(-0.005460694729406858)[0m [36mfold[0m=[35m2[0m [36msharpe_ratio[0m=[35m-2.147505341788906[0m [36msymbol[0m=[35mITC[0m [36mtest_end[0m=[35m'2025-09-04 00:00:00+05:30'[0m [36mtest_start[0m=[35m'2024-09-23 00:00:00+05:30'[0m [36mtotal_trades[0m=[35m119[0m [36mwin_rate[0m=[35m0.48739495798319327[0m
 + TRAIN_EXIT=0
 + mkdir -p models/latest logs
 + echo exit=0
 ++ date -u +%Y-%m-%dT%H:%M:%SZ
-+ echo finished_at=2026-09-02T12:35:35Z
++ echo finished_at=2026-09-02T16:58:28Z
 + cp /workspace/training.log logs/swing-walk-forward_training_full.log
