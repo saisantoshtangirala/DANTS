@@ -84,15 +84,15 @@
     "evolved_stoch_d_ratio_shooting_star"
   ],
   "training_metrics": {
-    "train_accuracy": 0.7572380640227248,
-    "train_precision": 0.7575738987627186,
-    "train_recall": 0.7572380640227248,
-    "train_f1": 0.7572236622349588,
-    "best_iteration": 28,
-    "val_accuracy": 0.5154702970297029,
-    "val_precision": 0.5190679367923888,
-    "val_recall": 0.5154702970297029,
-    "val_f1": 0.5155565739835575
+    "train_accuracy": 0.7484427931373621,
+    "train_precision": 0.7486355270000453,
+    "train_recall": 0.7484427931373621,
+    "train_f1": 0.7484461636280972,
+    "best_iteration": 26,
+    "val_accuracy": 0.5173267326732673,
+    "val_precision": 0.5220928860243775,
+    "val_recall": 0.5173267326732673,
+    "val_f1": 0.5168386931899858
   },
   "class_names": [
     "down",
