@@ -1,27 +1,27 @@
 [
   {
+    "feature_a": "minus_di",
+    "feature_b": "shooting_star",
+    "op": "ratio"
+  },
+  {
     "feature_a": "rsi_14",
     "feature_b": "shooting_star",
     "op": "ratio"
+  },
+  {
+    "feature_a": "minus_di",
+    "feature_b": "shooting_star",
+    "op": "diff"
+  },
+  {
+    "feature_a": "minus_di",
+    "feature_b": "volume_zscore",
+    "op": "diff"
   },
   {
     "feature_a": "stoch_k",
     "feature_b": "shooting_star",
     "op": "ratio"
-  },
-  {
-    "feature_a": "rsi_14",
-    "feature_b": "above_vwap",
-    "op": "diff"
-  },
-  {
-    "feature_a": "rsi_14",
-    "feature_b": "chaikin_money_flow",
-    "op": "diff"
-  },
-  {
-    "feature_a": "rsi_14",
-    "feature_b": "atr_pct",
-    "op": "diff"
   }
 ]

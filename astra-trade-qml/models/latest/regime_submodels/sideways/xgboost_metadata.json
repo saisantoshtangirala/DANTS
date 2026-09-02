@@ -78,22 +78,22 @@
     "williams_r",
     "cci",
     "_symbol_id",
+    "evolved_minus_di_ratio_shooting_star",
     "evolved_rsi_14_ratio_shooting_star",
-    "evolved_stoch_k_ratio_shooting_star",
-    "evolved_rsi_14_diff_above_vwap",
-    "evolved_rsi_14_diff_chaikin_money_flow",
-    "evolved_rsi_14_diff_atr_pct"
+    "evolved_minus_di_diff_shooting_star",
+    "evolved_minus_di_diff_volume_zscore",
+    "evolved_stoch_k_ratio_shooting_star"
   ],
   "training_metrics": {
-    "train_accuracy": 0.7219881656804734,
-    "train_precision": 0.7222894580111484,
-    "train_recall": 0.7219881656804734,
-    "train_f1": 0.7220936929371472,
-    "best_iteration": 50,
-    "val_accuracy": 0.5484043979619201,
-    "val_precision": 0.5479969123610912,
-    "val_recall": 0.5484043979619201,
-    "val_f1": 0.5480587221238091
+    "train_accuracy": 0.7104528462594047,
+    "train_precision": 0.7110675762524972,
+    "train_recall": 0.7104528462594047,
+    "train_f1": 0.7106218299293633,
+    "best_iteration": 43,
+    "val_accuracy": 0.5522788203753352,
+    "val_precision": 0.5525279762338063,
+    "val_recall": 0.5522788203753352,
+    "val_f1": 0.5523676920459131
   },
   "class_names": [
     "down",
