@@ -1,26 +1,26 @@
 [
   {
-    "feature_a": "minus_di",
-    "feature_b": "shooting_star",
+    "feature_a": "roc_20",
+    "feature_b": "rsi_oversold",
+    "op": "ratio"
+  },
+  {
+    "feature_a": "roc_10",
+    "feature_b": "rsi_oversold",
     "op": "ratio"
   },
   {
     "feature_a": "rsi_14",
-    "feature_b": "shooting_star",
+    "feature_b": "rsi_oversold",
     "op": "ratio"
   },
   {
-    "feature_a": "minus_di",
-    "feature_b": "shooting_star",
-    "op": "diff"
+    "feature_a": "macd_signal_norm",
+    "feature_b": "rsi_oversold",
+    "op": "ratio"
   },
   {
-    "feature_a": "minus_di",
-    "feature_b": "volume_zscore",
-    "op": "diff"
-  },
-  {
-    "feature_a": "stoch_k",
+    "feature_a": "stoch_d",
     "feature_b": "shooting_star",
     "op": "ratio"
   }
