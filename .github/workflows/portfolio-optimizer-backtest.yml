@@ -1,0 +1,67 @@
+name: Portfolio Optimizer Backtest Diagnostic (CI Runner)
+
+# Diagnostic-only: rolling out-of-sample comparison of three portfolio
+# allocation strategies over the existing 18-symbol equity universe -
+# naive top-K equal weight, classical mean-variance (scipy SLSQP), and
+# QUBO/quantum-inspired asset selection via simulated annealing. This is
+# a fundamentally different question than every other diagnostic
+# workflow in this repo: those all ask "can we predict a stock's own
+# next move"; this asks "given some return estimate, does the
+# quantum-inspired allocation layer pick a better basket than simple
+# classical baselines" - directly implementing the "Quantum Layer" and
+# "Risk Layer" of the hybrid AI/quantum-inspired trading plan, on its
+# own branch (quantum-portfolio-optimizer), explicitly as a strategy
+# that competes against classical baselines rather than being assumed
+# superior. See src/portfolio/backtest.py's module docstring for the
+# full methodology, including why QAOA is excluded from this full-scale
+# run (confirmed impractical to classically simulate at 18 qubits;
+# validated separately at small scale in tests/test_quantum_optimizer.py).
+#
+# No ML model training at all, so like pairs-trading-test.yml this runs
+# directly on a plain ubuntu-latest runner - no RunPod GPU pod needed.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: portfolio-optimizer-backtest
+  cancel-in-progress: false
+
+jobs:
+  portfolio-optimizer-backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-portfolio-backtest.txt
+
+      - name: Run portfolio optimizer backtest diagnostic
+        working-directory: astra-trade-qml
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode portfolio-optimizer-backtest | tee /tmp/portfolio_optimizer_backtest.log
+
+      - name: Summarize portfolio optimizer backtest run
+        if: always()
+        run: |
+          {
+            echo "### Portfolio optimizer backtest diagnostic run"
+            echo
+            echo '```'
+            grep -E "portfolio_optimizer_backtest_started|portfolio_optimizer_backtest_result|portfolio_optimizer_backtest_complete" /tmp/portfolio_optimizer_backtest.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
