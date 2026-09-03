@@ -11,6 +11,7 @@ Usage:
     python3 -m src.main --mode xgboost-baseline    # diagnostic: bare XGBoost on the production feature set, no quantum ensemble
     python3 -m src.main --mode regime-gated-test   # diagnostic: regime-gated backtest against the full production ensemble
     python3 -m src.main --mode pairs-trading-test  # diagnostic: market-neutral pairs/relative-value trading, no ML model
+    python3 -m src.main --mode event-drift-test    # diagnostic: abnormal-reaction event drift, no ML model
 """
 
 import argparse
@@ -702,6 +703,65 @@ def run_pairs_trading_test(config: dict, logger) -> None:
         )
 
 
+def run_event_drift_test(config: dict, logger) -> None:
+    """Diagnostic: tests whether an unusually large, high-volume,
+    benchmark-adjusted single-day move in a stock is followed by
+    continuation (drift) or reversion over the following 5/10/20 trading
+    days - pooled across the whole equity universe, since a single
+    symbol has too few detected events on its own for a meaningful test.
+    A fundamentally different signal shape than every other diagnostic
+    this session has tried (all predict a stock's own next-move
+    direction from price/technical features; all came back null, and a
+    direct cost-sanity-check confirmed the underlying gross edge is
+    genuinely flat, not just cost-eaten). Deliberately scoped as an
+    "abnormal-reaction" test, not literal earnings-announcement drift
+    (PEAD) - that needs a corporate-announcements data source this
+    system doesn't have. See
+    TrainingPipeline.event_drift_backtest()'s docstring and
+    src/training/event_drift.py for the full methodology. No ML model
+    training, daily OHLCV only (swing_data_ingestion), runs on a plain
+    CI runner."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_event_drift_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("event_drift_test_started")
+    result = pipeline.event_drift_backtest()
+    logger.info("event_drift_test_event_counts", per_symbol=result["per_symbol_event_counts"])
+
+    for window, by_direction in result["pooled"].items():
+        for direction, report in by_direction.items():
+            continuation = report.get("continuation_stats", {})
+            logger.info(
+                "event_drift_backtest_result",
+                window=window,
+                direction=direction,
+                total_trades=report.get("total_trades"),
+                win_rate=report.get("win_rate"),
+                avg_trade_return_pct=report.get("avg_trade_return_pct"),
+                expectancy=report.get("expectancy"),
+                sharpe_ratio=report.get("sharpe_ratio"),
+                continuation_n_events=continuation.get("n_events"),
+                continuation_mean_pct=continuation.get("mean_continuation_pct"),
+                continuation_p_value=continuation.get("p_value"),
+                bonferroni_alpha=report.get("bonferroni_alpha"),
+            )
+    logger.info("event_drift_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -722,7 +782,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -753,6 +813,8 @@ def main() -> None:
         run_regime_gated_test(config, logger)
     elif args.mode == "pairs-trading-test":
         run_pairs_trading_test(config, logger)
+    elif args.mode == "event-drift-test":
+        run_event_drift_test(config, logger)
 
 
 if __name__ == "__main__":

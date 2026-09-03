@@ -28,6 +28,13 @@ from src.trading.market_rules import CircuitCheck, round_to_tick
 from src.trading.portfolio_allocator import AllocationResult, PortfolioAllocator
 from src.training.feature_evolution import FeatureEvolver
 from src.training.lstm_nas import is_nas_due, load_nas_state, run_lstm_nas, save_nas_state
+from src.training.event_drift import (
+    MIN_ROWS_FOR_EVENT_DETECTION,
+    collect_event_trades,
+    compute_excess_returns,
+    detect_reaction_events,
+    summarize_continuation,
+)
 from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
 from src.training.regime_submodels import RegimeSubModelTrainer, compute_regime_thresholds, label_regime_proxy
 from src.training.walk_forward import WalkForwardValidator
@@ -1274,6 +1281,119 @@ class TrainingPipeline:
             "n_symbols_qualified": len(log_prices_train),
             "n_pairs_cointegrated": len(pairs),
             "results": results,
+        }
+
+    def event_drift_backtest(
+        self,
+        symbols: Optional[List[str]] = None,
+        benchmark_symbol: str = "NIFTY 50",
+        train_frac: float = 0.7,
+        windows: Optional[List[int]] = None,
+        baseline_window: int = 60,
+        return_z_threshold: float = 2.5,
+        volume_z_threshold: float = 2.0,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: tests whether an unusually large, high-volume,
+        benchmark-adjusted single-day move in a stock is followed by
+        continuation (drift) or reversion over the following 5/10/20
+        trading days - a fundamentally different signal shape than every
+        direction-prediction diagnostic this session has tried (all of
+        which came back null, confirmed by a direct transaction-cost
+        sanity check to be a genuinely flat gross edge, not just a
+        cost-eaten one). See src/training/event_drift.py's module
+        docstring for the full methodology, including why this is
+        deliberately scoped as an "abnormal-reaction" test rather than
+        literal earnings-announcement drift (PEAD).
+
+        Uses swing_data_ingestion()'s daily OHLCV (fetched here if not
+        already present) for every symbol plus the benchmark. Events are
+        detected once per symbol over its full available history (the
+        rolling baseline is already causal - shift(1) - so this isn't
+        leakage), then split by date at train_frac into a train slice
+        (sanity-check only: are events even being detected, non-
+        degenerate) and an OOS slice (the confirmatory numbers). Trades
+        are pooled ACROSS SYMBOLS for each (window, direction)
+        combination before computing statistics - a single symbol
+        typically has too few detected events on its own for a
+        meaningful test; this is a market-wide pooled-event anomaly
+        test, not 18 separate per-symbol ones.
+        """
+        windows = list(windows) if windows is not None else [5, 10, 20]
+        symbols = symbols if symbols is not None else self.data_cfg.get("symbols", {}).get("equity_universe", [])
+
+        needed = list(symbols) + [benchmark_symbol]
+        if not hasattr(self, "swing_raw_data") or not self.swing_raw_data:
+            self.swing_data_ingestion(symbols=needed)
+        else:
+            missing = [s for s in needed if s not in self.swing_raw_data or self.swing_raw_data[s].empty]
+            if missing:
+                fetched = self.swing_data_ingestion(symbols=missing)
+                self.swing_raw_data.update(fetched)
+
+        benchmark_df = self.swing_raw_data.get(benchmark_symbol)
+        if benchmark_df is None or benchmark_df.empty:
+            raise RuntimeError(f"No data for benchmark symbol {benchmark_symbol!r}; cannot compute excess returns.")
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+        max_position_size_pct = self.config["trading"]["position_sizing"]["max_position_size_pct"]
+
+        per_symbol_event_counts: Dict[str, Dict[str, int]] = {}
+        pooled_trades: Dict[tuple, List[Dict[str, Any]]] = {
+            (w, d): [] for w in windows for d in ("positive", "negative")
+        }
+
+        for symbol in symbols:
+            df = self.swing_raw_data.get(symbol)
+            if df is None or df.empty:
+                continue
+
+            merged = compute_excess_returns(df, benchmark_df)
+            if len(merged) < MIN_ROWS_FOR_EVENT_DETECTION:
+                continue
+
+            events = detect_reaction_events(
+                merged, baseline_window=baseline_window,
+                return_z_threshold=return_z_threshold, volume_z_threshold=volume_z_threshold,
+            )
+            if events.empty:
+                continue
+
+            cutoff_idx = int(len(merged) * train_frac)
+            cutoff_date = merged["date"].iloc[cutoff_idx]
+            train_events = events[events["date"] < cutoff_date]
+            oos_events = events[events["date"] >= cutoff_date]
+            per_symbol_event_counts[symbol] = {"train": len(train_events), "oos": len(oos_events)}
+
+            for window in windows:
+                for direction, side in (("positive", "BUY"), ("negative", "SELL")):
+                    cohort = oos_events[oos_events["direction"] == direction]
+                    if cohort.empty:
+                        continue
+                    trades = collect_event_trades(
+                        merged, cohort, cost_calc, initial_capital, max_position_size_pct,
+                        window, side, symbol,
+                    )
+                    pooled_trades[(window, direction)].extend(trades)
+
+        n_hypotheses = len(windows) * 2
+        bonferroni_alpha = 0.05 / n_hypotheses
+
+        pooled_results: Dict[int, Dict[str, Any]] = {}
+        for (window, direction), trades in pooled_trades.items():
+            if not trades:
+                continue
+            trades_df = pd.DataFrame(trades)
+            equity_curve = (1 + trades_df["pnl_pct"]).cumprod() * initial_capital
+            report = generate_performance_report(trades_df, equity_curve)
+            report["continuation_stats"] = summarize_continuation(trades_df["continuation_pct"].tolist())
+            report["bonferroni_alpha"] = bonferroni_alpha
+            pooled_results.setdefault(window, {})[direction] = report
+
+        return {
+            "per_symbol_event_counts": per_symbol_event_counts,
+            "pooled": pooled_results,
         }
 
     def walk_forward_validation(self) -> Dict[str, Any]:

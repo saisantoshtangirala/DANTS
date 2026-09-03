@@ -1,0 +1,71 @@
+name: Event Drift Diagnostic (CI Runner)
+
+# Diagnostic-only: tests whether an unusually large, high-volume,
+# benchmark-adjusted single-day move in a stock is followed by
+# continuation (drift) or reversion over the following 5/10/20 trading
+# days, pooled across the whole equity universe. A fundamentally
+# different signal shape than every other diagnostic in this repo: those
+# all predict a stock's own next-move direction from price/technical
+# features (production ensemble, XGBoost baseline, regime-gating, swing
+# walk-forward), all of which came back null - and a direct transaction-
+# cost sanity check confirmed the underlying gross edge is genuinely
+# flat, not just cost-eaten. Deliberately scoped as an "abnormal-
+# reaction" test, not literal earnings-announcement drift (PEAD) - PEAD
+# needs a corporate-announcements data source this system doesn't have.
+# See TrainingPipeline.event_drift_backtest()'s docstring and
+# src/training/event_drift.py for the full methodology.
+#
+# No ML model training at all, so like pairs-trading-test.yml this runs
+# directly on a plain ubuntu-latest runner - no RunPod GPU pod needed.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: event-drift-test
+  cancel-in-progress: false
+
+jobs:
+  event-drift-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-event-drift.txt
+
+      - name: Run event-drift diagnostic
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode event-drift-test | tee /tmp/event_drift_test.log
+
+      - name: Summarize event-drift run
+        if: always()
+        run: |
+          {
+            echo "### Event drift diagnostic run"
+            echo
+            echo '```'
+            grep -E "event_drift_test_started|event_drift_test_event_counts|event_drift_backtest_result|event_drift_test_complete" /tmp/event_drift_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
