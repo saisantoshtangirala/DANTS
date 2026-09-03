@@ -76,16 +76,27 @@ def build_return_panel(price_data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     return panel.sort_index()
 
 
-def monthly_rebalance_dates(trading_dates: pd.DatetimeIndex, warmup_days: int) -> List[pd.Timestamp]:
+def monthly_rebalance_dates(
+    trading_dates: pd.DatetimeIndex, warmup_days: int, every_n_months: int = 1
+) -> List[pd.Timestamp]:
     """First trading day of each month, skipping the initial warmup
-    period needed to build the first factor-score estimate."""
+    period needed to build the first factor-score estimate.
+
+    every_n_months > 1 lengthens the holding period by keeping only
+    every Nth month-start (e.g. 3 = quarterly rebalance, ~3-month
+    holds) instead of trading every single month - the lever the
+    momentum stress test's own findings pointed at: turnover (and the
+    cost drag it causes) is what a slower rebalance directly cuts."""
     if len(trading_dates) <= warmup_days:
         return []
     usable = trading_dates[trading_dates >= trading_dates[warmup_days]]
     if usable.empty:
         return []
     months = usable.to_series().groupby([usable.year, usable.month]).min()
-    return sorted(months.tolist())
+    dates = sorted(months.tolist())
+    if every_n_months > 1:
+        dates = dates[::every_n_months]
+    return dates
 
 
 def momentum_scores(panel: pd.DataFrame, as_of_idx: int, lookback_days: int, skip_days: int) -> Optional[pd.Series]:
@@ -129,7 +140,7 @@ def _representative_round_trip_cost_pct(cost_calc: CostCalculator, price: float 
     return cost / (price * quantity)
 
 
-def _equity_stats(period_returns: List[float]) -> Dict[str, float]:
+def _equity_stats(period_returns: List[float], periods_per_year: float = 12.0) -> Dict[str, float]:
     if not period_returns:
         return {"total_return_pct": 0.0, "annualized_sharpe": 0.0, "max_drawdown_pct": 0.0}
     returns = np.array(period_returns)
@@ -138,7 +149,7 @@ def _equity_stats(period_returns: List[float]) -> Dict[str, float]:
 
     mean_r = returns.mean()
     std_r = returns.std(ddof=1) if len(returns) > 1 else 0.0
-    sharpe = float(mean_r / std_r * np.sqrt(12)) if std_r > 1e-12 else 0.0
+    sharpe = float(mean_r / std_r * np.sqrt(periods_per_year)) if std_r > 1e-12 else 0.0
 
     peak = np.maximum.accumulate(equity)
     drawdown = (equity - peak) / peak
@@ -158,14 +169,18 @@ def run_factor_backtest(
     momentum_lookback_days: int = 126,
     momentum_skip_days: int = 21,
     vol_lookback_days: int = 60,
+    rebalance_every_n_months: int = 1,
 ) -> Dict[str, Any]:
     """
-    Rolling monthly walk-forward comparison of momentum-tilt, low-vol-
-    tilt, and equal-weight-all-18, over `price_data` (symbol -> daily
-    OHLCV with 'date'/'close'). Factor scores at each rebalance date use
-    ONLY data strictly before that date (both momentum_scores and
-    low_vol_scores are causal by construction), so this is a genuine
-    walk-forward test, not a fit-and-look-back.
+    Rolling walk-forward comparison of momentum-tilt, low-vol-tilt, and
+    equal-weight-all, over `price_data` (symbol -> daily OHLCV with
+    'date'/'close'), rebalanced every `rebalance_every_n_months` months
+    (default 1 = monthly, matching the original 18-symbol large-cap
+    diagnostic; > 1 lengthens the hold - see monthly_rebalance_dates).
+    Factor scores at each rebalance date use ONLY data strictly before
+    that date (both momentum_scores and low_vol_scores are causal by
+    construction), so this is a genuine walk-forward test, not a
+    fit-and-look-back.
 
     Returns {"momentum": {...}, "low_vol": {...}, "equal_weight_all": {...}},
     each with n_periods, total_return_pct, annualized_sharpe,
@@ -176,7 +191,7 @@ def run_factor_backtest(
     """
     panel = build_return_panel(price_data)
     warmup = max(momentum_lookback_days, vol_lookback_days) + 5
-    rebalance_dates = monthly_rebalance_dates(panel.index, warmup_days=warmup)
+    rebalance_dates = monthly_rebalance_dates(panel.index, warmup_days=warmup, every_n_months=rebalance_every_n_months)
     if len(rebalance_dates) < 2:
         raise RuntimeError(
             f"Only {len(rebalance_dates)} rebalance dates available; need at least 2 "
@@ -226,8 +241,9 @@ def run_factor_backtest(
             prev_weights[strategy] = weights
 
     results = {}
+    periods_per_year = 12.0 / rebalance_every_n_months
     for strategy in period_returns:
-        stats = _equity_stats(period_returns[strategy])
+        stats = _equity_stats(period_returns[strategy], periods_per_year=periods_per_year)
         avg_turnover = float(np.mean(turnovers[strategy])) if turnovers[strategy] else 0.0
         total_cost_drag_pct = float(sum(turnovers[strategy]) * round_trip_cost_pct * 100.0)
         results[strategy] = {

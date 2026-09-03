@@ -1551,6 +1551,113 @@ class TrainingPipeline:
             "parameter_grid": grid,
         }
 
+    def midcap_momentum_backtest(
+        self,
+        symbols: Optional[List[str]] = None,
+        target_n: int = 8,
+        momentum_lookback_days: int = 126,
+        momentum_skip_days: int = 21,
+        vol_lookback_days: int = 60,
+        rebalance_every_n_months: int = 3,
+        min_adtv_cr: Optional[float] = None,
+        impact_slippage_pct: float = 0.006,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: re-runs the momentum/low-vol factor-tilt methodology
+        (factor_investing_backtest, run_factor_backtest) against a
+        genuinely different universe - config.yaml's
+        data.symbols.midcap_smallcap_factor_universe, ~40 liquid NSE
+        mid/small-cap names disjoint from the 18-symbol large-cap
+        equity_universe every prior diagnostic this session used - with
+        two changes the momentum stress test's own findings motivated,
+        not applied blindly:
+
+        1. rebalance_every_n_months=3 (quarterly, ~3-month holds) instead
+           of the original monthly rebalance. Turnover/cost-drag was the
+           stress test's clearest, most direct lever (see
+           run_factor_backtest's turnover-based cost model) - this tests
+           whether a slower rebalance alone changes the verdict, without
+           also changing the universe as a confound. (The universe change
+           is the real, separate hypothesis under test here: does a
+           momentum premium survive better away from the most efficiently
+           priced, most heavily covered large-cap names.)
+        2. impact_slippage_pct=0.6%/side (vs. the system-wide
+           slippage_pct of 0.05%/side in trading.costs, calibrated for
+           this account's large-cap order sizes) - smaller-cap names have
+           materially wider effective spreads and market impact, and
+           silently reusing the large-cap cost assumption here would
+           understate the real cost drag exactly like the flat-Rs20-
+           brokerage bug earlier this session did for turnover-heavy
+           strategies. This is still an approximation (a single override
+           applied uniformly, not a per-symbol liquidity-scaled impact
+           model), documented as such rather than silently assumed.
+
+        Liquidity-filters the universe first: any symbol whose average
+        daily traded value (over the ingested window) falls under
+        min_adtv_cr (default: config's data.liquidity.min_adtv_cr) is
+        dropped before the backtest runs, using the same ADTV
+        calculation compute_liquidity() uses for the intraday universe -
+        a momentum tilt only tradable in illiquid names isn't a real
+        edge. Returns {"results": {...same shape as
+        factor_investing_backtest...}, "universe": {...counts and the
+        dropped-symbol list, so a thin surviving universe is visible
+        rather than hidden}}.
+        """
+        symbols = (
+            symbols if symbols is not None
+            else self.data_cfg.get("symbols", {}).get("midcap_smallcap_factor_universe", [])
+        )
+        if not symbols:
+            raise ValueError("No midcap_smallcap_factor_universe symbols configured.")
+
+        if not hasattr(self, "swing_raw_data") or not self.swing_raw_data:
+            self.swing_data_ingestion(symbols=symbols)
+        else:
+            missing = [s for s in symbols if s not in self.swing_raw_data or self.swing_raw_data[s].empty]
+            if missing:
+                fetched = self.swing_data_ingestion(symbols=missing)
+                self.swing_raw_data.update(fetched)
+
+        min_adtv_cr = min_adtv_cr if min_adtv_cr is not None else self.config["data"]["liquidity"]["min_adtv_cr"]
+        liquid_symbols: List[str] = []
+        dropped_illiquid: List[Dict[str, Any]] = []
+        for s in symbols:
+            df = self.swing_raw_data.get(s)
+            if df is None or df.empty:
+                continue
+            adtv_cr = float((df["close"] * df["volume"]).mean() / 1e7)
+            if adtv_cr >= min_adtv_cr:
+                liquid_symbols.append(s)
+            else:
+                dropped_illiquid.append({"symbol": s, "adtv_cr": adtv_cr})
+
+        if dropped_illiquid:
+            logger.info("midcap_momentum_backtest_dropped_illiquid", dropped=dropped_illiquid, min_adtv_cr=min_adtv_cr)
+
+        price_data = {s: self.swing_raw_data[s] for s in liquid_symbols}
+
+        costs_cfg = dict(self.config["trading"]["costs"])
+        costs_cfg["slippage_pct"] = impact_slippage_pct
+        cost_calc = CostCalculator(costs_cfg)
+
+        results = run_factor_backtest(
+            price_data, cost_calc, target_n=target_n,
+            momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
+            vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
+        )
+
+        return {
+            "results": results,
+            "universe": {
+                "requested": len(symbols),
+                "liquid": len(liquid_symbols),
+                "dropped_illiquid": dropped_illiquid,
+                "min_adtv_cr": min_adtv_cr,
+                "impact_slippage_pct": impact_slippage_pct,
+                "rebalance_every_n_months": rebalance_every_n_months,
+            },
+        }
+
     def orb_backtest(
         self,
         symbols: Optional[List[str]] = None,

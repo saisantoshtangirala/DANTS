@@ -15,6 +15,7 @@ Usage:
     python3 -m src.main --mode passive-benchmarks-test  # diagnostic: NIFTY SIP + momentum/low-vol factor tilts, no ML model
     python3 -m src.main --mode orb-test             # diagnostic: opening-range-breakout, no ML model
     python3 -m src.main --mode factor-stress-test   # stress-test: momentum factor result significance/sensitivity
+    python3 -m src.main --mode midcap-momentum-test # diagnostic: momentum factor tilt over a disjoint mid/small-cap universe, quarterly rebalance
 """
 
 import argparse
@@ -971,6 +972,64 @@ def run_factor_stress_test(config: dict, logger) -> None:
     logger.info("factor_stress_test_complete")
 
 
+def run_midcap_momentum_test(config: dict, logger) -> None:
+    """Diagnostic: re-runs the momentum/low-vol factor-tilt methodology
+    over a disjoint ~40-symbol mid/small-cap universe (config's
+    data.symbols.midcap_smallcap_factor_universe) instead of the
+    18-symbol large-cap equity_universe every prior diagnostic this
+    session used, with a quarterly rebalance and a realistic higher
+    small/mid-cap impact-cost assumption - the follow-up the momentum
+    factor stress test's findings (turnover-sensitive, not significant
+    at monthly rebalance over large caps) pointed at. See
+    TrainingPipeline.midcap_momentum_backtest()'s docstring for the
+    full methodology and what's still an approximation. No ML model
+    training, daily OHLCV only, runs on a plain CI runner."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_midcap_momentum_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("midcap_momentum_test_started")
+    outcome = pipeline.midcap_momentum_backtest()
+
+    universe = outcome["universe"]
+    logger.info(
+        "midcap_momentum_test_universe",
+        requested=universe.get("requested"),
+        liquid=universe.get("liquid"),
+        n_dropped_illiquid=len(universe.get("dropped_illiquid") or []),
+        min_adtv_cr=universe.get("min_adtv_cr"),
+        impact_slippage_pct=universe.get("impact_slippage_pct"),
+        rebalance_every_n_months=universe.get("rebalance_every_n_months"),
+    )
+
+    for strategy, stats in outcome["results"].items():
+        logger.info(
+            "midcap_momentum_test_result",
+            strategy=strategy,
+            n_periods=stats.get("n_periods"),
+            total_return_pct=stats.get("total_return_pct"),
+            annualized_sharpe=stats.get("annualized_sharpe"),
+            max_drawdown_pct=stats.get("max_drawdown_pct"),
+            avg_turnover_pct=stats.get("avg_turnover_pct"),
+            total_cost_drag_pct=stats.get("total_cost_drag_pct"),
+        )
+
+    logger.info("midcap_momentum_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -991,7 +1050,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1030,6 +1089,8 @@ def main() -> None:
         run_orb_test(config, logger)
     elif args.mode == "factor-stress-test":
         run_factor_stress_test(config, logger)
+    elif args.mode == "midcap-momentum-test":
+        run_midcap_momentum_test(config, logger)
 
 
 if __name__ == "__main__":

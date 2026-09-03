@@ -78,6 +78,73 @@ data:
       - "APOLLOTYRE"
     fno_universe: []                # Auto-populated from NSE F&O list
     midcap_watchlist: []
+    # midcap_smallcap_factor_universe: a second, DISJOINT universe (no
+    # overlap with equity_universe/focus_universe above) for
+    # TrainingPipeline.midcap_momentum_backtest() - the follow-up to the
+    # momentum factor tilt that looked promising over the 18-symbol
+    # large-cap universe (Sharpe 1.10 vs 0.97) but failed its own stress
+    # test (paired-t p=0.108, only 3/12 parameter-grid points beat
+    # equal-weight, a real loss in the earliest subperiod - see
+    # factor_momentum_stress_test()). Large caps are the most efficiently
+    # priced, most heavily covered part of the market; if a momentum
+    # premium exists anywhere in this system's reach, institutional
+    # under-coverage of mid/small caps is the more plausible place to
+    # find it, not a re-test of the same 18 names with a different knob.
+    #
+    # NOT an official NSE/Nifty index constituent list - this system has
+    # no licensed access to one. Hand-curated instead: established,
+    # long-listed (avoiding recent-IPO data-continuity gaps, the same
+    # reasoning behind the existing 10-midcap focus_universe additions),
+    # F&O-eligible-or-comparably-liquid NSE mid/small-cap names, spread
+    # across sectors (IT services, pharma, auto ancillaries, capital
+    # goods/electricals, NBFC/financial services, realty, specialty
+    # chemicals, city gas distribution, PSU logistics/rail, market
+    # infrastructure) so a top-N momentum tilt isn't just a sector bet.
+    # Liquidity is still verified at runtime, not assumed from this list -
+    # midcap_momentum_backtest() drops anything under data.liquidity's
+    # min_adtv_cr floor using the same ingested-data ADTV calculation
+    # compute_liquidity() uses for the intraday universe.
+    midcap_smallcap_factor_universe:
+      - "PERSISTENT"
+      - "COFORGE"
+      - "MPHASIS"
+      - "LTTS"
+      - "AUROPHARMA"
+      - "LUPIN"
+      - "LAURUSLABS"
+      - "GLAND"
+      - "BIOCON"
+      - "CUMMINSIND"
+      - "BHARATFORG"
+      - "MOTHERSON"
+      - "BALKRISIND"
+      - "SUPREMEIND"
+      - "ASTRAL"
+      - "POLYCAB"
+      - "KEI"
+      - "CROMPTON"
+      - "DIXON"
+      - "AMBER"
+      - "JUBLFOOD"
+      - "INDHOTEL"
+      - "ABFRL"
+      - "CHOLAFIN"
+      - "MUTHOOTFIN"
+      - "LICHSGFIN"
+      - "GODREJPROP"
+      - "OBEROIRLTY"
+      - "LODHA"
+      - "PIIND"
+      - "COROMANDEL"
+      - "DEEPAKNTR"
+      - "GUJGASLTD"
+      - "IGL"
+      - "MGL"
+      - "ESCORTS"
+      - "CONCOR"
+      - "IRCTC"
+      - "CDSL"
+      - "BSE"
 
   timeframes:
     intraday: "5minute"              # Primary intraday timeframe - stored in Kite's native interval format

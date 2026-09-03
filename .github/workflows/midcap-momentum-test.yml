@@ -1,0 +1,75 @@
+name: Mid/Small-Cap Momentum Factor Diagnostic (CI Runner)
+
+# Follow-up to the momentum factor tilt that looked promising over the
+# 18-symbol large-cap equity_universe (Sharpe 1.10 vs equal-weight's
+# 0.97) but failed its own stress test in factor-stress-test.yml
+# (paired-t p=0.108, only 3/12 parameter-grid points beat equal-weight,
+# a real loss in the earliest subperiod).
+#
+# Re-runs the same momentum/low-vol methodology
+# (TrainingPipeline.midcap_momentum_backtest(), which reuses
+# run_factor_backtest()) against a DISJOINT ~40-symbol mid/small-cap
+# universe (config's data.symbols.midcap_smallcap_factor_universe - no
+# overlap with equity_universe), with two changes the stress test's own
+# findings motivated: a quarterly rebalance (rebalance_every_n_months=3)
+# instead of monthly, since turnover/cost-drag was the clearest lever,
+# and a realistic higher small/mid-cap impact-cost assumption
+# (impact_slippage_pct=0.6%/side vs. the system-wide 0.05%/side
+# calibrated for this account's large-cap order sizes). See
+# TrainingPipeline.midcap_momentum_backtest()'s docstring for the full
+# methodology and what's still an approximation.
+#
+# No ML model training at all, so like the other recent diagnostics this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: midcap-momentum-test
+  cancel-in-progress: false
+
+jobs:
+  midcap-momentum-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-midcap-momentum.txt
+
+      - name: Run midcap-momentum diagnostic
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode midcap-momentum-test | tee /tmp/midcap_momentum_test.log
+
+      - name: Summarize midcap-momentum run
+        if: always()
+        run: |
+          {
+            echo "### Mid/small-cap momentum factor diagnostic run"
+            echo
+            echo '```'
+            grep -E "midcap_momentum_test_started|midcap_momentum_test_universe|midcap_momentum_backtest_dropped_illiquid|midcap_momentum_test_result|midcap_momentum_test_complete" /tmp/midcap_momentum_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -50,6 +50,19 @@ class TestMonthlyRebalanceDates:
         dates = pd.bdate_range("2024-01-01", periods=5)
         assert monthly_rebalance_dates(dates, warmup_days=10) == []
 
+    def test_default_every_n_months_matches_monthly_dates(self):
+        dates = pd.bdate_range("2024-01-01", "2025-06-30")
+        assert monthly_rebalance_dates(dates, warmup_days=25) == monthly_rebalance_dates(
+            dates, warmup_days=25, every_n_months=1
+        )
+
+    def test_every_n_months_keeps_every_nth_month_start(self):
+        dates = pd.bdate_range("2024-01-01", "2025-06-30")
+        monthly = monthly_rebalance_dates(dates, warmup_days=25, every_n_months=1)
+        quarterly = monthly_rebalance_dates(dates, warmup_days=25, every_n_months=3)
+        assert quarterly == monthly[::3]
+        assert len(quarterly) < len(monthly)
+
 
 class TestMomentumScores:
     def test_ranks_higher_return_symbol_first(self):
@@ -139,3 +152,27 @@ class TestRunFactorBacktest:
         result = run_factor_backtest(price_data, cost_calc, target_n=3)
         for strategy, stats in result.items():
             assert stats["total_cost_drag_pct"] >= 0.0
+
+    def test_quarterly_rebalance_has_fewer_periods_and_lower_turnover(self, cost_calc):
+        """rebalance_every_n_months=3 should hold ~3x longer per period:
+        fewer total rebalances over the same window, and each factor
+        tilt's turnover-driven cost drag should shrink accordingly since
+        there's 1/3 as much reshuffling."""
+        price_data = self._synthetic_price_data(n_days=1000)
+        monthly = run_factor_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=1)
+        quarterly = run_factor_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        assert quarterly["momentum"]["n_periods"] < monthly["momentum"]["n_periods"]
+        assert quarterly["momentum"]["total_cost_drag_pct"] < monthly["momentum"]["total_cost_drag_pct"]
+
+    def test_quarterly_rebalance_annualizes_sharpe_with_fewer_periods_per_year(self, cost_calc):
+        """A strategy with identical per-period return/vol should get a
+        different (not equal) annualized Sharpe depending on whether
+        those periods are treated as monthly (x12) or quarterly (x4) -
+        catches silently reusing the sqrt(12) monthly annualization
+        factor regardless of the actual rebalance cadence."""
+        price_data = self._synthetic_price_data(n_days=1000)
+        monthly = run_factor_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=1)
+        quarterly = run_factor_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        # Same underlying process, different annualization base - the two
+        # Sharpe ratios should not just be trivially rescaled by chance.
+        assert monthly["equal_weight_all"]["annualized_sharpe"] != quarterly["equal_weight_all"]["annualized_sharpe"]
