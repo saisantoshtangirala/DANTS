@@ -12,6 +12,7 @@ Usage:
     python3 -m src.main --mode regime-gated-test   # diagnostic: regime-gated backtest against the full production ensemble
     python3 -m src.main --mode pairs-trading-test  # diagnostic: market-neutral pairs/relative-value trading, no ML model
     python3 -m src.main --mode event-drift-test    # diagnostic: abnormal-reaction event drift, no ML model
+    python3 -m src.main --mode passive-benchmarks-test  # diagnostic: NIFTY SIP + momentum/low-vol factor tilts, no ML model
 """
 
 import argparse
@@ -762,6 +763,65 @@ def run_event_drift_test(config: dict, logger) -> None:
     logger.info("event_drift_test_complete")
 
 
+def run_passive_benchmarks_test(config: dict, logger) -> None:
+    """Diagnostic: two honest, non-adversarial baselines every active
+    strategy this session has tried needs to beat - (1) a plain NIFTY 50
+    SIP on the same monthly cash flow this system's strategies were
+    sized around (no signal, no model, no timing), and (2) long-only
+    momentum/low-volatility factor tilts, rebalanced monthly (a
+    genuinely different, far-lower-turnover signal shape than every
+    direction-prediction diagnostic tried this session, all of which
+    came back null). See TrainingPipeline.sip_benchmark() and
+    .factor_investing_backtest()'s docstrings, and
+    src/training/sip_benchmark.py / factor_investing.py, for the full
+    methodology. No ML model training, daily OHLCV only, runs on a
+    plain CI runner."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_passive_benchmarks_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("passive_benchmarks_test_started")
+
+    sip_result = pipeline.sip_benchmark()
+    logger.info(
+        "sip_benchmark_result",
+        n_contributions=sip_result.get("n_contributions"),
+        total_invested=sip_result.get("total_invested"),
+        final_value=sip_result.get("final_value"),
+        absolute_gain=sip_result.get("absolute_gain"),
+        xirr_pct=sip_result.get("xirr_pct"),
+        max_drawdown_pct=sip_result.get("max_drawdown_pct"),
+    )
+
+    factor_result = pipeline.factor_investing_backtest()
+    for strategy, stats in factor_result.items():
+        logger.info(
+            "factor_investing_backtest_result",
+            strategy=strategy,
+            n_periods=stats.get("n_periods"),
+            total_return_pct=stats.get("total_return_pct"),
+            annualized_sharpe=stats.get("annualized_sharpe"),
+            max_drawdown_pct=stats.get("max_drawdown_pct"),
+            avg_turnover_pct=stats.get("avg_turnover_pct"),
+            total_cost_drag_pct=stats.get("total_cost_drag_pct"),
+        )
+
+    logger.info("passive_benchmarks_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -782,7 +842,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -815,6 +875,8 @@ def main() -> None:
         run_pairs_trading_test(config, logger)
     elif args.mode == "event-drift-test":
         run_event_drift_test(config, logger)
+    elif args.mode == "passive-benchmarks-test":
+        run_passive_benchmarks_test(config, logger)
 
 
 if __name__ == "__main__":

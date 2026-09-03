@@ -1,0 +1,74 @@
+name: Passive Benchmarks Diagnostic (CI Runner)
+
+# Diagnostic-only: two honest, non-adversarial baselines every active
+# strategy tried this session needs to beat -
+#
+# 1. A plain NIFTY 50 SIP (Systematic Investment Plan) on the same
+#    monthly cash flow this system's active strategies were sized
+#    around - no signal, no model, no timing.
+# 2. Long-only momentum / low-volatility factor tilts over the equity
+#    universe, rebalanced monthly - a genuinely different, far-lower-
+#    turnover signal shape than every direction-prediction diagnostic
+#    tried this session (production ensemble, XGBoost baseline,
+#    regime-gating, swing walk-forward, pairs trading, event-drift),
+#    all of which came back null with a direct cost-sanity-check
+#    confirming the underlying gross edge is genuinely flat.
+#
+# See TrainingPipeline.sip_benchmark() / .factor_investing_backtest()'s
+# docstrings, and src/training/sip_benchmark.py / factor_investing.py,
+# for the full methodology.
+#
+# No ML model training at all, so like the other recent diagnostics this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: passive-benchmarks-test
+  cancel-in-progress: false
+
+jobs:
+  passive-benchmarks-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-passive-benchmarks.txt
+
+      - name: Run passive-benchmarks diagnostic
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode passive-benchmarks-test | tee /tmp/passive_benchmarks_test.log
+
+      - name: Summarize passive-benchmarks run
+        if: always()
+        run: |
+          {
+            echo "### Passive benchmarks diagnostic run"
+            echo
+            echo '```'
+            grep -E "passive_benchmarks_test_started|sip_benchmark_result|factor_investing_backtest_result|passive_benchmarks_test_complete" /tmp/passive_benchmarks_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

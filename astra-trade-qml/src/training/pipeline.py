@@ -35,7 +35,9 @@ from src.training.event_drift import (
     detect_reaction_events,
     summarize_continuation,
 )
+from src.training.factor_investing import run_factor_backtest
 from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
+from src.training.sip_benchmark import simulate_sip
 from src.training.regime_submodels import RegimeSubModelTrainer, compute_regime_thresholds, label_regime_proxy
 from src.training.walk_forward import WalkForwardValidator
 from src.utils.database import DatabaseManager
@@ -1395,6 +1397,72 @@ class TrainingPipeline:
             "per_symbol_event_counts": per_symbol_event_counts,
             "pooled": pooled_results,
         }
+
+    def sip_benchmark(
+        self, benchmark_symbol: str = "NIFTY 50", monthly_investment: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: the honest passive baseline every active strategy
+        this session has tried needs to beat - a plain NIFTY 50 SIP
+        (Systematic Investment Plan) on the same monthly cash flow
+        (config's trading.capital.initial, ~INR 50,000/month) this
+        system's strategies were sized around. No signal, no model, no
+        timing - see src/training/sip_benchmark.py's module docstring
+        for the full methodology (fractional-unit monthly purchases,
+        money-weighted XIRR since contributions are staggered over
+        time).
+        """
+        monthly_investment = monthly_investment if monthly_investment is not None else self.config["trading"]["capital"]["initial"]
+
+        if not hasattr(self, "swing_raw_data") or benchmark_symbol not in getattr(self, "swing_raw_data", {}):
+            self.swing_data_ingestion(symbols=[benchmark_symbol])
+
+        benchmark_df = self.swing_raw_data.get(benchmark_symbol)
+        if benchmark_df is None or benchmark_df.empty:
+            raise RuntimeError(f"No data for benchmark symbol {benchmark_symbol!r}.")
+
+        result = simulate_sip(benchmark_df, monthly_investment)
+        result.pop("value_curve", None)  # not JSON/log-friendly; caller can re-derive from raw data if needed
+        return result
+
+    def factor_investing_backtest(
+        self,
+        symbols: Optional[List[str]] = None,
+        target_n: int = 6,
+        momentum_lookback_days: int = 126,
+        momentum_skip_days: int = 21,
+        vol_lookback_days: int = 60,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: long-only momentum and low-volatility factor tilts
+        over the equity universe, rebalanced monthly - a genuinely
+        different signal shape than every direction-prediction
+        diagnostic tried this session (all null), and far lower turnover
+        than any of them so the transaction-cost drag that fully
+        explained those losses matters much less here. See
+        src/training/factor_investing.py's module docstring for the
+        full methodology, including the honest gap it doesn't address
+        (no value/quality factor - those need fundamental data this
+        system doesn't ingest).
+        """
+        symbols = symbols if symbols is not None else self.data_cfg.get("symbols", {}).get("equity_universe", [])
+
+        if not hasattr(self, "swing_raw_data") or not self.swing_raw_data:
+            self.swing_data_ingestion(symbols=symbols)
+        else:
+            missing = [s for s in symbols if s not in self.swing_raw_data or self.swing_raw_data[s].empty]
+            if missing:
+                fetched = self.swing_data_ingestion(symbols=missing)
+                self.swing_raw_data.update(fetched)
+
+        price_data = {s: self.swing_raw_data[s] for s in symbols if s in self.swing_raw_data and not self.swing_raw_data[s].empty}
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+
+        return run_factor_backtest(
+            price_data, cost_calc, target_n=target_n,
+            momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
+            vol_lookback_days=vol_lookback_days,
+        )
 
     def walk_forward_validation(self) -> Dict[str, Any]:
         """Task: expanding-window walk-forward validation (training.validation.walk_forward_windows),
