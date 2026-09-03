@@ -191,6 +191,7 @@ def run_factor_backtest(
     period_returns: Dict[str, List[float]] = {"momentum": [], "low_vol": [], "equal_weight_all": []}
     turnovers: Dict[str, List[float]] = {"momentum": [], "low_vol": [], "equal_weight_all": []}
     prev_weights: Dict[str, Dict[str, float]] = {"momentum": {}, "low_vol": {}, "equal_weight_all": {}}
+    period_dates: List = []
 
     for i in range(len(rebalance_dates) - 1):
         rebal_date, next_rebal_date = rebalance_dates[i], rebalance_dates[i + 1]
@@ -200,6 +201,7 @@ def run_factor_backtest(
         vol = low_vol_scores(panel, as_of_idx, vol_lookback_days)
         if mom is None or vol is None:
             continue
+        period_dates.append(rebal_date)
 
         top_momentum = mom.sort_values(ascending=False).head(target_n).index.tolist()
         top_low_vol = vol.sort_values(ascending=False).head(target_n).index.tolist()
@@ -232,6 +234,15 @@ def run_factor_backtest(
             "n_periods": len(period_returns[strategy]),
             "avg_turnover_pct": avg_turnover * 100.0,
             "total_cost_drag_pct": total_cost_drag_pct,
+            # period_returns/period_dates are index-aligned (period_dates[i]
+            # is the rebalance date period_returns[i]'s holding period
+            # started at) and IDENTICAL across every strategy's dict here
+            # (duplicated per-strategy, not hoisted to a single top-level
+            # key) so existing callers that do `for strategy, stats in
+            # results.items()` - assuming every top-level key names a
+            # strategy - keep working unmodified.
+            "period_returns": list(period_returns[strategy]),
+            "period_dates": list(period_dates),
             **stats,
         }
     return results

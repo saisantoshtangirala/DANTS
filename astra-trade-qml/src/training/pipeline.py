@@ -37,6 +37,12 @@ from src.training.event_drift import (
     summarize_continuation,
 )
 from src.training.factor_investing import run_factor_backtest
+from src.training.factor_stress_test import (
+    bootstrap_sharpe_ci,
+    paired_significance_test,
+    parameter_grid_search,
+    subperiod_breakdown,
+)
 from src.training.orb import run_orb_backtest
 from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
 from src.training.sip_benchmark import simulate_sip
@@ -1465,6 +1471,85 @@ class TrainingPipeline:
             momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
             vol_lookback_days=vol_lookback_days,
         )
+
+    def factor_momentum_stress_test(
+        self,
+        symbols: Optional[List[str]] = None,
+        target_n: int = 6,
+        momentum_lookback_days: int = 126,
+        momentum_skip_days: int = 21,
+        vol_lookback_days: int = 60,
+        n_subperiod_splits: int = 3,
+        grid_target_ns: Optional[List[int]] = None,
+        grid_lookback_days: Optional[List[int]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Stress test for factor_investing_backtest()'s momentum result -
+        the one strategy this session found with a better risk-adjusted
+        return than its own baseline (equal_weight_all), and the one
+        result that had NOT yet been held to the same scrutiny every
+        null result this session got (walk-forward splits, Bonferroni
+        corrections, repeated re-verification). See
+        src/training/factor_stress_test.py's module docstring for why
+        that asymmetry matters and the full methodology of the three
+        checks run here: a paired significance test against
+        equal_weight_all (same calendar months, so paired is the
+        correct, more powerful test), a bootstrap confidence interval on
+        momentum's own Sharpe ratio, a chronological subperiod
+        breakdown (does it win consistently or off one stretch), and a
+        parameter-sensitivity grid search (does it survive nearby
+        target_n/lookback choices, or only the one hand-picked
+        configuration).
+        """
+        symbols = symbols if symbols is not None else self.data_cfg.get("symbols", {}).get("equity_universe", [])
+        grid_target_ns = grid_target_ns if grid_target_ns is not None else [3, 6, 9]
+        grid_lookback_days = grid_lookback_days if grid_lookback_days is not None else [63, 126, 189, 252]
+
+        if not hasattr(self, "swing_raw_data") or not self.swing_raw_data:
+            self.swing_data_ingestion(symbols=symbols)
+        else:
+            missing = [s for s in symbols if s not in self.swing_raw_data or self.swing_raw_data[s].empty]
+            if missing:
+                fetched = self.swing_data_ingestion(symbols=missing)
+                self.swing_raw_data.update(fetched)
+
+        price_data = {s: self.swing_raw_data[s] for s in symbols if s in self.swing_raw_data and not self.swing_raw_data[s].empty}
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+
+        primary = run_factor_backtest(
+            price_data, cost_calc, target_n=target_n,
+            momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
+            vol_lookback_days=vol_lookback_days,
+        )
+        momentum_returns = primary["momentum"]["period_returns"]
+        equal_weight_returns = primary["equal_weight_all"]["period_returns"]
+        low_vol_returns = primary["low_vol"]["period_returns"]
+        period_dates = primary["momentum"]["period_dates"]
+
+        significance = paired_significance_test(momentum_returns, equal_weight_returns)
+        bootstrap = bootstrap_sharpe_ci(momentum_returns)
+        subperiods = subperiod_breakdown(
+            period_dates,
+            {"momentum": momentum_returns, "equal_weight_all": equal_weight_returns, "low_vol": low_vol_returns},
+            n_splits=n_subperiod_splits,
+        )
+        grid = parameter_grid_search(
+            price_data, cost_calc, target_ns=grid_target_ns, lookback_days_grid=grid_lookback_days,
+            momentum_skip_days=momentum_skip_days, vol_lookback_days=vol_lookback_days,
+        )
+
+        primary_summary = {
+            strategy: {k: v for k, v in stats.items() if k not in ("period_returns", "period_dates")}
+            for strategy, stats in primary.items()
+        }
+
+        return {
+            "primary": primary_summary,
+            "significance_vs_equal_weight": significance,
+            "bootstrap_sharpe_ci": bootstrap,
+            "subperiod_breakdown": subperiods,
+            "parameter_grid": grid,
+        }
 
     def orb_backtest(
         self,

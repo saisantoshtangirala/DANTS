@@ -1,0 +1,76 @@
+name: Factor Momentum Stress Test (CI Runner)
+
+# Not a new strategy diagnostic - a stress test of the ONE result this
+# session found with a better risk-adjusted return than its own baseline
+# (the momentum factor tilt in passive-benchmarks-test.yml's
+# factor_investing_backtest(), Sharpe 1.10 vs. equal_weight_all's 0.97).
+# Every NULL result this session got walk-forward splits, Bonferroni
+# corrections, and repeated re-verification before being trusted; this
+# one result had not been held to the same bar. A false positive here is
+# the one outcome that would actually lose money if trusted and acted
+# on, unlike another null - so it gets checked harder, not less.
+#
+# Four checks: a paired significance test against equal_weight_all (same
+# calendar months, so paired is the correct, more powerful test than two
+# independent samples), a bootstrap confidence interval on momentum's own
+# Sharpe ratio, a chronological subperiod breakdown (wins consistently,
+# or off one stretch), and a parameter-sensitivity grid search (survives
+# nearby target_n/lookback choices, or only the one hand-picked
+# configuration). See TrainingPipeline.factor_momentum_stress_test()'s
+# docstring and src/training/factor_stress_test.py for the full
+# methodology.
+#
+# No ML model training at all, so like the other recent diagnostics this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: factor-stress-test
+  cancel-in-progress: false
+
+jobs:
+  factor-stress-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-factor-stress-test.txt
+
+      - name: Run factor stress test
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode factor-stress-test | tee /tmp/factor_stress_test.log
+
+      - name: Summarize factor stress test run
+        if: always()
+        run: |
+          {
+            echo "### Factor momentum stress test run"
+            echo
+            echo '```'
+            grep -E "factor_stress_test_started|factor_stress_test_primary_result|factor_stress_test_significance|factor_stress_test_bootstrap_sharpe|factor_stress_test_subperiod|factor_stress_test_grid_point|factor_stress_test_complete" /tmp/factor_stress_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

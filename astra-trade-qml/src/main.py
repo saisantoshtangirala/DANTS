@@ -14,6 +14,7 @@ Usage:
     python3 -m src.main --mode event-drift-test    # diagnostic: abnormal-reaction event drift, no ML model
     python3 -m src.main --mode passive-benchmarks-test  # diagnostic: NIFTY SIP + momentum/low-vol factor tilts, no ML model
     python3 -m src.main --mode orb-test             # diagnostic: opening-range-breakout, no ML model
+    python3 -m src.main --mode factor-stress-test   # stress-test: momentum factor result significance/sensitivity
 """
 
 import argparse
@@ -885,6 +886,91 @@ def run_orb_test(config: dict, logger) -> None:
     logger.info("orb_test_complete")
 
 
+def run_factor_stress_test(config: dict, logger) -> None:
+    """Diagnostic: stress-tests factor_investing_backtest()'s momentum
+    result - the one strategy this session found with a better risk-
+    adjusted return than its own baseline, and the one result that
+    hadn't yet been held to the same scrutiny every null result this
+    session got. Runs a paired significance test against
+    equal_weight_all, a bootstrap Sharpe confidence interval, a
+    chronological subperiod breakdown, and a parameter-sensitivity grid
+    search. See TrainingPipeline.factor_momentum_stress_test()'s
+    docstring and src/training/factor_stress_test.py for the full
+    methodology. No ML model training, daily OHLCV only, runs on a
+    plain CI runner."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_factor_stress_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("factor_stress_test_started")
+    result = pipeline.factor_momentum_stress_test()
+
+    for strategy, stats in result["primary"].items():
+        logger.info(
+            "factor_stress_test_primary_result",
+            strategy=strategy,
+            n_periods=stats.get("n_periods"),
+            total_return_pct=stats.get("total_return_pct"),
+            annualized_sharpe=stats.get("annualized_sharpe"),
+            max_drawdown_pct=stats.get("max_drawdown_pct"),
+            total_cost_drag_pct=stats.get("total_cost_drag_pct"),
+        )
+
+    sig = result["significance_vs_equal_weight"]
+    logger.info(
+        "factor_stress_test_significance",
+        n_periods=sig.get("n_periods"),
+        mean_diff_pct=sig.get("mean_diff_pct"),
+        t_stat=sig.get("t_stat"),
+        p_value=sig.get("p_value"),
+    )
+
+    boot = result["bootstrap_sharpe_ci"]
+    logger.info(
+        "factor_stress_test_bootstrap_sharpe",
+        n_periods=boot.get("n_periods"),
+        sharpe_median=boot.get("sharpe_median"),
+        ci_low_5pct=boot.get("ci_low_5pct"),
+        ci_high_95pct=boot.get("ci_high_95pct"),
+    )
+
+    for bucket in result["subperiod_breakdown"]:
+        logger.info(
+            "factor_stress_test_subperiod",
+            start_date=bucket.get("start_date"),
+            end_date=bucket.get("end_date"),
+            n_periods=bucket.get("n_periods"),
+            momentum=bucket.get("momentum"),
+            equal_weight_all=bucket.get("equal_weight_all"),
+            low_vol=bucket.get("low_vol"),
+        )
+
+    for combo in result["parameter_grid"]:
+        logger.info(
+            "factor_stress_test_grid_point",
+            target_n=combo.get("target_n"),
+            lookback_days=combo.get("lookback_days"),
+            momentum_sharpe=combo.get("momentum_sharpe"),
+            equal_weight_sharpe=combo.get("equal_weight_sharpe"),
+            momentum_beats_equal_weight_sharpe=combo.get("momentum_beats_equal_weight_sharpe"),
+        )
+
+    logger.info("factor_stress_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -905,7 +991,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -942,6 +1028,8 @@ def main() -> None:
         run_passive_benchmarks_test(config, logger)
     elif args.mode == "orb-test":
         run_orb_test(config, logger)
+    elif args.mode == "factor-stress-test":
+        run_factor_stress_test(config, logger)
 
 
 if __name__ == "__main__":
