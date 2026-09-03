@@ -70,6 +70,21 @@ from src.utils.metrics import generate_performance_report
 MIN_OPENING_RANGE_BARS = 2
 
 
+def _day_boundary(day_bars: pd.DataFrame, day, clock_time: dt_time) -> datetime:
+    """A datetime.combine(day, clock_time) whose tzinfo matches
+    day_bars['date']'s own tzinfo, so it can be compared against those
+    timestamps directly. Real intraday data (Kite) is timezone-aware
+    (IST); the Yahoo Finance fallback and this module's own tests use
+    naive timestamps - datetime.combine() alone assumes naive and
+    raises "Invalid comparison between dtype=datetime64[us, tz] and
+    datetime" the moment it's compared against tz-aware bars, which is
+    exactly what happened the first time this ran against real Kite
+    data (every local test/probe had used naive timestamps and never
+    exercised this path)."""
+    tzinfo = day_bars["date"].iloc[0].tzinfo
+    return datetime.combine(day, clock_time, tzinfo=tzinfo) if tzinfo else datetime.combine(day, clock_time)
+
+
 def compute_opening_range(
     day_bars: pd.DataFrame, market_open: dt_time, opening_range_minutes: int,
 ) -> Optional[Tuple[float, float, float]]:
@@ -79,7 +94,7 @@ def compute_opening_range(
     or None if fewer than MIN_OPENING_RANGE_BARS bars fall in that
     window (e.g. a half-day session, or a data gap right at the open)."""
     day = day_bars["date"].iloc[0].date()
-    cutoff = datetime.combine(day, market_open) + timedelta(minutes=opening_range_minutes)
+    cutoff = _day_boundary(day_bars, day, market_open) + timedelta(minutes=opening_range_minutes)
     window = day_bars[day_bars["date"] < cutoff]
     if len(window) < MIN_OPENING_RANGE_BARS:
         return None
@@ -104,8 +119,8 @@ def find_first_breakout(
     the first qualifying bar, or None if no breakout occurs (a day with
     no trade is a normal, expected outcome, not an error)."""
     day = day_bars["date"].iloc[0].date()
-    range_end = datetime.combine(day, market_open) + timedelta(minutes=opening_range_minutes)
-    entry_cutoff = datetime.combine(day, no_new_entry_after)
+    range_end = _day_boundary(day_bars, day, market_open) + timedelta(minutes=opening_range_minutes)
+    entry_cutoff = _day_boundary(day_bars, day, no_new_entry_after)
 
     candidates = day_bars[(day_bars["date"] >= range_end) & (day_bars["date"] <= entry_cutoff)]
     for pos in range(len(candidates)):
@@ -137,7 +152,7 @@ def simulate_orb_trade(
     if there are no bars at all after entry_idx (shouldn't happen given
     find_first_breakout's no_new_entry_after cutoff, but guarded)."""
     day = day_bars["date"].iloc[0].date()
-    square_off_dt = datetime.combine(day, square_off_time)
+    square_off_dt = _day_boundary(day_bars, day, square_off_time)
 
     if direction == "long":
         stop, risk = range_low, entry_price - range_low

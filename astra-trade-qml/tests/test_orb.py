@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -13,13 +14,17 @@ from src.training.orb import (
 )
 
 MARKET_OPEN = time(9, 15)
+IST = ZoneInfo("Asia/Kolkata")
 
 
-def _day_bars(day: date, bars):
-    """bars: list of (minutes_after_open, open, high, low, close, volume)."""
+def _day_bars(day: date, bars, tz=None):
+    """bars: list of (minutes_after_open, open, high, low, close, volume).
+    tz=None (the default) produces naive timestamps, matching the Yahoo
+    Finance fallback path and most of this file's tests; pass a tzinfo
+    (e.g. IST) to build bars matching Kite's real tz-aware timestamps."""
     rows = []
     for minutes, o, h, l, c, v in bars:
-        ts = datetime.combine(day, MARKET_OPEN) + pd.Timedelta(minutes=minutes)
+        ts = datetime.combine(day, MARKET_OPEN, tzinfo=tz) + pd.Timedelta(minutes=minutes)
         rows.append({"date": ts, "open": o, "high": h, "low": l, "close": c, "volume": v})
     return pd.DataFrame(rows)
 
@@ -218,3 +223,63 @@ class TestRunOrbBacktest:
             {"FLAT": flat}, cost_calc, initial_capital=50_000.0, max_position_size_pct=0.1,
         )
         assert result["n_trades"] == 0
+
+
+class TestTimezoneAwareBars:
+    """Regression tests: real Kite intraday data carries tz-aware (IST)
+    timestamps, but every other test in this file (and the local
+    integration probe run before this session's first CI dispatch)
+    used naive ones - datetime.combine() without an explicit tzinfo
+    builds a naive datetime, and comparing that against tz-aware bars
+    raises "Invalid comparison between dtype=datetime64[us, tz] and
+    datetime". This crashed the real CI run against real Kite data
+    (after successfully fetching a full year of 5-min bars for all 18
+    symbols - the bug was in the ORB logic itself, not the data
+    ingestion) despite every unit test and local probe passing, because
+    none of them had exercised tz-aware timestamps. compute_opening_range,
+    find_first_breakout, simulate_orb_trade, and run_orb_backtest must
+    all handle tz-aware bars exactly as they handle naive ones."""
+
+    def test_compute_opening_range_with_tz_aware_bars(self):
+        day = date(2024, 1, 2)
+        bars = _day_bars(day, [
+            (0, 100, 102, 99, 101, 1000),
+            (5, 101, 103, 100, 102, 1200),
+            (10, 102, 104, 101, 103, 800),
+        ], tz=IST)
+        result = compute_opening_range(bars, MARKET_OPEN, opening_range_minutes=15)
+        assert result is not None
+        assert result[0] == 104.0
+        assert result[1] == 99.0
+
+    def test_find_first_breakout_with_tz_aware_bars(self):
+        day = date(2024, 1, 2)
+        opening = [(0, 100, 101, 99, 100, 1000), (5, 100, 101, 99, 100, 1000), (10, 100, 101, 99, 100, 1000)]
+        bars = _day_bars(day, opening + [(15, 101, 103, 101, 102.5, 2000)], tz=IST)
+        result = find_first_breakout(bars, 101.0, 99.0, 1000.0, MARKET_OPEN, 15, 1.5, time(15, 0))
+        assert result is not None
+        assert result["direction"] == "long"
+
+    def test_simulate_orb_trade_with_tz_aware_bars(self):
+        day = date(2024, 1, 2)
+        bars = _day_bars(day, [
+            (0, 100, 101, 99, 100, 1000), (5, 100, 101, 99, 100, 1000), (10, 100, 101, 99, 100, 1000),
+            (15, 102, 103, 101.5, 102.5, 2000),
+            (20, 102, 102.2, 97, 97.5, 2000),
+        ], tz=IST)
+        trade = simulate_orb_trade(bars, entry_idx=3, direction="long", entry_price=102.5,
+                                    range_high=101.0, range_low=99.0, reward_multiple=2.0,
+                                    square_off_time=time(15, 15))
+        assert trade["exit_reason"] == "stop"
+
+    def test_run_orb_backtest_with_tz_aware_bars(self, cost_calc):
+        day = date(2024, 1, 2)
+        bars = _day_bars(day, [
+            (0, 100, 101, 99, 100, 1000), (5, 100, 101, 99, 100, 1000), (10, 100, 101, 99, 100, 1000),
+            (15, 102, 103, 101.5, 102.5, 2000),
+            (20, 103, 110, 102, 109.8, 2000),
+        ], tz=IST)
+        result = run_orb_backtest(
+            {"SYM": bars}, cost_calc, initial_capital=50_000.0, max_position_size_pct=0.1,
+        )
+        assert result["n_trades"] == 1
