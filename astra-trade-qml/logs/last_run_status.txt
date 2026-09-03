@@ -1,2 +1,2 @@
-exit=0
-finished_at=2026-09-02T16:17:28Z
+exit=1
+finished_at=2026-09-03T15:16:33Z
