@@ -24,6 +24,7 @@ from src.models.classical.xgboost_model import XGBoostMarketModel
 from src.models.quantum.hybrid_model import HybridQMLModel
 from src.trading.costs import CostCalculator
 from src.trading.live_feed import KiteLiveFeed
+from src.trading.market_hours import parse_hhmm
 from src.trading.market_rules import CircuitCheck, round_to_tick
 from src.trading.portfolio_allocator import AllocationResult, PortfolioAllocator
 from src.training.feature_evolution import FeatureEvolver
@@ -36,6 +37,7 @@ from src.training.event_drift import (
     summarize_continuation,
 )
 from src.training.factor_investing import run_factor_backtest
+from src.training.orb import run_orb_backtest
 from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
 from src.training.sip_benchmark import simulate_sip
 from src.training.regime_submodels import RegimeSubModelTrainer, compute_regime_thresholds, label_regime_proxy
@@ -1462,6 +1464,62 @@ class TrainingPipeline:
             price_data, cost_calc, target_n=target_n,
             momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
             vol_lookback_days=vol_lookback_days,
+        )
+
+    def orb_backtest(
+        self,
+        symbols: Optional[List[str]] = None,
+        opening_range_minutes: int = 15,
+        volume_confirmation_multiplier: float = 1.5,
+        reward_multiple: float = 2.0,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: Opening-Range-Breakout (ORB) - the "start at 9:15,
+        watch the trend, buy/sell, close by 9:45" strategy shape,
+        tested with the same rigor as every other diagnostic this
+        session. See src/training/orb.py's module docstring for the
+        full methodology, including the two things it's honestly built
+        to test rather than assume: whether this genuinely different
+        (reactive to the opening range, not predictive of an unknown
+        future) signal shape has an edge, and the real data constraint
+        this has that swing-horizon diagnostics don't (needs real 5-min
+        intraday history via data_ingestion(), which is Yahoo-Finance-
+        fallback-limited to 60 calendar days when Kite isn't configured
+        or fails - n_days_with_data in the result makes the actual
+        sample size this run had visible, rather than hiding it).
+
+        Uses data_ingestion()'s 5-min intraday bars (fetched here if not
+        already present) restricted to `symbols` (default: the
+        cash-tradable equity_universe - data_ingestion() itself always
+        fetches the full focus_universe, which includes indices that
+        can't actually be bought).
+        """
+        symbols = symbols if symbols is not None else self.data_cfg.get("symbols", {}).get("equity_universe", [])
+
+        if not self.raw_data:
+            self.data_ingestion()
+
+        price_data = {s: self.raw_data[s] for s in symbols if s in self.raw_data and not self.raw_data[s].empty}
+        if not price_data:
+            raise RuntimeError("No intraday data available for any requested symbol; cannot run ORB backtest.")
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+        max_position_size_pct = self.config["trading"]["position_sizing"]["max_position_size_pct"]
+        schedule_cfg = self.config["trading"]["schedule"]
+        # no_new_entry_after / square_off_time live under signals.intraday
+        # (shared with the live paper-trading loop's own intraday exit
+        # rules), not trading.schedule (which only has session open/close).
+        intraday_cfg = self.config["signals"]["intraday"]
+
+        return run_orb_backtest(
+            price_data, cost_calc, initial_capital, max_position_size_pct,
+            market_open=parse_hhmm(schedule_cfg["market_open"]),
+            opening_range_minutes=opening_range_minutes,
+            volume_confirmation_multiplier=volume_confirmation_multiplier,
+            reward_multiple=reward_multiple,
+            no_new_entry_after=parse_hhmm(intraday_cfg["no_new_entry_after"]),
+            square_off_time=parse_hhmm(intraday_cfg["square_off_time"]),
         )
 
     def walk_forward_validation(self) -> Dict[str, Any]:

@@ -1,0 +1,45 @@
+# Astra-Trade QML - Opening-Range-Breakout (ORB) Diagnostic (plain CI runner, no GPU)
+#
+# TrainingPipeline.orb_backtest() involves no ML model training at all
+# (opening-range computation + a bar-by-bar bracket-order simulation), so
+# this diagnostic runs directly on a plain ubuntu-latest GitHub Actions
+# runner instead of a rented RunPod GPU pod - see
+# .github/workflows/orb-test.yml. Identical to
+# requirements-passive-benchmarks.txt / requirements-event-drift.txt
+# (same reasoning: nothing on this path trains a model, but importing
+# TrainingPipeline still transitively needs torch/xgboost/statsmodels
+# importable) - kept as its own file so this diagnostic's dependency set
+# can diverge independently later.
+#
+# Unlike the recent daily-bar diagnostics (event-drift, passive-
+# benchmarks), this one needs REAL 5-MINUTE INTRADAY history
+# (TrainingPipeline.data_ingestion(), not swing_data_ingestion()) - the
+# KITE_* secrets below matter more here than they did for those, since
+# Yahoo Finance's intraday fallback hard-caps at the trailing 60
+# calendar days when Kite isn't configured or fails.
+
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+pyyaml>=6.0
+python-dotenv>=1.0
+python-dateutil>=2.8
+pytz>=2023.3
+
+requests>=2.31
+yfinance>=0.2.40
+
+scikit-learn>=1.5
+xgboost>=2.0
+statsmodels>=0.14
+
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.4
+--extra-index-url https://pypi.org/simple
+
+SQLAlchemy>=2.0
+structlog>=23.1
+
+kiteconnect>=4.2
+websocket-client>=1.6
+pyotp>=2.9

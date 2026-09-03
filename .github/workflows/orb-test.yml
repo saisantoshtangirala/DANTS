@@ -1,0 +1,78 @@
+name: Opening-Range-Breakout Diagnostic (CI Runner)
+
+# Diagnostic-only: Opening-Range-Breakout (ORB) - the "start at 9:15,
+# watch the trend, buy/sell, close by 9:45" strategy shape, tested with
+# the same rigor as every other diagnostic in this repo, on real
+# 5-minute intraday bars. A genuinely different signal shape than every
+# other diagnostic here (reactive to the realized opening range, not
+# predictive of an unknown future - see the two premises this answers:
+# SEBI's own study found over 70% of individual intraday equity traders
+# in India lost money in FY23, and algorithmic/institutional flow
+# already dominates the opening window's volume, so a retail human
+# trading it is mostly trading against algorithms, not competing with
+# humans an algorithm "can't" replicate). See
+# TrainingPipeline.orb_backtest()'s docstring and src/training/orb.py
+# for the full methodology.
+#
+# Unlike the recent daily-bar diagnostics (event-drift-test.yml,
+# passive-benchmarks-test.yml), this needs REAL 5-MINUTE INTRADAY
+# history (data_ingestion(), not swing_data_ingestion()) - the KITE_*
+# secrets matter more here, since Yahoo Finance's intraday fallback
+# hard-caps at the trailing 60 calendar days when Kite isn't configured
+# or fails. The run's actual sample size (n_days_with_data / n_trades)
+# is logged plainly either way.
+#
+# No ML model training at all, so like the other recent diagnostics this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: orb-test
+  cancel-in-progress: false
+
+jobs:
+  orb-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-orb.txt
+
+      - name: Run ORB diagnostic
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode orb-test | tee /tmp/orb_test.log
+
+      - name: Summarize ORB run
+        if: always()
+        run: |
+          {
+            echo "### Opening-range-breakout diagnostic run"
+            echo
+            echo '```'
+            grep -E "orb_test_started|orb_test_sample_size|orb_backtest_result|orb_test_complete" /tmp/orb_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

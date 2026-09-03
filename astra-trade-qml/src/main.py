@@ -13,6 +13,7 @@ Usage:
     python3 -m src.main --mode pairs-trading-test  # diagnostic: market-neutral pairs/relative-value trading, no ML model
     python3 -m src.main --mode event-drift-test    # diagnostic: abnormal-reaction event drift, no ML model
     python3 -m src.main --mode passive-benchmarks-test  # diagnostic: NIFTY SIP + momentum/low-vol factor tilts, no ML model
+    python3 -m src.main --mode orb-test             # diagnostic: opening-range-breakout, no ML model
 """
 
 import argparse
@@ -822,6 +823,68 @@ def run_passive_benchmarks_test(config: dict, logger) -> None:
     logger.info("passive_benchmarks_test_complete")
 
 
+def run_orb_test(config: dict, logger) -> None:
+    """Diagnostic: Opening-Range-Breakout (ORB) - the "start at 9:15,
+    watch the trend, buy/sell, close by 9:45" strategy shape, tested
+    with the same rigor as every other diagnostic this session, on real
+    5-minute intraday bars. A genuinely different signal shape than
+    every other diagnostic tried (reactive to the realized opening
+    range, not predictive of an unknown future) - see
+    TrainingPipeline.orb_backtest()'s docstring and src/training/orb.py
+    for the full methodology, including the honest data constraint this
+    has that the recent daily-bar diagnostics don't (Yahoo Finance's
+    intraday fallback hard-caps at 60 calendar days when Kite isn't
+    configured or fails)."""
+    import os
+
+    from src.data.nse_ingestion import KiteDataProvider
+    from src.training.pipeline import TrainingPipeline
+    from src.utils.kite_auth import KiteLoginError, generate_access_token_from_env
+
+    kite_provider = None
+    if os.environ.get("KITE_API_KEY"):
+        try:
+            access_token = generate_access_token_from_env()
+            kite_provider = KiteDataProvider(api_key=os.environ["KITE_API_KEY"], access_token=access_token)
+            logger.info("kite_session_ready_for_orb_test")
+        except KiteLoginError as e:
+            logger.warning("kite_login_failed_falling_back_to_nse_archive", error=str(e))
+
+    pipeline = TrainingPipeline(config, kite_provider=kite_provider)
+
+    logger.info("orb_test_started")
+    result = pipeline.orb_backtest()
+    logger.info("orb_test_sample_size", n_days_with_data=result.get("n_days_with_data"), n_trades=result.get("n_trades"))
+
+    for split_name in ("train", "oos"):
+        report = result.get(split_name) or {}
+        if not report:
+            continue
+        logger.info(
+            "orb_backtest_result",
+            split=split_name,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            expectancy=report.get("expectancy"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+            max_drawdown_pct=report.get("max_drawdown_pct"),
+        )
+        for direction, dir_report in (report.get("by_direction") or {}).items():
+            logger.info(
+                "orb_backtest_result_by_direction",
+                split=split_name,
+                direction=direction,
+                total_trades=dir_report.get("total_trades"),
+                win_rate=dir_report.get("win_rate"),
+                avg_trade_return_pct=dir_report.get("avg_trade_return_pct"),
+                expectancy=dir_report.get("expectancy"),
+                sharpe_ratio=dir_report.get("sharpe_ratio"),
+            )
+
+    logger.info("orb_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -842,7 +905,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -877,6 +940,8 @@ def main() -> None:
         run_event_drift_test(config, logger)
     elif args.mode == "passive-benchmarks-test":
         run_passive_benchmarks_test(config, logger)
+    elif args.mode == "orb-test":
+        run_orb_test(config, logger)
 
 
 if __name__ == "__main__":
