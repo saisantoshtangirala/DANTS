@@ -10,7 +10,7 @@ model_deployment.
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -1603,6 +1603,42 @@ class TrainingPipeline:
         dropped-symbol list, so a thin surviving universe is visible
         rather than hidden}}.
         """
+        symbols, price_data, universe_meta = self._liquid_midcap_price_data(
+            symbols, min_adtv_cr=min_adtv_cr, log_event="midcap_momentum_backtest_dropped_illiquid",
+        )
+
+        costs_cfg = dict(self.config["trading"]["costs"])
+        costs_cfg["slippage_pct"] = impact_slippage_pct
+        cost_calc = CostCalculator(costs_cfg)
+
+        results = run_factor_backtest(
+            price_data, cost_calc, target_n=target_n,
+            momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
+            vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
+        )
+
+        universe_meta.update({
+            "impact_slippage_pct": impact_slippage_pct,
+            "rebalance_every_n_months": rebalance_every_n_months,
+        })
+        return {"results": results, "universe": universe_meta}
+
+    def _liquid_midcap_price_data(
+        self,
+        symbols: Optional[List[str]],
+        min_adtv_cr: Optional[float],
+        log_event: str,
+    ) -> Tuple[List[str], Dict[str, pd.DataFrame], Dict[str, Any]]:
+        """Shared ingestion + liquidity-filter step for
+        midcap_momentum_backtest() and midcap_momentum_stress_test():
+        resolves `symbols` (default: config's
+        midcap_smallcap_factor_universe), ensures swing_raw_data is
+        populated for them, then drops anything under min_adtv_cr
+        (default: config's data.liquidity.min_adtv_cr) using the same
+        ADTV calculation compute_liquidity() uses for the intraday
+        universe. Returns (resolved_symbols, price_data for the
+        surviving liquid symbols, universe metadata dict with counts and
+        the dropped-symbol list)."""
         symbols = (
             symbols if symbols is not None
             else self.data_cfg.get("symbols", {}).get("midcap_smallcap_factor_universe", [])
@@ -1632,30 +1668,105 @@ class TrainingPipeline:
                 dropped_illiquid.append({"symbol": s, "adtv_cr": adtv_cr})
 
         if dropped_illiquid:
-            logger.info("midcap_momentum_backtest_dropped_illiquid", dropped=dropped_illiquid, min_adtv_cr=min_adtv_cr)
+            logger.info(log_event, dropped=dropped_illiquid, min_adtv_cr=min_adtv_cr)
 
         price_data = {s: self.swing_raw_data[s] for s in liquid_symbols}
+        universe_meta = {
+            "requested": len(symbols),
+            "liquid": len(liquid_symbols),
+            "dropped_illiquid": dropped_illiquid,
+            "min_adtv_cr": min_adtv_cr,
+        }
+        return symbols, price_data, universe_meta
+
+    def midcap_momentum_stress_test(
+        self,
+        symbols: Optional[List[str]] = None,
+        target_n: int = 8,
+        momentum_lookback_days: int = 126,
+        momentum_skip_days: int = 21,
+        vol_lookback_days: int = 60,
+        rebalance_every_n_months: int = 3,
+        min_adtv_cr: Optional[float] = None,
+        impact_slippage_pct: float = 0.006,
+        n_subperiod_splits: int = 3,
+        grid_target_ns: Optional[List[int]] = None,
+        grid_lookback_days: Optional[List[int]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Stress test for midcap_momentum_backtest()'s result, held to the
+        exact same bar factor_momentum_stress_test() applied to the
+        original 18-symbol large-cap momentum result (which looked
+        promising - Sharpe 1.10 vs 0.97 - but failed: p=0.108, only 3/12
+        grid points, a real loss in the earliest subperiod). A quarterly-
+        rebalanced momentum tilt over the mid/small-cap universe beating
+        equal_weight_all's Sharpe on a single run is exactly the same
+        shape of unverified result, over an even smaller sample (quarterly
+        periods over the same history means roughly a third as many
+        observations as the monthly large-cap case had) - so it gets the
+        same three checks before being trusted, not fewer: a paired
+        significance test against equal_weight_all (same calendar
+        quarters, so paired is the correct, more powerful test), a
+        bootstrap confidence interval on momentum's own Sharpe ratio
+        (annualized at 12/rebalance_every_n_months periods/year, not the
+        monthly-only sqrt(12) the original stress test used), a
+        chronological subperiod breakdown, and a parameter-sensitivity
+        grid search (target_n x momentum_lookback_days, at the SAME
+        quarterly rebalance_every_n_months - varying rebalance cadence
+        too would confound which change is responsible for any result).
+        See src/training/factor_stress_test.py for the full methodology.
+        """
+        grid_target_ns = grid_target_ns if grid_target_ns is not None else [4, 8, 12]
+        grid_lookback_days = grid_lookback_days if grid_lookback_days is not None else [63, 126, 189, 252]
+
+        symbols, price_data, universe_meta = self._liquid_midcap_price_data(
+            symbols, min_adtv_cr=min_adtv_cr, log_event="midcap_momentum_stress_test_dropped_illiquid",
+        )
 
         costs_cfg = dict(self.config["trading"]["costs"])
         costs_cfg["slippage_pct"] = impact_slippage_pct
         cost_calc = CostCalculator(costs_cfg)
 
-        results = run_factor_backtest(
+        primary = run_factor_backtest(
             price_data, cost_calc, target_n=target_n,
             momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
             vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
         )
+        momentum_returns = primary["momentum"]["period_returns"]
+        equal_weight_returns = primary["equal_weight_all"]["period_returns"]
+        low_vol_returns = primary["low_vol"]["period_returns"]
+        period_dates = primary["momentum"]["period_dates"]
 
+        periods_per_year = 12.0 / rebalance_every_n_months
+        significance = paired_significance_test(momentum_returns, equal_weight_returns)
+        bootstrap = bootstrap_sharpe_ci(momentum_returns, periods_per_year=periods_per_year)
+        subperiods = subperiod_breakdown(
+            period_dates,
+            {"momentum": momentum_returns, "equal_weight_all": equal_weight_returns, "low_vol": low_vol_returns},
+            n_splits=n_subperiod_splits,
+        )
+        grid = parameter_grid_search(
+            price_data, cost_calc, target_ns=grid_target_ns, lookback_days_grid=grid_lookback_days,
+            momentum_skip_days=momentum_skip_days, vol_lookback_days=vol_lookback_days,
+            rebalance_every_n_months=rebalance_every_n_months,
+        )
+
+        primary_summary = {
+            strategy: {k: v for k, v in stats.items() if k not in ("period_returns", "period_dates")}
+            for strategy, stats in primary.items()
+        }
+
+        universe_meta.update({
+            "impact_slippage_pct": impact_slippage_pct,
+            "rebalance_every_n_months": rebalance_every_n_months,
+        })
         return {
-            "results": results,
-            "universe": {
-                "requested": len(symbols),
-                "liquid": len(liquid_symbols),
-                "dropped_illiquid": dropped_illiquid,
-                "min_adtv_cr": min_adtv_cr,
-                "impact_slippage_pct": impact_slippage_pct,
-                "rebalance_every_n_months": rebalance_every_n_months,
-            },
+            "universe": universe_meta,
+            "primary": primary_summary,
+            "significance_vs_equal_weight": significance,
+            "bootstrap_sharpe_ci": bootstrap,
+            "subperiod_breakdown": subperiods,
+            "parameter_grid": grid,
         }
 
     def orb_backtest(

@@ -125,3 +125,18 @@ class TestParameterGridSearch:
         )
         # lookback_days=10 <= momentum_skip_days=21 should be skipped entirely
         assert all(r["lookback_days"] != 10 for r in results)
+
+    def test_rebalance_every_n_months_passthrough_changes_result(self, cost_calc):
+        """rebalance_every_n_months should reach run_factor_backtest (not
+        get silently dropped) - a quarterly grid run should differ from
+        the monthly default on the same data (different n_periods,
+        turnover, and therefore returns/Sharpe)."""
+        price_data = self._synthetic_price_data(n_days=1000)
+        monthly = parameter_grid_search(
+            price_data, cost_calc, target_ns=(3,), lookback_days_grid=(126,), momentum_skip_days=21,
+        )
+        quarterly = parameter_grid_search(
+            price_data, cost_calc, target_ns=(3,), lookback_days_grid=(126,), momentum_skip_days=21,
+            rebalance_every_n_months=3,
+        )
+        assert monthly[0]["momentum_return_pct"] != quarterly[0]["momentum_return_pct"]

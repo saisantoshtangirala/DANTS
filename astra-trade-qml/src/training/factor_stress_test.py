@@ -151,16 +151,17 @@ def parameter_grid_search(
     lookback_days_grid: Sequence[int] = (63, 126, 189, 252),
     momentum_skip_days: int = 21,
     vol_lookback_days: int = 60,
+    rebalance_every_n_months: int = 1,
 ) -> List[Dict[str, Any]]:
     """Re-runs run_factor_backtest across every (target_n, lookback_days)
-    combination in the grid (holding momentum_skip_days/vol_lookback_days
-    fixed), reporting momentum's and equal_weight_all's Sharpe/return at
-    each point. A combination where lookback_days <= momentum_skip_days
-    is skipped (degenerate - no momentum window would remain). This is
-    the parameter-sensitivity check: if momentum only beats equal-weight
-    at the one hand-picked configuration and loses at most neighboring
-    ones, that result is far more likely to be this dataset's noise than
-    a real, robust premium.
+    combination in the grid (holding momentum_skip_days/vol_lookback_days/
+    rebalance_every_n_months fixed), reporting momentum's and
+    equal_weight_all's Sharpe/return at each point. A combination where
+    lookback_days <= momentum_skip_days is skipped (degenerate - no
+    momentum window would remain). This is the parameter-sensitivity
+    check: if momentum only beats equal-weight at the one hand-picked
+    configuration and loses at most neighboring ones, that result is far
+    more likely to be this dataset's noise than a real, robust premium.
     """
     results = []
     for target_n in target_ns:
@@ -171,7 +172,7 @@ def parameter_grid_search(
                 r = run_factor_backtest(
                     price_data, cost_calc, target_n=target_n,
                     momentum_lookback_days=lookback_days, momentum_skip_days=momentum_skip_days,
-                    vol_lookback_days=vol_lookback_days,
+                    vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
                 )
             except RuntimeError:
                 continue

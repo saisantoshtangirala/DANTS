@@ -1,0 +1,77 @@
+name: Mid/Small-Cap Momentum Stress Test (CI Runner)
+
+# Stress-tests midcap-momentum-test.yml's result (quarterly momentum
+# tilt over the disjoint ~40-symbol mid/small-cap universe: total
+# return 143.5% vs equal-weight's 104.6%, Sharpe 1.09 vs 0.95, over 18
+# quarterly periods) with the EXACT SAME three checks
+# factor-stress-test.yml applied to the original 18-symbol large-cap
+# momentum result - which looked just as promising (Sharpe 1.10 vs
+# 0.97) but failed: paired-t p=0.108, only 3/12 parameter-grid points
+# beat equal-weight, a real loss in the earliest subperiod. A positive-
+# looking number over only 18 quarterly periods is, if anything, a
+# SMALLER sample than the large-cap case's monthly periods had - it
+# gets no benefit of the doubt for looking better on the surface.
+#
+# See TrainingPipeline.midcap_momentum_stress_test()'s docstring and
+# src/training/factor_stress_test.py for the full methodology: a paired
+# significance test against equal_weight_all, a bootstrap confidence
+# interval on momentum's own Sharpe ratio (annualized at quarterly
+# cadence, not the monthly sqrt(12) the original stress test used), a
+# chronological subperiod breakdown, and a parameter-sensitivity grid
+# search (target_n x momentum_lookback_days, holding the quarterly
+# rebalance fixed so cadence isn't confounded with parameter choice).
+#
+# No ML model training at all, so like the other recent diagnostics this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: midcap-momentum-stress-test
+  cancel-in-progress: false
+
+jobs:
+  midcap-momentum-stress-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-midcap-momentum.txt
+
+      - name: Run midcap-momentum stress test
+        working-directory: astra-trade-qml
+        env:
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          KITE_USER_ID: ${{ secrets.KITE_USER_ID }}
+          KITE_PASSWORD: ${{ secrets.KITE_PASSWORD }}
+          KITE_TOTP_SECRET: ${{ secrets.KITE_TOTP_SECRET }}
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode midcap-momentum-stress-test | tee /tmp/midcap_momentum_stress_test.log
+
+      - name: Summarize midcap-momentum stress test run
+        if: always()
+        run: |
+          {
+            echo "### Mid/small-cap momentum stress test run"
+            echo
+            echo '```'
+            grep -E "midcap_momentum_stress_test_started|midcap_momentum_stress_test_universe|midcap_momentum_stress_test_dropped_illiquid|midcap_momentum_stress_test_primary_result|midcap_momentum_stress_test_significance|midcap_momentum_stress_test_bootstrap_sharpe|midcap_momentum_stress_test_subperiod|midcap_momentum_stress_test_grid_point|midcap_momentum_stress_test_complete" /tmp/midcap_momentum_stress_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
