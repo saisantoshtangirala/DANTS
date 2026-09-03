@@ -117,6 +117,6 @@ def simulate_sip(prices: pd.DataFrame, monthly_investment: float) -> Dict[str, A
         "final_value": final_value,
         "absolute_gain": float(final_value - total_invested),
         "xirr_pct": None if np.isnan(xirr_rate) else float(xirr_rate * 100),
-        "max_drawdown_pct": float(max_dd),
+        "max_drawdown_pct": float(max_dd * 100),
         "value_curve": value_curve,
     }

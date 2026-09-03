@@ -78,6 +78,20 @@ class TestSimulateSip:
         result = simulate_sip(prices, monthly_investment=500.0)
         assert len(result["value_curve"]) == len(prices)
 
+    def test_max_drawdown_is_percentage_not_raw_fraction(self):
+        """Regression test: simulate_sip() once returned
+        calculate_max_drawdown()'s raw fraction (e.g. -0.15) unscaled
+        under the 'max_drawdown_pct' key, understating every reported
+        drawdown by 100x. Plant an unmistakable ~50% price crash and
+        confirm the reported value is in percentage units."""
+        dates = pd.date_range("2024-01-01", periods=12, freq="MS")
+        prices = np.full(12, 100.0)
+        prices[6:] = 50.0  # halves the price from month 7 onward
+        result = simulate_sip(pd.DataFrame({"date": dates, "close": prices}), monthly_investment=1000.0)
+        # A raw fraction would be roughly -0.3 to -0.5; the correctly
+        # scaled percentage must be roughly -30 to -50.
+        assert result["max_drawdown_pct"] < -10.0
+
     def test_empty_prices_returns_degenerate_result(self):
         prices = pd.DataFrame({"date": [], "close": []})
         result = simulate_sip(prices, monthly_investment=1000.0)
