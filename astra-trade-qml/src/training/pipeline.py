@@ -44,6 +44,11 @@ from src.training.factor_stress_test import (
     staggered_parameter_grid_search,
     subperiod_breakdown,
 )
+from src.training.fii_dii_flow import run_fii_dii_flow_backtest
+from src.training.fii_dii_flow_stress_test import (
+    fii_dii_flow_parameter_grid_search,
+    one_sample_significance_test,
+)
 from src.training.orb import run_orb_backtest
 from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
 from src.training.sip_benchmark import simulate_sip
@@ -1791,6 +1796,155 @@ class TrainingPipeline:
             "significance_vs_equal_weight": significance,
             "bootstrap_sharpe_ci": bootstrap,
             "subperiod_breakdown": subperiods,
+            "parameter_grid": grid,
+        }
+
+    def fii_dii_data_ingestion(self, lookback_days: int = 1825) -> None:
+        """Fetches NSE's daily participant-wise (FII/DII/Pro/Client)
+        open-interest panel and NIFTY 50 daily closes over the trailing
+        lookback_days, via src/data/participant_oi.py and
+        src/data/index_close.py - a genuinely different data source
+        from every other diagnostic this session (no Kite dependency;
+        both providers hit NSE's public archives directly and disk-
+        cache per calendar day, so a re-run only fetches new dates).
+
+        Stores results on self (participant_oi_net_positioning,
+        fii_dii_price_df) so fii_dii_flow_backtest() and
+        fii_dii_flow_stress_test() don't each re-fetch when called in
+        the same run. fii_dii_price_df's close is the raw NIFTY 50
+        index level DIVIDED BY 100 - an approximation for a NIFTY 50
+        ETF (e.g. NIFTYBEES) price, the actual cash-tradable instrument
+        this account would use (see fii_dii_flow.py's module docstring
+        on why: index futures/options reintroduce the margin-vs-this-
+        account's-capital mismatch already flagged for the options-
+        selling idea this session declined to build). This ignores a
+        real ETF's small tracking error and its own dividend-driven
+        price gaps - a documented approximation, not real NIFTYBEES
+        tick data.
+        """
+        from src.data.index_close import IndexCloseProvider
+        from src.data.participant_oi import ParticipantOIProvider, compute_net_positioning
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=lookback_days)
+
+        oi_provider = ParticipantOIProvider()
+        panel = oi_provider.fetch_range(start_date, end_date)
+        net_positioning = compute_net_positioning(panel)
+        self.participant_oi_net_positioning = net_positioning["dii_net_index_future"] if not net_positioning.empty else net_positioning
+
+        price_provider = IndexCloseProvider()
+        nifty = price_provider.fetch_index_range("Nifty 50", start_date, end_date)
+        price_df = nifty[["date", "close"]].copy() if not nifty.empty else nifty
+        if not price_df.empty:
+            price_df["close"] = price_df["close"] / 100.0
+        self.fii_dii_price_df = price_df
+
+    def fii_dii_flow_backtest(
+        self,
+        flow_lookback_days: int = 5,
+        trailing_window: int = 252,
+        quantile_threshold: float = 0.8,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        train_frac: float = 0.7,
+        lookback_days: int = 1825,
+    ) -> Dict[str, Any]:
+        """
+        Diagnostic: the strategy this session's exploratory analysis of
+        NSE's FII/DII institutional-flow data actually found, rather
+        than a strategy shape picked from a template and tested against
+        data - see src/training/fii_dii_flow.py's module docstring for
+        the full methodology, the robustness checks that preceded any
+        of this code being written (Bonferroni-corrected IC across 120
+        feature/horizon combinations, split-sample and quarterly
+        stability, a momentum-confound control, a realistic one-day
+        execution-lag check), and why concurrent tranches replaced an
+        initial single-position design.
+        """
+        if not hasattr(self, "fii_dii_price_df") or self.fii_dii_price_df is None or self.fii_dii_price_df.empty:
+            self.fii_dii_data_ingestion(lookback_days=lookback_days)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        return run_fii_dii_flow_backtest(
+            self.fii_dii_price_df, self.participant_oi_net_positioning, cost_calc, initial_capital,
+            flow_lookback_days=flow_lookback_days, trailing_window=trailing_window,
+            quantile_threshold=quantile_threshold, hold_days=hold_days,
+            max_concurrent_positions=max_concurrent_positions, train_frac=train_frac,
+        )
+
+    def fii_dii_flow_stress_test(
+        self,
+        flow_lookback_days: int = 5,
+        trailing_window: int = 252,
+        quantile_threshold: float = 0.8,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        train_frac: float = 0.7,
+        n_subperiod_splits: int = 3,
+        grid_quantile_thresholds: Optional[List[float]] = None,
+        grid_hold_days: Optional[List[int]] = None,
+        lookback_days: int = 1825,
+    ) -> Dict[str, Any]:
+        """
+        Stress test for fii_dii_flow_backtest()'s result, held to the
+        same bar as every stress test this session ran: a one-sample
+        significance test on the OOS trades' mean return (not a paired
+        test - this strategy is event-driven with irregular trade
+        timing, no directly comparable calendar-aligned baseline
+        series), a bootstrap confidence interval on the OOS Sharpe
+        ratio (annualized at the split's OWN actual trade frequency,
+        not a hardcoded 252/year - see fii_dii_flow.py's _report()
+        docstring on why that matters here), a chronological subperiod
+        breakdown of the OOS trades, and a parameter-sensitivity grid
+        over quantile_threshold x hold_days. See
+        src/training/fii_dii_flow_stress_test.py for the full
+        methodology.
+        """
+        grid_quantile_thresholds = grid_quantile_thresholds if grid_quantile_thresholds is not None else [0.70, 0.75, 0.80, 0.85, 0.90]
+        grid_hold_days = grid_hold_days if grid_hold_days is not None else [3, 5, 10, 20]
+
+        if not hasattr(self, "fii_dii_price_df") or self.fii_dii_price_df is None or self.fii_dii_price_df.empty:
+            self.fii_dii_data_ingestion(lookback_days=lookback_days)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        primary = run_fii_dii_flow_backtest(
+            self.fii_dii_price_df, self.participant_oi_net_positioning, cost_calc, initial_capital,
+            flow_lookback_days=flow_lookback_days, trailing_window=trailing_window,
+            quantile_threshold=quantile_threshold, hold_days=hold_days,
+            max_concurrent_positions=max_concurrent_positions, train_frac=train_frac,
+        )
+
+        oos = primary.get("oos") or {}
+        oos_returns = oos.get("period_returns", [])
+        oos_dates = oos.get("period_dates", [])
+        oos_trades_per_year = oos.get("trades_per_year", 12.0)
+
+        significance = one_sample_significance_test(oos_returns)
+        bootstrap = bootstrap_sharpe_ci(oos_returns, periods_per_year=oos_trades_per_year)
+        subperiods = subperiod_breakdown(oos_dates, {"fii_dii_flow": oos_returns}, n_splits=n_subperiod_splits)
+        grid = fii_dii_flow_parameter_grid_search(
+            self.fii_dii_price_df, self.participant_oi_net_positioning, cost_calc, initial_capital,
+            quantile_thresholds=grid_quantile_thresholds, hold_days_grid=grid_hold_days,
+            flow_lookback_days=flow_lookback_days, trailing_window=trailing_window,
+        )
+
+        primary_summary = {
+            split: {k: v for k, v in stats.items() if k not in ("period_returns", "period_dates")}
+            for split, stats in primary.items() if split in ("train", "oos") and stats
+        }
+        primary_summary["n_days_with_data"] = primary.get("n_days_with_data")
+        primary_summary["n_trades"] = primary.get("n_trades")
+
+        return {
+            "primary": primary_summary,
+            "oos_significance": significance,
+            "oos_bootstrap_sharpe_ci": bootstrap,
+            "oos_subperiod_breakdown": subperiods,
             "parameter_grid": grid,
         }
 

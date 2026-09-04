@@ -1,0 +1,71 @@
+name: FII/DII Institutional-Flow Stress Test (CI Runner)
+
+# Stress-tests fii-dii-flow-test.yml's result with the same rigor every
+# other result this session got: a one-sample significance test on OOS
+# trades (not paired - this strategy is event-driven with irregular
+# trade timing, no calendar-aligned baseline), a bootstrap Sharpe CI
+# annualized at the split's OWN actual trade frequency (not a
+# hardcoded 252/year - a real annualization bug was caught and fixed
+# before this was ever trusted, see fii_dii_flow.py's _report()
+# docstring), a chronological subperiod breakdown, and a
+# parameter-sensitivity grid over quantile_threshold x hold_days. See
+# TrainingPipeline.fii_dii_flow_stress_test()'s docstring and
+# src/training/fii_dii_flow_stress_test.py for the full methodology.
+#
+# No Kite session needed (see fii-dii-flow-test.yml) - both data
+# sources hit NSE's public archives directly. Re-fetches the same
+# ~5-year window fii-dii-flow-test.yml does (each workflow run gets a
+# fresh runner with no persisted cache), so this is similarly slow
+# (~11-12 minutes per source fetching cold) - timeout-minutes is set
+# well above that, and the stress test's own extra work (a
+# quantile_threshold x hold_days grid of backtest re-runs) is cheap by
+# comparison since it reuses the same already-fetched data.
+#
+# No ML model training at all, so like the other recent diagnostics this
+# runs directly on a plain ubuntu-latest runner - no RunPod GPU pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: fii-dii-flow-stress-test
+  cancel-in-progress: false
+
+jobs:
+  fii-dii-flow-stress-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-fii-dii-flow.txt
+
+      - name: Run fii-dii-flow stress test
+        working-directory: astra-trade-qml
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode fii-dii-flow-stress-test | tee /tmp/fii_dii_flow_stress_test.log
+
+      - name: Summarize fii-dii-flow stress test run
+        if: always()
+        run: |
+          {
+            echo "### FII/DII institutional-flow stress test run"
+            echo
+            echo '```'
+            grep -E "fii_dii_flow_stress_test_started|fii_dii_flow_stress_test_sample_size|fii_dii_flow_stress_test_primary_result|fii_dii_flow_stress_test_significance|fii_dii_flow_stress_test_bootstrap_sharpe|fii_dii_flow_stress_test_subperiod|fii_dii_flow_stress_test_grid_point|fii_dii_flow_stress_test_complete" /tmp/fii_dii_flow_stress_test.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

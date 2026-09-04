@@ -1,0 +1,40 @@
+# Astra-Trade QML - FII/DII Institutional-Flow Diagnostic (plain CI runner, no GPU)
+#
+# TrainingPipeline.fii_dii_flow_backtest()/.fii_dii_flow_stress_test()
+# involve no ML model training at all (a rolling-quantile signal, a
+# trade-level backtest, and a t-test/bootstrap/grid-search stress
+# test), so this runs directly on a plain ubuntu-latest GitHub Actions
+# runner instead of a rented RunPod GPU pod - see
+# .github/workflows/fii-dii-flow-test.yml /
+# fii-dii-flow-stress-test.yml. Also, uniquely among this session's
+# diagnostics, needs NO Kite session at all - both data sources
+# (src/data/participant_oi.py, src/data/index_close.py) hit NSE's
+# public archives directly, so kiteconnect/pyotp/websocket-client are
+# kept only because importing TrainingPipeline still transitively
+# needs them importable, not because this path calls Kite.
+
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+pyyaml>=6.0
+python-dotenv>=1.0
+python-dateutil>=2.8
+pytz>=2023.3
+
+requests>=2.31
+yfinance>=0.2.40
+
+scikit-learn>=1.5
+xgboost>=2.0
+statsmodels>=0.14
+
+--index-url https://download.pytorch.org/whl/cpu
+torch>=2.4
+--extra-index-url https://pypi.org/simple
+
+SQLAlchemy>=2.0
+structlog>=23.1
+
+kiteconnect>=4.2
+websocket-client>=1.6
+pyotp>=2.9

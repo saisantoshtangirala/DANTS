@@ -17,6 +17,8 @@ Usage:
     python3 -m src.main --mode factor-stress-test   # stress-test: momentum factor result significance/sensitivity
     python3 -m src.main --mode midcap-momentum-test # diagnostic: momentum factor tilt over a disjoint mid/small-cap universe, quarterly rebalance
     python3 -m src.main --mode midcap-momentum-stress-test  # stress-test: midcap-momentum-test result significance/sensitivity
+    python3 -m src.main --mode fii-dii-flow-test     # diagnostic: NSE FII/DII institutional-flow signal, no ML model
+    python3 -m src.main --mode fii-dii-flow-stress-test  # stress-test: fii-dii-flow-test result significance/sensitivity
 """
 
 import argparse
@@ -1127,6 +1129,121 @@ def run_midcap_momentum_stress_test(config: dict, logger) -> None:
     logger.info("midcap_momentum_stress_test_complete")
 
 
+def run_fii_dii_flow_test(config: dict, logger) -> None:
+    """Diagnostic: the strategy this session's exploratory analysis of
+    NSE's daily FII/DII institutional-flow data actually found (DII's
+    5-day change in net NIFTY index-futures positioning predicts
+    NIFTY 50's forward return), rather than a strategy picked from a
+    template and tested against data. See
+    TrainingPipeline.fii_dii_flow_backtest()'s docstring and
+    src/training/fii_dii_flow.py for the full methodology and the
+    robustness checks that preceded any of this code being written.
+    Unlike every other diagnostic this session, needs no Kite session -
+    both its data sources (src/data/participant_oi.py,
+    src/data/index_close.py) hit NSE's public archives directly."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_test_started")
+    result = pipeline.fii_dii_flow_backtest()
+    logger.info("fii_dii_flow_test_sample_size", n_days_with_data=result.get("n_days_with_data"), n_trades=result.get("n_trades"))
+
+    for split_name in ("train", "oos"):
+        report = result.get(split_name) or {}
+        if not report:
+            continue
+        logger.info(
+            "fii_dii_flow_test_result",
+            split=split_name,
+            total_trades=report.get("total_trades"),
+            win_rate=report.get("win_rate"),
+            avg_trade_return_pct=report.get("avg_trade_return_pct"),
+            sharpe_ratio=report.get("sharpe_ratio"),
+            trades_per_year=report.get("trades_per_year"),
+            max_drawdown_pct=report.get("max_drawdown_pct"),
+            profit_factor=report.get("profit_factor"),
+            expectancy=report.get("expectancy"),
+        )
+
+    logger.info("fii_dii_flow_test_complete")
+
+
+def run_fii_dii_flow_stress_test(config: dict, logger) -> None:
+    """Diagnostic: stress-tests fii_dii_flow_test's result - a
+    one-sample significance test on OOS trades, a bootstrap Sharpe CI
+    (annualized at the split's actual trade frequency), a subperiod
+    breakdown, and a parameter-sensitivity grid. See
+    TrainingPipeline.fii_dii_flow_stress_test()'s docstring for the
+    full methodology. No Kite session needed (see run_fii_dii_flow_test)."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_stress_test_started")
+    result = pipeline.fii_dii_flow_stress_test()
+
+    primary = result["primary"]
+    logger.info(
+        "fii_dii_flow_stress_test_sample_size",
+        n_days_with_data=primary.get("n_days_with_data"),
+        n_trades=primary.get("n_trades"),
+    )
+    for split in ("train", "oos"):
+        stats = primary.get(split) or {}
+        if not stats:
+            continue
+        logger.info(
+            "fii_dii_flow_stress_test_primary_result",
+            split=split,
+            total_trades=stats.get("total_trades"),
+            sharpe_ratio=stats.get("sharpe_ratio"),
+            trades_per_year=stats.get("trades_per_year"),
+            avg_trade_return_pct=stats.get("avg_trade_return_pct"),
+            max_drawdown_pct=stats.get("max_drawdown_pct"),
+        )
+
+    sig = result["oos_significance"]
+    logger.info(
+        "fii_dii_flow_stress_test_significance",
+        n_trades=sig.get("n_trades"),
+        mean_return_pct=sig.get("mean_return_pct"),
+        t_stat=sig.get("t_stat"),
+        p_value=sig.get("p_value"),
+    )
+
+    boot = result["oos_bootstrap_sharpe_ci"]
+    logger.info(
+        "fii_dii_flow_stress_test_bootstrap_sharpe",
+        n_periods=boot.get("n_periods"),
+        sharpe_median=boot.get("sharpe_median"),
+        ci_low_5pct=boot.get("ci_low_5pct"),
+        ci_high_95pct=boot.get("ci_high_95pct"),
+    )
+
+    for bucket in result["oos_subperiod_breakdown"]:
+        logger.info(
+            "fii_dii_flow_stress_test_subperiod",
+            start_date=bucket.get("start_date"),
+            end_date=bucket.get("end_date"),
+            n_periods=bucket.get("n_periods"),
+            fii_dii_flow=bucket.get("fii_dii_flow"),
+        )
+
+    for combo in result["parameter_grid"]:
+        logger.info(
+            "fii_dii_flow_stress_test_grid_point",
+            quantile_threshold=combo.get("quantile_threshold"),
+            hold_days=combo.get("hold_days"),
+            oos_n_trades=combo.get("oos_n_trades"),
+            oos_sharpe=combo.get("oos_sharpe"),
+            oos_win_rate=combo.get("oos_win_rate"),
+            oos_positive_sharpe=combo.get("oos_positive_sharpe"),
+        )
+
+    logger.info("fii_dii_flow_stress_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -1147,7 +1264,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1190,6 +1307,10 @@ def main() -> None:
         run_midcap_momentum_test(config, logger)
     elif args.mode == "midcap-momentum-stress-test":
         run_midcap_momentum_stress_test(config, logger)
+    elif args.mode == "fii-dii-flow-test":
+        run_fii_dii_flow_test(config, logger)
+    elif args.mode == "fii-dii-flow-stress-test":
+        run_fii_dii_flow_stress_test(config, logger)
 
 
 if __name__ == "__main__":
