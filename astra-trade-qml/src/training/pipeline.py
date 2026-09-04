@@ -1948,6 +1948,81 @@ class TrainingPipeline:
             "parameter_grid": grid,
         }
 
+    def fii_dii_flow_paper_step(
+        self,
+        state_path: str = "paper_trading/fii_dii_flow_state.json",
+        symbol: str = "NIFTYBEES",
+        flow_lookback_days: int = 5,
+        trailing_window: int = 252,
+        quantile_threshold: float = 0.8,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        lookback_days: int = 450,
+    ) -> Dict[str, Any]:
+        """
+        One resumable daily paper-trading step for the FII/DII
+        institutional-flow strategy - see
+        src/trading/fii_dii_flow_paper.py's module docstring for the
+        full design (why git-persisted JSON state, the execution-price
+        approximation, and why a fresh state doesn't backfill history
+        as paper trades).
+
+        Unlike fii_dii_flow_backtest()/fii_dii_flow_stress_test(),
+        which used the NIFTY 50 index level / 100 as a documented
+        NIFTYBEES approximation, this uses REAL NIFTYBEES traded
+        prices (src/data/equity_bhavcopy.py, NSE's per-symbol daily
+        bhavcopy+delivery archive) - the actual instrument this
+        account would hold, now that real data for it is available.
+        Also uses a much shorter lookback_days (default 450 calendar
+        days, ~300 trading days) than the backtest's full 5-year
+        window - live signal generation only needs trailing_window's
+        worth of history plus warmup, not the whole walk-forward
+        evaluation period, so this fetches far faster (~4-6 minutes
+        cold vs. ~11-20 for the full backtest).
+
+        Returns the updated state dict (open_tranches, closed_trades,
+        cumulative_pnl, and this run's own events) - the caller is
+        responsible for persisting it back to state_path.
+        """
+        import json
+        from pathlib import Path
+
+        from src.data.equity_bhavcopy import EquityBhavcopyProvider
+        from src.data.participant_oi import ParticipantOIProvider, compute_net_positioning
+        from src.trading.fii_dii_flow_paper import advance_paper_state, new_empty_state
+
+        state_file = Path(state_path)
+        if state_file.exists():
+            state = json.loads(state_file.read_text())
+        else:
+            state = new_empty_state()
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=lookback_days)
+
+        oi_provider = ParticipantOIProvider()
+        panel = oi_provider.fetch_range(start_date, end_date)
+        net_positioning = compute_net_positioning(panel)
+        dii_net_index_future = net_positioning["dii_net_index_future"] if not net_positioning.empty else net_positioning
+
+        price_provider = EquityBhavcopyProvider()
+        price_df = price_provider.fetch_symbol_range(symbol, start_date, end_date)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        new_state = advance_paper_state(
+            state, price_df, dii_net_index_future, cost_calc, initial_capital,
+            flow_lookback_days=flow_lookback_days, trailing_window=trailing_window,
+            quantile_threshold=quantile_threshold, hold_days=hold_days,
+            max_concurrent_positions=max_concurrent_positions,
+        )
+
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(json.dumps(new_state, indent=2, default=str))
+
+        return new_state
+
     def orb_backtest(
         self,
         symbols: Optional[List[str]] = None,

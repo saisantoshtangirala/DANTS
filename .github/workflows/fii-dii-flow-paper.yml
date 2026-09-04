@@ -1,0 +1,92 @@
+name: FII/DII Flow Paper Trading (Daily Step)
+
+# One resumable daily paper-trading step for the FII/DII institutional-
+# flow strategy - the first result this session validated well enough
+# to actually paper-trade (OOS Sharpe ~2.1, p=0.014 one-sample
+# significance, bootstrap 90% CI [0.81, 3.36], 20/20 parameter-grid
+# points positive, confirmed on an independent CI data pull separate
+# from the exploratory run that first found it). See
+# TrainingPipeline.fii_dii_flow_paper_step()'s docstring and
+# src/trading/fii_dii_flow_paper.py for the full design.
+#
+# State (open tranches + the full closed-trade journal) is git-
+# persisted JSON, not this codebase's usual gitignored
+# logs/astra_trade.db - this environment has no persistent server (see
+# config.yaml's infrastructure.trading_host), so the repo itself is
+# the only durable store actually available. This workflow commits
+# paper_trading/fii_dii_flow_state.json back to THIS branch after
+# every run - a real, ongoing repository-mutating side effect, done
+# deliberately per explicit instruction to start paper trading this
+# strategy, and confined to a single dedicated JSON file.
+#
+# No Kite session needed - both data sources hit NSE's public archives
+# directly. Uses a short (450-day) lookback for speed (~4-6 minutes
+# cold, not the full backtest's ~11-20), so this fits comfortably
+# within a lower timeout than the other fii-dii-flow workflows.
+#
+# Runs on a schedule (weekdays, 21:00 IST = 15:30 UTC - safely after
+# NSE typically publishes both the day's bhavcopy and participant-OI
+# archives) and supports workflow_dispatch for manual/catch-up runs.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "30 15 * * 1-5"
+
+concurrency:
+  group: fii-dii-flow-paper
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  fii-dii-flow-paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/unzip-and-explain-agpb8s
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-fii-dii-flow.txt
+
+      - name: Run fii-dii-flow paper-trading step
+        working-directory: astra-trade-qml
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode fii-dii-flow-paper | tee /tmp/fii_dii_flow_paper.log
+
+      - name: Summarize paper-trading step
+        if: always()
+        run: |
+          {
+            echo "### FII/DII flow paper-trading step"
+            echo
+            echo '```'
+            grep -E "fii_dii_flow_paper_step_started|fii_dii_flow_paper_step_state|fii_dii_flow_paper_step_event|fii_dii_flow_paper_step_no_action|fii_dii_flow_paper_step_complete" /tmp/fii_dii_flow_paper.log \
+              || echo "(no matching result lines captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit updated paper-trading state
+        working-directory: astra-trade-qml
+        run: |
+          if git diff --quiet -- paper_trading/fii_dii_flow_state.json && [ -z "$(git status --porcelain -- paper_trading/fii_dii_flow_state.json)" ]; then
+            echo "No state change - nothing to commit."
+            exit 0
+          fi
+          git config user.name "astra-trade-bot"
+          git config user.email "astra-trade-bot@users.noreply.github.com"
+          git add paper_trading/fii_dii_flow_state.json
+          git commit -m "fii-dii-flow paper trading: daily state update ($(date -u +%Y-%m-%d))"
+          git push origin HEAD:claude/unzip-and-explain-agpb8s

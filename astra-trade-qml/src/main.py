@@ -19,6 +19,7 @@ Usage:
     python3 -m src.main --mode midcap-momentum-stress-test  # stress-test: midcap-momentum-test result significance/sensitivity
     python3 -m src.main --mode fii-dii-flow-test     # diagnostic: NSE FII/DII institutional-flow signal, no ML model
     python3 -m src.main --mode fii-dii-flow-stress-test  # stress-test: fii-dii-flow-test result significance/sensitivity
+    python3 -m src.main --mode fii-dii-flow-paper    # one resumable daily paper-trading step (git-persisted state)
 """
 
 import argparse
@@ -1244,6 +1245,44 @@ def run_fii_dii_flow_stress_test(config: dict, logger) -> None:
     logger.info("fii_dii_flow_stress_test_complete")
 
 
+def run_fii_dii_flow_paper(config: dict, logger) -> None:
+    """One resumable daily paper-trading step for the FII/DII
+    institutional-flow strategy - the first result this session
+    validated well enough to actually paper-trade (OOS Sharpe ~2.1,
+    p=0.014, confirmed on an independent data pull). See
+    TrainingPipeline.fii_dii_flow_paper_step()'s docstring and
+    src/trading/fii_dii_flow_paper.py for the full design: git-
+    persisted JSON state (this environment has no persistent server -
+    see config.yaml's infrastructure.trading_host - so state is
+    committed back to the repo after every run, not held in the usual
+    gitignored logs/astra_trade.db), real NIFTYBEES prices (not the
+    backtest's NIFTY-index/100 approximation), and why a fresh state
+    doesn't backfill 5 years of history as paper trades. No Kite
+    session needed - both data sources hit NSE's public archives
+    directly."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_paper_step_started")
+    state = pipeline.fii_dii_flow_paper_step()
+
+    logger.info(
+        "fii_dii_flow_paper_step_state",
+        last_processed_signal_date=state.get("last_processed_signal_date"),
+        n_open_tranches=state.get("n_open_tranches"),
+        n_closed_trades=state.get("n_closed_trades"),
+        cumulative_pnl=state.get("cumulative_pnl"),
+    )
+    for event in state.get("events", []):
+        logger.info("fii_dii_flow_paper_step_event", **event)
+
+    if not state.get("events"):
+        logger.info("fii_dii_flow_paper_step_no_action", reason="no signal fired and no tranche reached hold_days today")
+
+    logger.info("fii_dii_flow_paper_step_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -1264,7 +1303,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1311,6 +1350,8 @@ def main() -> None:
         run_fii_dii_flow_test(config, logger)
     elif args.mode == "fii-dii-flow-stress-test":
         run_fii_dii_flow_stress_test(config, logger)
+    elif args.mode == "fii-dii-flow-paper":
+        run_fii_dii_flow_paper(config, logger)
 
 
 if __name__ == "__main__":
