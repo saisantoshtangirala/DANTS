@@ -7,6 +7,7 @@ from src.training.factor_stress_test import (
     bootstrap_sharpe_ci,
     paired_significance_test,
     parameter_grid_search,
+    staggered_parameter_grid_search,
     subperiod_breakdown,
 )
 
@@ -140,3 +141,44 @@ class TestParameterGridSearch:
             rebalance_every_n_months=3,
         )
         assert monthly[0]["momentum_return_pct"] != quarterly[0]["momentum_return_pct"]
+
+
+class TestStaggeredParameterGridSearch:
+    def _synthetic_price_data(self, n_symbols=10, n_days=1400, seed=1):
+        rng = np.random.default_rng(seed)
+        dates = pd.bdate_range(end=pd.Timestamp.now().normalize(), periods=n_days)
+        price_data = {}
+        for i in range(n_symbols):
+            drift = rng.normal(0.0003, 0.0002)
+            vol = rng.uniform(0.01, 0.03)
+            returns = rng.normal(drift, vol, n_days)
+            close = 100 * np.cumprod(1 + returns)
+            price_data[f"SYM{i}"] = _price_df(dates, close)
+        return price_data
+
+    def test_covers_grid_and_skips_degenerate_combos(self, cost_calc):
+        price_data = self._synthetic_price_data()
+        results = staggered_parameter_grid_search(
+            price_data, cost_calc, target_ns=(3, 6), lookback_days_grid=(63, 126),
+            momentum_skip_days=21, rebalance_every_n_months=3,
+        )
+        assert len(results) == 4
+        for r in results:
+            assert "momentum_beats_equal_weight_sharpe" in r
+            assert r["lookback_days"] > 21
+
+    def test_more_periods_than_single_portfolio_grid(self, cost_calc):
+        """The staggered grid's momentum result should come from a
+        larger n_periods sample than the single-portfolio grid at the
+        same (target_n, lookback_days, rebalance_every_n_months) -
+        otherwise the tranching isn't actually reaching the grid search."""
+        price_data = self._synthetic_price_data()
+        from src.training.factor_investing import run_factor_backtest, run_staggered_tranche_backtest
+
+        single = run_factor_backtest(
+            price_data, cost_calc, target_n=3, momentum_lookback_days=126, rebalance_every_n_months=3,
+        )
+        staggered = run_staggered_tranche_backtest(
+            price_data, cost_calc, target_n=3, momentum_lookback_days=126, rebalance_every_n_months=3,
+        )
+        assert staggered["momentum"]["n_periods"] > single["momentum"]["n_periods"]

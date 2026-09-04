@@ -48,7 +48,7 @@ import numpy as np
 from scipy import stats
 
 from src.trading.costs import CostCalculator
-from src.training.factor_investing import run_factor_backtest
+from src.training.factor_investing import run_factor_backtest, run_staggered_tranche_backtest
 
 
 def paired_significance_test(returns_a: Sequence[float], returns_b: Sequence[float]) -> Dict[str, Any]:
@@ -170,6 +170,50 @@ def parameter_grid_search(
                 continue
             try:
                 r = run_factor_backtest(
+                    price_data, cost_calc, target_n=target_n,
+                    momentum_lookback_days=lookback_days, momentum_skip_days=momentum_skip_days,
+                    vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
+                )
+            except RuntimeError:
+                continue
+
+            momentum, equal_weight = r["momentum"], r["equal_weight_all"]
+            results.append({
+                "target_n": target_n,
+                "lookback_days": lookback_days,
+                "momentum_sharpe": momentum["annualized_sharpe"],
+                "momentum_return_pct": momentum["total_return_pct"],
+                "equal_weight_sharpe": equal_weight["annualized_sharpe"],
+                "equal_weight_return_pct": equal_weight["total_return_pct"],
+                "momentum_beats_equal_weight_sharpe": momentum["annualized_sharpe"] > equal_weight["annualized_sharpe"],
+            })
+    return results
+
+
+def staggered_parameter_grid_search(
+    price_data: Dict[str, Any],
+    cost_calc: CostCalculator,
+    target_ns: Sequence[int] = (3, 6, 9),
+    lookback_days_grid: Sequence[int] = (63, 126, 189, 252),
+    momentum_skip_days: int = 21,
+    vol_lookback_days: int = 60,
+    rebalance_every_n_months: int = 3,
+) -> List[Dict[str, Any]]:
+    """parameter_grid_search's counterpart for
+    run_staggered_tranche_backtest (see its docstring in
+    factor_investing.py) - same (target_n, lookback_days) grid and same
+    degenerate-combo skip, but re-running the LADDERED backtest at each
+    point instead of the single-portfolio one, so the parameter-
+    sensitivity check itself benefits from the tranching's extra
+    statistical power rather than being left on the noisier n=18-period
+    engine while only the headline result gets upgraded."""
+    results = []
+    for target_n in target_ns:
+        for lookback_days in lookback_days_grid:
+            if lookback_days <= momentum_skip_days:
+                continue
+            try:
+                r = run_staggered_tranche_backtest(
                     price_data, cost_calc, target_n=target_n,
                     momentum_lookback_days=lookback_days, momentum_skip_days=momentum_skip_days,
                     vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,

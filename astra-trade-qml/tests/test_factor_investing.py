@@ -9,6 +9,7 @@ from src.training.factor_investing import (
     momentum_scores,
     monthly_rebalance_dates,
     run_factor_backtest,
+    run_staggered_tranche_backtest,
 )
 
 
@@ -176,3 +177,71 @@ class TestRunFactorBacktest:
         # Same underlying process, different annualization base - the two
         # Sharpe ratios should not just be trivially rescaled by chance.
         assert monthly["equal_weight_all"]["annualized_sharpe"] != quarterly["equal_weight_all"]["annualized_sharpe"]
+
+
+class TestRunStaggeredTrancheBacktest:
+    def _synthetic_price_data(self, n_symbols=10, n_days=1400, seed=1):
+        rng = np.random.default_rng(seed)
+        dates = pd.bdate_range(end=pd.Timestamp.now().normalize(), periods=n_days)
+        price_data = {}
+        for i in range(n_symbols):
+            drift = rng.normal(0.0003, 0.0002)
+            vol = rng.uniform(0.01, 0.03)
+            returns = rng.normal(drift, vol, n_days)
+            close = 100 * np.cumprod(1 + returns)
+            price_data[f"SYM{i}"] = _price_df(dates, close)
+        return price_data
+
+    def test_produces_roughly_n_tranches_times_more_periods_than_single_portfolio(self, cost_calc):
+        price_data = self._synthetic_price_data()
+        single = run_factor_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        staggered = run_staggered_tranche_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        # 3 tranches -> roughly 3x the calendar-month observations of the
+        # single quarterly-rebalanced portfolio over the same history.
+        ratio = staggered["momentum"]["n_periods"] / single["momentum"]["n_periods"]
+        assert 2.5 <= ratio <= 3.5
+
+    def test_default_n_tranches_matches_rebalance_every_n_months(self, cost_calc):
+        price_data = self._synthetic_price_data()
+        result = run_staggered_tranche_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=4)
+        assert result["momentum"]["n_tranches"] == 4
+
+    def test_total_cost_drag_is_comparable_to_single_portfolio_quarterly(self, cost_calc):
+        """Same total trading volume as the single-portfolio quarterly
+        backtest over the same window - staggering spreads WHEN the
+        trading happens, not how much of it there is."""
+        price_data = self._synthetic_price_data()
+        single = run_factor_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        staggered = run_staggered_tranche_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        single_drag = single["momentum"]["total_cost_drag_pct"]
+        staggered_drag = staggered["momentum"]["total_cost_drag_pct"]
+        assert staggered_drag == pytest.approx(single_drag, rel=0.3)
+
+    def test_first_months_include_idle_untranched_capital(self, cost_calc):
+        """The first (n_tranches - 1) months have fewer than n_tranches
+        tranches initialized, so equal_weight_all's return those months
+        should be smaller in magnitude than a fully-rotated month (idle
+        cash drags toward exactly 0, not toward the full basket's
+        return)."""
+        price_data = self._synthetic_price_data()
+        result = run_staggered_tranche_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+        early_returns = result["equal_weight_all"]["period_returns"][:2]
+        later_returns = result["equal_weight_all"]["period_returns"][6:8]
+        assert np.mean(np.abs(early_returns)) < np.mean(np.abs(later_returns))
+
+    def test_raises_with_too_little_history(self, cost_calc):
+        price_data = self._synthetic_price_data(n_days=200)
+        with pytest.raises(RuntimeError):
+            run_staggered_tranche_backtest(price_data, cost_calc, target_n=3, rebalance_every_n_months=3)
+
+    def test_n_tranches_independent_of_rebalance_every_n_months_stays_correct(self, cost_calc):
+        """n_tranches=2 with rebalance_every_n_months=3 leaves some
+        months with no tranche due (neither tranche 0 nor tranche 1's
+        (i - t) % 3 == 0) - should still run without error and produce
+        one period per calendar month regardless."""
+        price_data = self._synthetic_price_data()
+        result = run_staggered_tranche_backtest(
+            price_data, cost_calc, target_n=3, rebalance_every_n_months=3, n_tranches=2,
+        )
+        assert result["momentum"]["n_tranches"] == 2
+        assert result["momentum"]["n_periods"] > 0

@@ -262,3 +262,157 @@ def run_factor_backtest(
             **stats,
         }
     return results
+
+
+def run_staggered_tranche_backtest(
+    price_data: Dict[str, pd.DataFrame],
+    cost_calc: CostCalculator,
+    target_n: int = 6,
+    momentum_lookback_days: int = 126,
+    momentum_skip_days: int = 21,
+    vol_lookback_days: int = 60,
+    rebalance_every_n_months: int = 3,
+    n_tranches: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Staggered/laddered variant of run_factor_backtest, built to answer a
+    direct question: a quarterly-rebalanced portfolio over ~4.5 years of
+    history gives only ~18 independent return observations - too few for
+    a paired significance test to have real power, and simply
+    rebalancing more often (monthly) reintroduces the turnover/cost drag
+    quarterly rebalancing exists to avoid. Real funds solve exactly this
+    tradeoff with a laddered portfolio: split capital into n_tranches
+    (default: rebalance_every_n_months, so quarterly -> 3 tranches)
+    equal sub-portfolios. Tranche t rebalances at calendar month t, then
+    t+rebalance_every_n_months, t+2*rebalance_every_n_months, and so on -
+    each INDIVIDUAL position is still held for the same
+    rebalance_every_n_months months (same low per-rebalance turnover,
+    same cost per event). With the default n_tranches ==
+    rebalance_every_n_months, this offsets every tranche by exactly one
+    month from the next, so exactly one tranche is due to rebalance each
+    calendar month and the COMBINED portfolio produces a genuine monthly
+    return series - roughly n_tranches times more independent
+    observations from the same underlying price history, at the same
+    total trading volume (and therefore the same total cost drag) just
+    spread evenly across months instead of concentrated once a quarter.
+    (n_tranches can be set independently of rebalance_every_n_months,
+    but then some months have no tranche due - or, if n_tranches >
+    rebalance_every_n_months, more than one - which stays correct but
+    no longer perfectly smooths one rebalance per month; the default
+    keeps them equal deliberately.) This is a real portfolio-
+    construction technique, not a statistical trick: every tranche's
+    monthly return is a real, non-overlapping holding-period return, so
+    - unlike overlapping rolling windows - no autocorrelation adjustment
+    is needed for the paired significance test or bootstrap CI
+    downstream.
+
+    A tranche that hasn't had its first rebalance yet (the initial
+    (n_tranches - 1)-month rotation) contributes exactly 0% that month -
+    real idle cash, reported honestly rather than hidden or backfilled.
+
+    Returns the same shape as run_factor_backtest
+    ({"momentum": {...}, "low_vol": {...}, "equal_weight_all": {...}}),
+    plus "n_tranches" in each strategy's stats. n_periods now counts
+    calendar months (not rebalance cycles), and annualized_sharpe uses
+    periods_per_year=12.0 unconditionally - the combined series IS
+    monthly regardless of rebalance_every_n_months.
+    """
+    n_tranches = n_tranches if n_tranches is not None else rebalance_every_n_months
+    if n_tranches < 1:
+        raise ValueError("n_tranches must be >= 1.")
+
+    panel = build_return_panel(price_data)
+    warmup = max(momentum_lookback_days, vol_lookback_days) + 5
+    month_starts = monthly_rebalance_dates(panel.index, warmup_days=warmup, every_n_months=1)
+    if len(month_starts) < n_tranches * 2:
+        raise RuntimeError(
+            f"Only {len(month_starts)} monthly dates available; need at least {n_tranches * 2} "
+            f"(2 full rotations of {n_tranches} tranches). Need more price history."
+        )
+
+    round_trip_cost_pct = _representative_round_trip_cost_pct(cost_calc)
+    date_to_idx = {d: i for i, d in enumerate(panel.index)}
+    all_symbols = list(panel.columns)
+    equal_all_weights = {s: 1.0 / len(all_symbols) for s in all_symbols}
+
+    strategies = ("momentum", "low_vol", "equal_weight_all")
+    tranche_weights: Dict[str, List[Dict[str, float]]] = {s: [dict() for _ in range(n_tranches)] for s in strategies}
+    combined_period_returns: Dict[str, List[float]] = {s: [] for s in strategies}
+    # raw_turnovers: per-rebalance-event turnover as a fraction of THAT
+    # TRANCHE's own capital (same interpretation/magnitude as
+    # run_factor_backtest's turnover - "how much of the reshuffling
+    # tranche got churned"), used for avg_turnover_pct. portfolio_scaled_
+    # turnovers: the same events scaled by 1/n_tranches (that tranche is
+    # only 1/n_tranches of TOTAL capital), used for total_cost_drag_pct
+    # so it stays comparable to the single-portfolio case's total cost
+    # (same total capital-weighted trading over the same window, just
+    # spread across more, smaller events) instead of appearing
+    # ~n_tranches times inflated.
+    raw_turnovers: Dict[str, List[float]] = {s: [] for s in strategies}
+    portfolio_scaled_turnovers: Dict[str, List[float]] = {s: [] for s in strategies}
+    period_dates: List = []
+
+    for i in range(len(month_starts) - 1):
+        month_date, next_month_date = month_starts[i], month_starts[i + 1]
+        as_of_idx, end_idx = date_to_idx[month_date], date_to_idx[next_month_date]
+        period_dates.append(month_date)
+
+        # Tranche t's own rebalance schedule is t, t + rebalance_every_n_months,
+        # t + 2*rebalance_every_n_months, ... - independent of n_tranches, so
+        # this stays correct even if a caller sets n_tranches != rebalance_every_n_months
+        # (the intended/default case has them equal, giving exactly one due
+        # tranche every month; other combos may leave a month with none due,
+        # or - if n_tranches > rebalance_every_n_months - more than one).
+        due_tranches = [t for t in range(n_tranches) if i >= t and (i - t) % rebalance_every_n_months == 0]
+
+        mom = momentum_scores(panel, as_of_idx, momentum_lookback_days, momentum_skip_days)
+        vol = low_vol_scores(panel, as_of_idx, vol_lookback_days)
+        momentum_top = mom.sort_values(ascending=False).head(target_n).index.tolist() if mom is not None else None
+        low_vol_top = vol.sort_values(ascending=False).head(target_n).index.tolist() if vol is not None else None
+
+        new_weights_by_strategy = {
+            "equal_weight_all": equal_all_weights,
+            "momentum": {s: 1.0 / len(momentum_top) for s in momentum_top} if momentum_top else None,
+            "low_vol": {s: 1.0 / len(low_vol_top) for s in low_vol_top} if low_vol_top else None,
+        }
+
+        start_prices, end_prices = panel.iloc[as_of_idx], panel.iloc[end_idx]
+        for strategy in strategies:
+            new_weights = new_weights_by_strategy[strategy]
+            rebalance_turnover_by_tranche: Dict[int, float] = {}
+            if new_weights is not None:
+                for t in due_tranches:
+                    turnover = _turnover(tranche_weights[strategy][t], new_weights)
+                    tranche_weights[strategy][t] = new_weights
+                    rebalance_turnover_by_tranche[t] = turnover
+                    raw_turnovers[strategy].append(turnover)
+                    portfolio_scaled_turnovers[strategy].append(turnover / n_tranches)
+
+            month_contribution = 0.0
+            for t in range(n_tranches):
+                w = tranche_weights[strategy][t]
+                if not w:
+                    continue  # this tranche hasn't had its first rebalance yet - idle cash, 0% contribution
+                symbol_returns = (end_prices[list(w.keys())] / start_prices[list(w.keys())]) - 1.0
+                gross = float(sum(w[s] * symbol_returns[s] for s in w))
+                if t in rebalance_turnover_by_tranche:
+                    gross -= rebalance_turnover_by_tranche[t] * round_trip_cost_pct
+                month_contribution += gross / n_tranches
+
+            combined_period_returns[strategy].append(month_contribution)
+
+    results = {}
+    for strategy in strategies:
+        stats = _equity_stats(combined_period_returns[strategy], periods_per_year=12.0)
+        avg_turnover = float(np.mean(raw_turnovers[strategy])) if raw_turnovers[strategy] else 0.0
+        total_cost_drag_pct = float(sum(portfolio_scaled_turnovers[strategy]) * round_trip_cost_pct * 100.0)
+        results[strategy] = {
+            "n_periods": len(combined_period_returns[strategy]),
+            "n_tranches": n_tranches,
+            "avg_turnover_pct": avg_turnover * 100.0,
+            "total_cost_drag_pct": total_cost_drag_pct,
+            "period_returns": list(combined_period_returns[strategy]),
+            "period_dates": list(period_dates),
+            **stats,
+        }
+    return results

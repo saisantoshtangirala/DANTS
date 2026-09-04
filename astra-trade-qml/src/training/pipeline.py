@@ -36,11 +36,12 @@ from src.training.event_drift import (
     detect_reaction_events,
     summarize_continuation,
 )
-from src.training.factor_investing import run_factor_backtest
+from src.training.factor_investing import run_factor_backtest, run_staggered_tranche_backtest
 from src.training.factor_stress_test import (
     bootstrap_sharpe_ci,
     paired_significance_test,
     parameter_grid_search,
+    staggered_parameter_grid_search,
     subperiod_breakdown,
 )
 from src.training.orb import run_orb_backtest
@@ -1564,24 +1565,34 @@ class TrainingPipeline:
     ) -> Dict[str, Any]:
         """
         Diagnostic: re-runs the momentum/low-vol factor-tilt methodology
-        (factor_investing_backtest, run_factor_backtest) against a
-        genuinely different universe - config.yaml's
+        against a genuinely different universe - config.yaml's
         data.symbols.midcap_smallcap_factor_universe, ~40 liquid NSE
         mid/small-cap names disjoint from the 18-symbol large-cap
         equity_universe every prior diagnostic this session used - with
-        two changes the momentum stress test's own findings motivated,
-        not applied blindly:
+        changes the momentum stress test's own findings motivated, not
+        applied blindly:
 
-        1. rebalance_every_n_months=3 (quarterly, ~3-month holds) instead
-           of the original monthly rebalance. Turnover/cost-drag was the
-           stress test's clearest, most direct lever (see
-           run_factor_backtest's turnover-based cost model) - this tests
-           whether a slower rebalance alone changes the verdict, without
-           also changing the universe as a confound. (The universe change
-           is the real, separate hypothesis under test here: does a
-           momentum premium survive better away from the most efficiently
-           priced, most heavily covered large-cap names.)
-        2. impact_slippage_pct=0.6%/side (vs. the system-wide
+        1. A quarterly (rebalance_every_n_months=3) hold instead of the
+           original monthly rebalance, cutting turnover/cost-drag (the
+           stress test's clearest, most direct lever).
+        2. Run via run_staggered_tranche_backtest, not the plain
+           run_factor_backtest a single-portfolio quarterly rebalance
+           would use. A single quarterly-rebalanced portfolio over
+           ~4.5 years gives only ~18 independent return observations -
+           the FIRST run of this diagnostic found a promising-looking
+           headline number (Sharpe 1.09 vs 0.95) that its own stress
+           test then showed wasn't statistically significant (p=0.489,
+           actually worse than the large-cap monthly case's already-
+           failing p=0.108) precisely because n=18 is too small a
+           sample for a paired t-test to have real power. The staggered/
+           laddered engine splits capital into 3 tranches rebalanced on
+           the SAME quarterly cadence but offset by a month from each
+           other, giving a genuine monthly return series (~3x the
+           observations) at the same total trading volume and cost -
+           see run_staggered_tranche_backtest's docstring for why this
+           is a real portfolio-construction fix, not a statistical
+           trick.
+        3. impact_slippage_pct=0.6%/side (vs. the system-wide
            slippage_pct of 0.05%/side in trading.costs, calibrated for
            this account's large-cap order sizes) - smaller-cap names have
            materially wider effective spreads and market impact, and
@@ -1599,8 +1610,8 @@ class TrainingPipeline:
         calculation compute_liquidity() uses for the intraday universe -
         a momentum tilt only tradable in illiquid names isn't a real
         edge. Returns {"results": {...same shape as
-        factor_investing_backtest...}, "universe": {...counts and the
-        dropped-symbol list, so a thin surviving universe is visible
+        run_staggered_tranche_backtest...}, "universe": {...counts and
+        the dropped-symbol list, so a thin surviving universe is visible
         rather than hidden}}.
         """
         symbols, price_data, universe_meta = self._liquid_midcap_price_data(
@@ -1611,7 +1622,7 @@ class TrainingPipeline:
         costs_cfg["slippage_pct"] = impact_slippage_pct
         cost_calc = CostCalculator(costs_cfg)
 
-        results = run_factor_backtest(
+        results = run_staggered_tranche_backtest(
             price_data, cost_calc, target_n=target_n,
             momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
             vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
@@ -1620,6 +1631,7 @@ class TrainingPipeline:
         universe_meta.update({
             "impact_slippage_pct": impact_slippage_pct,
             "rebalance_every_n_months": rebalance_every_n_months,
+            "n_tranches": results["equal_weight_all"]["n_tranches"],
         })
         return {"results": results, "universe": universe_meta}
 
@@ -1698,23 +1710,36 @@ class TrainingPipeline:
         exact same bar factor_momentum_stress_test() applied to the
         original 18-symbol large-cap momentum result (which looked
         promising - Sharpe 1.10 vs 0.97 - but failed: p=0.108, only 3/12
-        grid points, a real loss in the earliest subperiod). A quarterly-
-        rebalanced momentum tilt over the mid/small-cap universe beating
-        equal_weight_all's Sharpe on a single run is exactly the same
-        shape of unverified result, over an even smaller sample (quarterly
-        periods over the same history means roughly a third as many
-        observations as the monthly large-cap case had) - so it gets the
-        same three checks before being trusted, not fewer: a paired
-        significance test against equal_weight_all (same calendar
-        quarters, so paired is the correct, more powerful test), a
-        bootstrap confidence interval on momentum's own Sharpe ratio
-        (annualized at 12/rebalance_every_n_months periods/year, not the
-        monthly-only sqrt(12) the original stress test used), a
+        grid points, a real loss in the earliest subperiod).
+
+        Runs against run_staggered_tranche_backtest (see its docstring in
+        factor_investing.py), not the single-portfolio run_factor_backtest.
+        The FIRST version of this stress test used the single-portfolio
+        engine and found the momentum result failed even harder than the
+        large-cap case (p=0.489 vs p=0.108) - not because the mid/small-
+        cap effect was weaker, but because a single quarterly-rebalanced
+        portfolio over ~4.5 years only produces ~18 independent return
+        observations, too few for a paired t-test to have real power
+        regardless of the true effect size. The staggered engine keeps
+        the same quarterly per-position holding period and the same
+        total trading volume/cost, but produces a genuine monthly return
+        series (~3x the observations) by laddering 3 tranches offset by
+        a month from each other - so this version of the stress test can
+        actually distinguish "no real effect" from "not enough data to
+        tell," which the first version could not.
+
+        Same three checks as factor_momentum_stress_test, all now run on
+        the staggered engine's monthly series: a paired significance test
+        against equal_weight_all (same calendar months, so paired is the
+        correct, more powerful test), a bootstrap confidence interval on
+        momentum's own Sharpe ratio (periods_per_year=12.0 - the combined
+        series is genuinely monthly, not 12/rebalance_every_n_months), a
         chronological subperiod breakdown, and a parameter-sensitivity
-        grid search (target_n x momentum_lookback_days, at the SAME
-        quarterly rebalance_every_n_months - varying rebalance cadence
-        too would confound which change is responsible for any result).
-        See src/training/factor_stress_test.py for the full methodology.
+        grid search (staggered_parameter_grid_search - target_n x
+        momentum_lookback_days, at the SAME quarterly
+        rebalance_every_n_months so cadence isn't confounded with
+        parameter choice). See src/training/factor_stress_test.py for the
+        full methodology.
         """
         grid_target_ns = grid_target_ns if grid_target_ns is not None else [4, 8, 12]
         grid_lookback_days = grid_lookback_days if grid_lookback_days is not None else [63, 126, 189, 252]
@@ -1727,7 +1752,7 @@ class TrainingPipeline:
         costs_cfg["slippage_pct"] = impact_slippage_pct
         cost_calc = CostCalculator(costs_cfg)
 
-        primary = run_factor_backtest(
+        primary = run_staggered_tranche_backtest(
             price_data, cost_calc, target_n=target_n,
             momentum_lookback_days=momentum_lookback_days, momentum_skip_days=momentum_skip_days,
             vol_lookback_days=vol_lookback_days, rebalance_every_n_months=rebalance_every_n_months,
@@ -1737,15 +1762,14 @@ class TrainingPipeline:
         low_vol_returns = primary["low_vol"]["period_returns"]
         period_dates = primary["momentum"]["period_dates"]
 
-        periods_per_year = 12.0 / rebalance_every_n_months
         significance = paired_significance_test(momentum_returns, equal_weight_returns)
-        bootstrap = bootstrap_sharpe_ci(momentum_returns, periods_per_year=periods_per_year)
+        bootstrap = bootstrap_sharpe_ci(momentum_returns, periods_per_year=12.0)
         subperiods = subperiod_breakdown(
             period_dates,
             {"momentum": momentum_returns, "equal_weight_all": equal_weight_returns, "low_vol": low_vol_returns},
             n_splits=n_subperiod_splits,
         )
-        grid = parameter_grid_search(
+        grid = staggered_parameter_grid_search(
             price_data, cost_calc, target_ns=grid_target_ns, lookback_days_grid=grid_lookback_days,
             momentum_skip_days=momentum_skip_days, vol_lookback_days=vol_lookback_days,
             rebalance_every_n_months=rebalance_every_n_months,
@@ -1759,6 +1783,7 @@ class TrainingPipeline:
         universe_meta.update({
             "impact_slippage_pct": impact_slippage_pct,
             "rebalance_every_n_months": rebalance_every_n_months,
+            "n_tranches": primary["equal_weight_all"]["n_tranches"],
         })
         return {
             "universe": universe_meta,

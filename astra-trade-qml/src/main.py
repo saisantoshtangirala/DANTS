@@ -1014,6 +1014,7 @@ def run_midcap_momentum_test(config: dict, logger) -> None:
         min_adtv_cr=universe.get("min_adtv_cr"),
         impact_slippage_pct=universe.get("impact_slippage_pct"),
         rebalance_every_n_months=universe.get("rebalance_every_n_months"),
+        n_tranches=universe.get("n_tranches"),
     )
 
     for strategy, stats in outcome["results"].items():
@@ -1070,6 +1071,7 @@ def run_midcap_momentum_stress_test(config: dict, logger) -> None:
         min_adtv_cr=universe.get("min_adtv_cr"),
         impact_slippage_pct=universe.get("impact_slippage_pct"),
         rebalance_every_n_months=universe.get("rebalance_every_n_months"),
+        n_tranches=universe.get("n_tranches"),
     )
 
     for strategy, stats in result["primary"].items():
