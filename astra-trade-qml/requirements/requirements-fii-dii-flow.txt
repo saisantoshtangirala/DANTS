@@ -8,7 +8,7 @@
 # .github/workflows/fii-dii-flow-test.yml /
 # fii-dii-flow-stress-test.yml. Also, uniquely among this session's
 # diagnostics, needs NO Kite session at all - both data sources
-# (src/data/participant_oi.py, src/data/index_close.py) hit NSE's
+# (src/data/participant_oi.py, src/data/equity_bhavcopy.py) hit NSE's
 # public archives directly, so kiteconnect/pyotp/websocket-client are
 # kept only because importing TrainingPipeline still transitively
 # needs them importable, not because this path calls Kite.

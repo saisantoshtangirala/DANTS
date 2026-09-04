@@ -33,12 +33,15 @@ returns, over ~5 years of real NSE data, 2021-08 to 2026-09):
 Instrument choice: NIFTY 50 itself isn't a cash-tradable equity. Index
 futures/options reintroduce the margin-vs-₹50,000-account mismatch
 already flagged for the options-selling idea this session declined to
-build. NIFTYBEES (or any NIFTY 50 ETF trading near 1/100th of the
-index level, so ~Rs.240 at Nifty~24,000) is genuinely cash-tradable at
-this account's size with real liquidity - used here as the traded
-instrument (price_df is expected to already be at that scale, or the
-caller passes a `price_scale_divisor` to convert from raw index
-levels).
+build. NIFTYBEES (a NIFTY 50 ETF trading near 1/100th of the index
+level, ~Rs.275 as of this writing) is genuinely cash-tradable at this
+account's size with real liquidity - used here as the traded
+instrument. price_df is expected to already carry that instrument's
+real prices (TrainingPipeline.fii_dii_data_ingestion() fetches real
+NIFTYBEES OHLCV via src/data/equity_bhavcopy.py, not an index-level
+approximation - an earlier version of this backtest used NIFTY 50 /
+100 before real ETF data was reachable; cross-checked before
+switching, see fii_dii_data_ingestion()'s docstring).
 
 Signal construction (long-only, up to `max_concurrent_positions`
 equal-weighted tranches - see below on why not a single position):

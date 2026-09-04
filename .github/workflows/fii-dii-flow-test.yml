@@ -17,7 +17,7 @@ name: FII/DII Institutional-Flow Diagnostic (CI Runner)
 # src/training/fii_dii_flow.py for the full methodology.
 #
 # Uniquely among this session's diagnostics, needs NO Kite session -
-# both data sources (src/data/participant_oi.py, src/data/index_close.py)
+# both data sources (src/data/participant_oi.py, src/data/equity_bhavcopy.py)
 # hit NSE's public archives directly. That data fetch (~5 years, one
 # request per trading day per source) is the slow part of this
 # workflow - empirically ~11-12 minutes per source fetching cold, so
