@@ -64,6 +64,30 @@ capped at 150 rows - before spending RunPod GPU budget re-testing
 QuantumKernelClassifier (run_fii_dii_flow_quantum_backtest) on the same
 disciplined search.
 
+Even with that fix, the FIRST classical run (nested validation, no
+block permutation yet) still lost to the benchmark - and a deeper dive
+found the nested-validation permutation test itself was still leaky:
+net-positioning features are cumulative sums (random walks) and
+hold_days-overlapping forward-return labels are autocorrelated, and a
+plain i.i.d. label shuffle destroys that structure in the null
+distribution while leaving it intact in the real (unshuffled) score. A
+synthetic test with ZERO true relationship between such a feature and
+label found i.i.d. shuffling falsely "significant" at a Bonferroni-
+corrected alpha=0.0025 in 22/200 trials (11.0%) vs. an i.i.d.-feature
+control's 1/200 (0.5%) - a ~20x inflation. Three real-data ablations
+confirmed the consequence: removing genetic evolution (raw features
+only, same leaky test) improved OOS Sharpe from -0.16 to +0.14 -
+evolution was making things WORSE, not neutral - while restricting to
+ONLY the one already-validated feature (dii_net_index_future_diff5)
+gave Sharpe 1.04 at p=0.043, nearly matching the benchmark's own
+1.12/p=0.030. That combination (a plain classifier can trade the known
+feature almost as well as the hand-tuned rule, but the wider 48-feature
+search finds nothing but harm) points at too little independent data
+for that search, not insufficient model capacity - see
+evolver_block_size/embargo_rows below for the leaky-test fix, and
+run_fii_dii_flow_pooled_ml_backtest for the cross-sectional pooling
+built to attack the actual data-volume bottleneck.
+
 Every fold's entry signals get combined into one full-history
 admissibility series and run through
 fii_dii_flow.simulate_concurrent_tranche_trades - the EXACT SAME
@@ -88,7 +112,7 @@ swapping paper trading over to a model this finds would be a separate,
 explicit step taken only after a run here recommends it.
 """
 
-from typing import Any, Callable, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -260,6 +284,7 @@ def run_fii_dii_flow_ml_backtest(
     evolver_population: int = 30,
     evolver_top_k: int = 5,
     evolver_n_candidates: int = 20,
+    evolver_block_size: Optional[int] = None,
     random_state: int = 42,
 ) -> Dict[str, Any]:
     """
@@ -275,6 +300,17 @@ def run_fii_dii_flow_ml_backtest(
     model this run used (e.g. "quantum_kernel",
     "logistic_regression_l1"), carried through to the result for
     logging/Telegram clarity when comparing model types.
+
+    evolver_block_size: forwarded to FeatureEvolver.evolve_with_validation
+    as block_size (default None -> hold_days) - shuffles contiguous
+    blocks of the label during the inner-validation permutation test
+    instead of individual points, and embargo_rows=hold_days drops the
+    last hold_days rows of each fold's inner_train before scoring gene
+    fitness on it. Both address the same root cause: net-positioning
+    features and hold_days-overlapping labels are autocorrelated, and a
+    plain i.i.d. shuffle was measured to falsely pass genes ~20x more
+    often than the nominal alpha in that situation - see this module's
+    docstring and permutation_test_ic's for the measured numbers.
 
     Returns model_label, n_days_with_data, n_trades, n_folds, oos (this
     walk-forward run's pooled OOS trade report - every trade here is
@@ -304,6 +340,8 @@ def run_fii_dii_flow_ml_backtest(
     df = raw_panel.reset_index(drop=True).copy()
     df["future_return"] = label
     df["date"] = dates
+
+    block_size = evolver_block_size if evolver_block_size is not None else hold_days
 
     min_train_days = max(MIN_TRAIN_DAYS, max(lookbacks) + 30)
     eligible_start = min_train_days
@@ -348,6 +386,7 @@ def run_fii_dii_flow_ml_backtest(
             survivors = evolver.evolve_with_validation(
                 inner_train_df, inner_val_df, raw_feature_cols, label_col="future_return",
                 n_candidates=evolver_n_candidates, n_permutations=n_permutations, alpha=permutation_alpha,
+                block_size=block_size, embargo_rows=hold_days,
             )
         genes = [gene for gene, _val_ic, _p in survivors]
         survivor_raw_features_by_fold.append(

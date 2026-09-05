@@ -201,6 +201,8 @@ class FeatureEvolver:
         n_candidates: int = 20,
         n_permutations: int = 1000,
         alpha: float = 0.05,
+        block_size: int = 1,
+        embargo_rows: int = 0,
     ) -> List[Tuple[Gene, float, float]]:
         """Fixes evolve()'s double-dip (fitness scored on train, then the
         same train data used to fit a downstream model - nothing ever has
@@ -227,6 +229,28 @@ class FeatureEvolver:
         mathematically impossible regardless of signal strength - caught
         by this method's own test suite hitting exactly that wall.
 
+        block_size: forwarded to permutation_test_ic - shuffle contiguous
+        blocks of this size instead of individual points when
+        permutation-testing df_val. Matters for autocorrelated features
+        (e.g. net-positioning diffs, which are random walks) tested
+        against autocorrelated labels (overlapping hold_days forward
+        returns): plain i.i.d. shuffling (block_size=1, the default) was
+        measured to falsely pass ~20x more often than the nominal alpha
+        in exactly that situation - see permutation_test_ic's docstring.
+        Callers with autocorrelated data should pass block_size equal to
+        (or a small multiple of) the label's hold period.
+
+        embargo_rows: drop this many rows off the END of df_train before
+        scoring gene fitness on it (does not affect the GA search itself,
+        which still runs on the full df_train). Without this, a gene's
+        train-side fitness score can be inflated by rows whose
+        forward-return label window extends past df_train's last date
+        and into df_val's date range - the same overlapping-window issue
+        block_size addresses, applied to the train/val boundary itself
+        rather than to the significance test. Pass hold_days (or
+        similar) when df_train and df_val are chronologically adjacent
+        slices of overlapping-window-labeled data.
+
         Returns (gene, val_ic, perm_p_value) triples sorted by val_ic
         descending, capped at self.top_k - often fewer than top_k, and
         honestly empty when nothing survives. Callers should refit the
@@ -237,13 +261,15 @@ class FeatureEvolver:
         if label_col not in df_train.columns or label_col not in df_val.columns or not feature_cols:
             return []
 
+        df_train_embargoed = df_train.iloc[: len(df_train) - embargo_rows] if embargo_rows > 0 else df_train
+
         # evolve() ranks by train fitness and returns only self.top_k - ask
         # for a wider pool temporarily so there's something left after the
         # validation filter below, then restore the configured value.
         original_top_k = self.top_k
         self.top_k = max(self.top_k, n_candidates)
         try:
-            candidates = self.evolve(df_train, feature_cols, label_col=label_col)
+            candidates = self.evolve(df_train_embargoed, feature_cols, label_col=label_col)
         finally:
             self.top_k = original_top_k
 
@@ -264,7 +290,7 @@ class FeatureEvolver:
                 continue
             p_value = permutation_test_ic(
                 derived_val, label_val, n_permutations=n_permutations,
-                random_state=int(self.rng.integers(0, 2**31 - 1)),
+                random_state=int(self.rng.integers(0, 2**31 - 1)), block_size=block_size,
             )
             if p_value <= corrected_alpha:
                 survivors.append((gene, val_fitness, p_value))
@@ -273,8 +299,21 @@ class FeatureEvolver:
         return survivors[:original_top_k]
 
 
+def _block_shuffle(arr: np.ndarray, block_size: int, rng: np.random.Generator) -> np.ndarray:
+    """Permute arr by shuffling the ORDER of contiguous blocks of
+    block_size, not individual elements - preserves each block's
+    internal (autocorrelated) structure while still destroying the
+    alignment with whatever it's being tested against. The last block
+    may be shorter if len(arr) isn't a multiple of block_size."""
+    n = len(arr)
+    n_blocks = int(np.ceil(n / block_size))
+    blocks = [arr[i * block_size : (i + 1) * block_size] for i in range(n_blocks)]
+    order = rng.permutation(n_blocks)
+    return np.concatenate([blocks[i] for i in order])
+
+
 def permutation_test_ic(
-    derived: pd.Series, label: np.ndarray, n_permutations: int = 500, random_state: int = 42,
+    derived: pd.Series, label: np.ndarray, n_permutations: int = 500, random_state: int = 42, block_size: int = 1,
 ) -> float:
     """Empirical p-value for a derived feature's |Spearman IC| against
     label: shuffles label n_permutations times, recomputes the same |IC|
@@ -282,7 +321,24 @@ def permutation_test_ic(
     observed value (with add-one smoothing, so a p-value of exactly 0 is
     never reported from a finite number of permutations). A gene that
     only fits noise will score well against roughly as many shuffled
-    labels as the real one - a real signal will beat almost all of them."""
+    labels as the real one - a real signal will beat almost all of them.
+
+    block_size (default 1 = plain i.i.d. shuffle, byte-identical to this
+    function's original behavior): for autocorrelated series - net-
+    positioning features are cumulative sums (random walks), and
+    hold_days-overlapping forward-return labels are autocorrelated too -
+    an i.i.d. shuffle destroys that structure in the null distribution
+    while leaving it intact in the observed (unshuffled) score, which
+    inflates false positives. A synthetic experiment with ZERO true
+    relationship between an autocorrelated feature and an autocorrelated
+    label found i.i.d. shuffling falsely "significant" at a Bonferroni-
+    corrected alpha=0.0025 in 22/200 trials (11.0%) versus an i.i.d.-
+    feature control's 1/200 (0.5%) - a ~20x inflation. Pass
+    block_size=hold_days (or similar) to shuffle contiguous blocks
+    instead of individual points, preserving each block's own
+    autocorrelation while still testing the right null hypothesis - see
+    tests/test_feature_evolution.py's TestPermutationTestIc block-size
+    tests for the measured before/after false-positive rate."""
     observed = FeatureEvolver._fitness(derived, label)
     if observed <= 0:
         return 1.0
@@ -298,7 +354,7 @@ def permutation_test_ic(
 
     count_ge = 0
     for _ in range(n_permutations):
-        shuffled_label = rng.permutation(label_finite)
+        shuffled_label = rng.permutation(label_finite) if block_size <= 1 else _block_shuffle(label_finite, block_size, rng)
         ic, _ = spearmanr(values_finite, shuffled_label)
         if ic is not None and np.isfinite(ic) and abs(float(ic)) >= observed:
             count_ge += 1
