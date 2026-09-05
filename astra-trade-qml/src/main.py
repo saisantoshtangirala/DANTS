@@ -23,6 +23,7 @@ Usage:
     python3 -m src.main --mode fii-dii-flow-quantum-test  # diagnostic: genetically-evolved features + quantum kernel classifier vs. the live rule-based signal
     python3 -m src.main --mode fii-dii-flow-classical-ml-test  # diagnostic: same search, L1 logistic regression instead of quantum - run this FIRST
     python3 -m src.main --mode fii-dii-flow-pooled-classical-ml-test  # diagnostic: same classical search, pooled across config.yaml's sector_etf_universe instead of just NIFTYBEES
+    python3 -m src.main --mode fii-dii-flow-recalibration-check  # scheduled: re-validates the live rule + re-checks both ML searches against the current window, report only
 """
 
 import argparse
@@ -1424,6 +1425,72 @@ def run_fii_dii_flow_pooled_classical_ml_test(config: dict, logger) -> None:
     logger.info("fii_dii_flow_pooled_classical_ml_test_complete")
 
 
+def run_fii_dii_flow_recalibration_check(config: dict, logger) -> None:
+    """Scheduled recalibration for the FII/DII rule-based signal: re-
+    validates the currently-live feature/lookback against the wider raw
+    feature space on an EXPANDING window through today, and re-checks
+    whether either disciplined classical ML search (single-instrument or
+    cross-sectional pooled) currently beats the rule-based benchmark. See
+    TrainingPipeline.fii_dii_flow_recalibration_check()'s docstring and
+    src/training/fii_dii_flow_recalibration.py's module docstring for
+    the full methodology. Gated by a frequency-days state file (mirrors
+    NAS's own is_nas_due pattern) - a scheduled run outside the cadence
+    is a cheap no-op; force=True (this mode always forces, since a
+    workflow_dispatch or cron firing at all is itself the trigger to
+    actually check) runs regardless. Never changes what's live in paper
+    trading - report/recommendation only. No Kite session needed (same
+    data sources as fii_dii_flow_test)."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_recalibration_check_started")
+    result = pipeline.fii_dii_flow_recalibration_check(force=True)
+
+    if result.get("skipped"):
+        logger.info("fii_dii_flow_recalibration_check_skipped", reason=result.get("reason"))
+        logger.info("fii_dii_flow_recalibration_check_complete")
+        return
+
+    ic_scan = result.get("ic_scan", {})
+    logger.info(
+        "fii_dii_flow_recalibration_check_ic_scan",
+        n_candidates_tested=ic_scan.get("n_candidates_tested"),
+        corrected_alpha=ic_scan.get("corrected_alpha"),
+        n_passing_candidates=len(ic_scan.get("passing_candidates", [])),
+        top_candidates=ic_scan.get("candidates", [])[:5],
+    )
+
+    for label, key in (("classical", "classical_ml_result"), ("pooled", "pooled_ml_result")):
+        ml_result = result.get(key)
+        if not ml_result:
+            continue
+        comparison = ml_result.get("comparison", {})
+        logger.info(
+            f"fii_dii_flow_recalibration_check_{label}_ml",
+            model_label=ml_result.get("model_label"),
+            n_trades=ml_result.get("n_trades"),
+            model_oos_sharpe=comparison.get("model_oos_sharpe"),
+            model_oos_p_value=comparison.get("model_oos_p_value"),
+            benchmark_oos_sharpe=comparison.get("benchmark_oos_sharpe"),
+            benchmark_oos_p_value=comparison.get("benchmark_oos_p_value"),
+            verdict=comparison.get("verdict"),
+        )
+
+    verdict = result.get("verdict", {})
+    logger.info(
+        "fii_dii_flow_recalibration_check_verdict",
+        current_candidate=verdict.get("current_candidate"),
+        current_feature_still_valid=verdict.get("current_feature_still_valid"),
+        best_candidate=verdict.get("best_candidate"),
+        recommend_feature_change=verdict.get("recommend_feature_change"),
+        ml_beats_benchmark=verdict.get("ml_beats_benchmark"),
+        winning_ml_model_label=verdict.get("winning_ml_model_label"),
+        recommendation=verdict.get("recommendation"),
+    )
+    logger.info("fii_dii_flow_recalibration_check_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -1444,7 +1511,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test", "fii-dii-flow-classical-ml-test", "fii-dii-flow-pooled-classical-ml-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test", "fii-dii-flow-classical-ml-test", "fii-dii-flow-pooled-classical-ml-test", "fii-dii-flow-recalibration-check"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1499,6 +1566,8 @@ def main() -> None:
         run_fii_dii_flow_classical_ml_test(config, logger)
     elif args.mode == "fii-dii-flow-pooled-classical-ml-test":
         run_fii_dii_flow_pooled_classical_ml_test(config, logger)
+    elif args.mode == "fii-dii-flow-recalibration-check":
+        run_fii_dii_flow_recalibration_check(config, logger)
 
 
 if __name__ == "__main__":

@@ -2180,6 +2180,81 @@ class TrainingPipeline:
             quantile_threshold=quantile_threshold, n_folds=n_folds,
         )
 
+    def fii_dii_flow_recalibration_check(
+        self,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        quantile_threshold: float = 0.8,
+        n_folds: int = 3,
+        lookback_days: int = 1825,
+        state_path: str = "paper_trading/fii_dii_flow_recalibration_state.json",
+        frequency_days: int = 30,
+        force: bool = False,
+        include_pooled: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Scheduled recalibration for the FII/DII rule-based signal: re-
+        validates the currently-live feature/lookback against the wider
+        raw feature space on an EXPANDING window through today (same
+        Bonferroni+both-halves methodology as the original discovery),
+        and re-checks whether either disciplined classical ML search
+        (single-instrument or, if include_pooled, cross-sectional pooled
+        across data.symbols.sector_etf_universe) currently beats the
+        rule-based benchmark. Gated by is_recalibration_due(state_path,
+        frequency_days) - mirrors src/training/lstm_nas.py's is_nas_due
+        pattern - so a scheduled run outside the cadence is a cheap no-op
+        (pass force=True, e.g. for a manual workflow_dispatch, to run
+        regardless). See src/training/fii_dii_flow_recalibration.py's
+        docstring for the full methodology.
+
+        Returns {"skipped": True, "reason": ...} when gated out by the
+        frequency check; otherwise the full
+        run_fii_dii_flow_recalibration_check result plus "state_path".
+        Persists the new verdict via save_recalibration_state on every
+        real (non-skipped) run - never changes what's live in paper
+        trading either way, only reports/recommends.
+        """
+        from src.training.fii_dii_flow_recalibration import (
+            is_recalibration_due,
+            run_fii_dii_flow_recalibration_check,
+            save_recalibration_state,
+        )
+
+        if not force and not is_recalibration_due(state_path, frequency_days):
+            return {"skipped": True, "reason": f"last run within {frequency_days} days", "state_path": state_path}
+
+        if not hasattr(self, "fii_dii_price_df") or self.fii_dii_price_df is None or self.fii_dii_price_df.empty:
+            self.fii_dii_data_ingestion(lookback_days=lookback_days)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        pooled_price_dfs = None
+        if include_pooled:
+            from src.data.equity_bhavcopy import EquityBhavcopyProvider
+
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=lookback_days)
+            price_provider = EquityBhavcopyProvider()
+            universe = self.config["data"]["symbols"].get("sector_etf_universe", [])
+            pooled_price_dfs = {}
+            for symbol in universe:
+                p_df = price_provider.fetch_symbol_range(symbol, start_date, end_date)
+                if not p_df.empty:
+                    pooled_price_dfs[symbol] = p_df[["date", "close"]].copy()
+            if not pooled_price_dfs:
+                pooled_price_dfs = None
+
+        result = run_fii_dii_flow_recalibration_check(
+            self.fii_dii_price_df, self.participant_oi_full_panel, cost_calc, initial_capital,
+            hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
+            quantile_threshold=quantile_threshold, n_folds=n_folds,
+            pooled_price_dfs=pooled_price_dfs,
+        )
+        save_recalibration_state(state_path, result["verdict"])
+        result["state_path"] = state_path
+        return result
+
     def orb_backtest(
         self,
         symbols: Optional[List[str]] = None,

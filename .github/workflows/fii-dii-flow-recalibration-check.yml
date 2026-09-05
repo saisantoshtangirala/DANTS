@@ -1,0 +1,104 @@
+name: FII/DII Institutional-Flow Recalibration Check
+
+# Scheduled recalibration for the FII/DII rule-based signal (the one
+# live in paper trading via fii-dii-flow-paper.yml): re-validates the
+# currently-live feature/lookback against the wider raw feature space
+# on an EXPANDING window through today (same Bonferroni+both-halves
+# methodology the original discovery had to clear), and re-checks
+# whether either disciplined classical ML search (single-instrument or
+# cross-sectional pooled across config.yaml's sector_etf_universe)
+# currently beats the rule-based benchmark. See
+# TrainingPipeline.fii_dii_flow_recalibration_check()'s docstring and
+# src/training/fii_dii_flow_recalibration.py's module docstring for the
+# full methodology.
+#
+# This NEVER changes what's live in paper trading - report/
+# recommendation only, same adoption-gate philosophy as every other
+# fii-dii-flow diagnostic in this family. A human reviews the Telegram
+# summary and decides whether to act on it as a separate, explicit step.
+#
+# No Kite session needed (same data sources as fii-dii-flow-test.yml).
+# No quantum simulation, no GPU needed - runs directly on a plain
+# ubuntu-latest runner, no RunPod pod. Monthly cron (1st of month) plus
+# workflow_dispatch for an on-demand check.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 6 1 * *"
+
+concurrency:
+  group: fii-dii-flow-recalibration-check
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  fii-dii-flow-recalibration-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/unzip-and-explain-agpb8s
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-fii-dii-flow.txt
+
+      - name: Run fii-dii-flow recalibration check
+        working-directory: astra-trade-qml
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode fii-dii-flow-recalibration-check | tee /tmp/fii_dii_flow_recalibration_check.log
+
+      - name: Summarize recalibration check
+        id: summarize
+        if: always()
+        run: |
+          RESULT_LINES=$(grep -E "fii_dii_flow_recalibration_check_started|fii_dii_flow_recalibration_check_skipped|fii_dii_flow_recalibration_check_ic_scan|fii_dii_flow_recalibration_check_classical_ml|fii_dii_flow_recalibration_check_pooled_ml|fii_dii_flow_recalibration_check_verdict|fii_dii_flow_recalibration_check_complete" /tmp/fii_dii_flow_recalibration_check.log || echo "(no matching result lines captured)")
+          {
+            echo "### FII/DII institutional-flow recalibration check"
+            echo
+            echo '```'
+            echo "$RESULT_LINES"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated recalibration state
+        working-directory: astra-trade-qml
+        run: |
+          if git diff --quiet -- paper_trading/fii_dii_flow_recalibration_state.json && [ -z "$(git status --porcelain -- paper_trading/fii_dii_flow_recalibration_state.json)" ]; then
+            echo "No state change - nothing to commit."
+            exit 0
+          fi
+          git config user.name "astra-trade-bot"
+          git config user.email "astra-trade-bot@users.noreply.github.com"
+          git add paper_trading/fii_dii_flow_recalibration_state.json
+          git commit -m "fii-dii-flow recalibration check: state update ($(date -u +%Y-%m-%d))"
+          git push origin HEAD:claude/unzip-and-explain-agpb8s
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            FII/DII Institutional-Flow Recalibration Check - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
