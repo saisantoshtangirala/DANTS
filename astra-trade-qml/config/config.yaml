@@ -145,6 +145,33 @@ data:
       - "IRCTC"
       - "CDSL"
       - "BSE"
+    # sector_etf_universe: cash-tradable NSE-listed index/sector ETFs used
+    # by fii_dii_flow_quantum.py's cross-sectional pooling
+    # (run_fii_dii_flow_pooled_ml_backtest) - the institutional-flow
+    # feature panel (FII/DII/Pro/Client net positioning) is ONE
+    # nationwide F&O-market aggregate, not per-symbol, so it's identical
+    # across every instrument here; pooling multiple instruments' own
+    # price series against that SAME shared feature panel multiplies the
+    # number of independent (date, instrument) label draws available to
+    # the walk-forward search without adding any new raw features -
+    # directly attacking the "not enough independent data" bottleneck
+    # this session's investigation found, rather than the search space.
+    # NOT an official index constituent list (same caveat as
+    # midcap_smallcap_factor_universe above) - hand-curated for real
+    # liquidity/tradability at this account's size, each trading in
+    # SERIES="EQ" on NSE same as any stock (confirmed via
+    # EquityBhavcopyProvider, which is symbol-agnostic). NIFTYBEES is the
+    # instrument fii_dii_flow.py's own validated rule already trades;
+    # the rest add cross-sectional breadth: BANKBEES (Bank Nifty),
+    # JUNIORBEES (Nifty Next 50), ITBEES (Nifty IT), PSUBNKBEES (PSU
+    # Bank) - liquidity is checked at runtime (a thin/no-data ETF simply
+    # contributes no rows for its date range), not assumed here.
+    sector_etf_universe:
+      - "NIFTYBEES"
+      - "BANKBEES"
+      - "JUNIORBEES"
+      - "ITBEES"
+      - "PSUBNKBEES"
 
   timeframes:
     intraday: "5minute"              # Primary intraday timeframe - stored in Kite's native interval format

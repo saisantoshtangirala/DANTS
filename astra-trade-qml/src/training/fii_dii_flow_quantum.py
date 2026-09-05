@@ -600,3 +600,351 @@ def run_fii_dii_flow_classical_ml_backtest(
         evolver_generations=evolver_generations, evolver_population=evolver_population,
         evolver_top_k=evolver_top_k, random_state=random_state,
     )
+
+
+def _first_index_on_or_after(dates: List[Any], target: Any) -> int:
+    """First position in dates (assumed sorted) whose value is >=
+    target, or len(dates) if none - used to translate a reference
+    instrument's eligible_start date into another instrument's own
+    positional index."""
+    for i, d in enumerate(dates):
+        if d >= target:
+            return i
+    return len(dates)
+
+
+def _combine_period_reports(reports: List[Dict[str, Any]], initial_capital: float) -> Dict[str, Any]:
+    """Pools several already-computed reports' period_returns/
+    period_dates (each produced by _report_from_trades) into one
+    aggregate report, using _report_from_trades itself on a
+    reconstructed pnl_pct/exit_date frame - used to combine multiple
+    instruments' individually-computed rule-based benchmark reports
+    into one pooled Sharpe/significance figure, the same way pooled
+    model trades are combined from a single concatenated trades_df."""
+    returns: List[float] = []
+    dates: List[Any] = []
+    for r in reports:
+        returns.extend(r.get("period_returns", []))
+        dates.extend(r.get("period_dates", []))
+    if not returns:
+        return {"n_trades": 0}
+    order = np.argsort(pd.to_datetime(pd.Series(dates)).to_numpy())
+    pooled = pd.DataFrame({"pnl_pct": np.array(returns)[order], "exit_date": np.array(dates, dtype=object)[order]})
+    return _report_from_trades(pooled, initial_capital)
+
+
+def run_fii_dii_flow_pooled_ml_backtest(
+    price_dfs: Dict[str, pd.DataFrame],
+    net_positioning_wide: pd.DataFrame,
+    cost_calc: CostCalculator,
+    initial_capital: float,
+    classifier_factory: Callable[[], Any],
+    model_label: str,
+    hold_days: int = 5,
+    max_concurrent_positions: int = 5,
+    quantile_threshold: float = 0.8,
+    n_folds: int = 3,
+    lookbacks: Sequence[int] = DEFAULT_LOOKBACKS,
+    inner_val_frac: float = 0.25,
+    n_permutations: int = 1000,
+    permutation_alpha: float = 0.05,
+    evolver_generations: int = 15,
+    evolver_population: int = 30,
+    evolver_top_k: int = 5,
+    evolver_n_candidates: int = 20,
+    evolver_block_size: Optional[int] = None,
+    random_state: int = 42,
+    reference_symbol: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Cross-sectional generalization of run_fii_dii_flow_ml_backtest:
+    pools MULTIPLE instruments' own price series against the SAME
+    shared institutional-flow feature panel (net_positioning_wide is one
+    nationwide F&O-market aggregate, identical across every instrument -
+    only each instrument's own forward-return label differs). This
+    multiplies the number of independent (date, instrument) label draws
+    available to the genetic search and classifier fit without adding
+    any new raw features - built to attack the "not enough independent
+    data" bottleneck this session's investigation found in the single-
+    instrument search (see this module's docstring), not to widen the
+    search space further.
+
+    price_dfs: {symbol: price_df} - each price_df is 'date' + 'close'
+    for one cash-tradable instrument (e.g. config.yaml's
+    data.symbols.sector_etf_universe). Each instrument keeps its own
+    trading calendar (an ETF listed partway through the window simply
+    contributes fewer rows, not NaN-padded ones).
+
+    Walk-forward folds are defined on `reference_symbol`'s own date
+    calendar (default: whichever instrument in price_dfs has the
+    longest history) - every other instrument's rows are pooled into
+    each fold's train/OOS slice by DATE cutoff (`< fold_start_date` /
+    `fold_start_date <= date < fold_end_date`), not by row position,
+    since instruments can have different calendars/history lengths.
+
+    Per fold: pool every instrument's own labeled rows before
+    fold_start_date into ONE train_df, run evolve_with_validation and
+    fit classifier_factory() ONCE on that pooled frame (this is where
+    the sample-size win comes from), then apply the single fitted
+    model + threshold separately to each instrument's own fold-period
+    rows to generate that instrument's entry_ok, and run
+    simulate_concurrent_tranche_trades per instrument (capital
+    allocation and exits are inherently per-instrument - this is a
+    diagnostic pooling multiple INDEPENDENT single-instrument backtests'
+    trades for one combined OOS report, not a capital-constrained
+    combined portfolio: each instrument's own simulate_concurrent_
+    tranche_trades call independently sizes tranches off the full
+    initial_capital, exactly like every other diagnostic in this
+    module).
+
+    Since the shared feature panel's values don't vary by instrument on
+    a given date, the fitted model's predicted probability for a date
+    is identical across every instrument still trading that date - a
+    real property of this signal (nationwide institutional flow doesn't
+    predict which stock/sector moves, only that "the market" broadly
+    might), not a bug: a qualifying day can open a tranche in several
+    pooled instruments simultaneously.
+
+    Returns the same shape as run_fii_dii_flow_ml_backtest plus
+    n_instruments/instruments; fold_diagnostics adds
+    n_instruments_pooled. benchmark/comparison pool each instrument's
+    own rule-based benchmark (recomputed over that instrument's slice of
+    the identical eligible window) via _combine_period_reports, so the
+    win/lose gate stays apples-to-apples with the pooled model result.
+    """
+    if not price_dfs:
+        raise RuntimeError("price_dfs is empty - need at least one instrument to pool.")
+
+    block_size = evolver_block_size if evolver_block_size is not None else hold_days
+
+    raw_panel = build_institutional_flow_feature_panel(net_positioning_wide, lookbacks=lookbacks)
+    if raw_panel.empty:
+        raise RuntimeError("net_positioning_wide is empty - no institutional-flow features to build.")
+    raw_feature_cols = list(raw_panel.columns)
+
+    symbol_frames: Dict[str, pd.DataFrame] = {}
+    symbol_dates: Dict[str, List[Any]] = {}
+    symbol_closes: Dict[str, List[float]] = {}
+    for symbol, p_df in price_dfs.items():
+        p_df = p_df.dropna(subset=["date", "close"]).sort_values("date").reset_index(drop=True)
+        if p_df.empty:
+            continue
+        dates_s = p_df["date"].tolist()
+        closes_s = p_df["close"].tolist()
+        df_s = raw_panel.reindex(dates_s).reset_index(drop=True)
+        df_s["future_return"] = _forward_return_label(closes_s, hold_days)
+        df_s["date"] = dates_s
+        symbol_frames[symbol] = df_s
+        symbol_dates[symbol] = dates_s
+        symbol_closes[symbol] = closes_s
+
+    if not symbol_frames:
+        raise RuntimeError("No usable price data (date+close) for any instrument in price_dfs.")
+
+    reference_symbol = reference_symbol or max(symbol_dates, key=lambda s: len(symbol_dates[s]))
+    ref_dates = symbol_dates[reference_symbol]
+    n_ref = len(ref_dates)
+
+    min_train_days = max(MIN_TRAIN_DAYS, max(lookbacks) + 30)
+    eligible_start = min_train_days
+    n_eligible = n_ref - eligible_start
+    if n_eligible < n_folds * 20:
+        raise RuntimeError(
+            f"Only {n_eligible} eligible days (on reference instrument '{reference_symbol}') after "
+            f"the {min_train_days}-day warmup; need at least {n_folds * 20} for {n_folds} folds."
+        )
+
+    fold_ranges = _fold_boundaries(n_eligible, n_folds)
+
+    entry_ok_by_symbol: Dict[str, pd.Series] = {
+        s: pd.Series(False, index=range(len(symbol_dates[s]))) for s in symbol_frames
+    }
+    fold_diagnostics: List[Dict[str, Any]] = []
+    survivor_raw_features_by_fold: List[set] = []
+
+    for fold_i, (fold_start_rel, fold_end_rel) in enumerate(fold_ranges):
+        fold_start_idx = eligible_start + fold_start_rel
+        fold_end_idx = eligible_start + fold_end_rel  # exclusive, on the reference calendar
+        fold_start_date = ref_dates[fold_start_idx]
+        fold_end_date_exclusive = ref_dates[fold_end_idx] if fold_end_idx < n_ref else None
+        fold_end_date_inclusive = ref_dates[fold_end_idx - 1] if fold_end_idx > fold_start_idx else fold_start_date
+
+        train_parts = [
+            df_s[df_s["date"] < fold_start_date].dropna(subset=["future_return"])
+            for df_s in symbol_frames.values()
+        ]
+        train_parts = [p for p in train_parts if not p.empty]
+        if not train_parts:
+            continue
+        train_df = pd.concat(train_parts, ignore_index=True).sort_values("date").reset_index(drop=True)
+        if len(train_df) < min_train_days // 2:
+            continue
+
+        inner_split = int(len(train_df) * (1 - inner_val_frac))
+        inner_train_df = train_df.iloc[:inner_split]
+        inner_val_df = train_df.iloc[inner_split:]
+
+        survivors: List[Tuple[Any, float, float]] = []
+        if len(inner_train_df) >= 30 and len(inner_val_df) >= 30:
+            evolver = FeatureEvolver(
+                population_size=evolver_population, n_generations=evolver_generations,
+                top_k=evolver_top_k, random_state=random_state + fold_i,
+            )
+            survivors = evolver.evolve_with_validation(
+                inner_train_df, inner_val_df, raw_feature_cols, label_col="future_return",
+                n_candidates=evolver_n_candidates, n_permutations=n_permutations, alpha=permutation_alpha,
+                block_size=block_size, embargo_rows=hold_days,
+            )
+        genes = [gene for gene, _val_ic, _p in survivors]
+        survivor_raw_features_by_fold.append(
+            {gene.feature_a for gene in genes} | {gene.feature_b for gene in genes if gene.feature_b}
+        )
+
+        train_evolved = FeatureEvolver.apply_genes(train_df, genes)
+        model_cols = raw_feature_cols + [gene.name() for gene in genes]
+        X_train = train_evolved[model_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0).to_numpy()
+        y_train = (train_evolved["future_return"].to_numpy() > 0).astype(int)
+
+        if len(np.unique(y_train)) < 2:
+            fold_diagnostics.append({
+                "fold": fold_i, "train_days": len(train_df), "skipped_reason": "degenerate_label",
+            })
+            continue
+
+        clf = classifier_factory()
+        clf.fit(X_train, y_train)
+
+        calib_size = min(len(X_train), 150)
+        if len(X_train) > calib_size:
+            calib_idx = np.random.default_rng(random_state + fold_i).choice(len(X_train), calib_size, replace=False)
+            X_calib = X_train[calib_idx]
+            y_calib = y_train[calib_idx]
+        else:
+            X_calib = X_train
+            y_calib = y_train
+        train_proba_up = clf.predict_proba(X_calib)[:, 1]
+        threshold = float(np.quantile(train_proba_up, quantile_threshold))
+        train_pred_up = (train_proba_up >= 0.5).astype(int)
+        train_accuracy = float(np.mean(train_pred_up == y_calib))
+
+        n_signals_this_fold = 0
+        for s, df_s in symbol_frames.items():
+            mask = df_s["date"] >= fold_start_date
+            if fold_end_date_exclusive is not None:
+                mask &= df_s["date"] < fold_end_date_exclusive
+            fold_slice = df_s[mask]
+            if fold_slice.empty:
+                continue
+            fold_evolved = FeatureEvolver.apply_genes(fold_slice, genes)
+            X_fold = fold_evolved[model_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0).to_numpy()
+            fold_proba_up = clf.predict_proba(X_fold)[:, 1]
+            fold_entries = fold_proba_up >= threshold
+            entry_ok_by_symbol[s].iloc[fold_slice.index.to_numpy()] = fold_entries
+            n_signals_this_fold += int(fold_entries.sum())
+
+        fold_diagnostics.append({
+            "fold": fold_i,
+            "train_days": len(train_df),
+            "inner_train_days": len(inner_train_df),
+            "inner_val_days": len(inner_val_df),
+            "fold_start_date": str(fold_start_date),
+            "fold_end_date": str(fold_end_date_inclusive),
+            "n_instruments_pooled": len(symbol_frames),
+            "n_genes_evaluated": evolver_n_candidates,
+            "n_genes_passed_validation": len(genes),
+            "evolved_gene_names": [gene.name() for gene in genes],
+            "permutation_p_values": [round(p, 5) for _g, _v, p in survivors],
+            "decision_threshold": threshold,
+            "is_quantum": getattr(clf, "is_quantum", None),
+            "train_accuracy": train_accuracy,
+            "n_signals_in_fold": n_signals_this_fold,
+        })
+
+    feature_fold_counts: Dict[str, int] = {}
+    for feats in survivor_raw_features_by_fold:
+        for feat in feats:
+            feature_fold_counts[feat] = feature_fold_counts.get(feat, 0) + 1
+    cross_fold_consistency = {
+        "recurring_raw_features": sorted(f for f, c in feature_fold_counts.items() if c >= 2),
+        "feature_fold_counts": feature_fold_counts,
+    }
+
+    position_notional = initial_capital / max_concurrent_positions
+    all_trades: List[Dict[str, Any]] = []
+    benchmark_reports: List[Dict[str, Any]] = []
+    eligible_start_date = ref_dates[eligible_start]
+    for s, df_s in symbol_frames.items():
+        dates_s = symbol_dates[s]
+        closes_s = symbol_closes[s]
+        trades_s = simulate_concurrent_tranche_trades(
+            dates_s, closes_s, entry_ok_by_symbol[s], hold_days, max_concurrent_positions, cost_calc, position_notional,
+        )
+        all_trades.extend(trades_s)
+
+        bench = _rule_based_benchmark_same_window(
+            pd.DataFrame({"date": dates_s, "close": closes_s}), net_positioning_wide, cost_calc, initial_capital,
+            eligible_start=_first_index_on_or_after(dates_s, eligible_start_date),
+            flow_lookback_days=5, trailing_window=252, quantile_threshold=quantile_threshold,
+            hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
+        )
+        if bench.get("n_trades", 0) > 0:
+            benchmark_reports.append(bench)
+
+    if not all_trades:
+        return {
+            "model_label": model_label,
+            "n_instruments": len(symbol_frames), "instruments": sorted(symbol_frames),
+            "n_trades": 0, "n_folds": len(fold_ranges),
+            "oos": {}, "fold_diagnostics": fold_diagnostics,
+            "cross_fold_consistency": cross_fold_consistency,
+        }
+
+    trades_df = pd.DataFrame(all_trades).sort_values("exit_date").reset_index(drop=True)
+    oos_report = _report_from_trades(trades_df, initial_capital)
+    benchmark = _combine_period_reports(benchmark_reports, initial_capital)
+    comparison = compare_to_rule_based_benchmark(oos_report, benchmark)
+
+    return {
+        "model_label": model_label,
+        "n_instruments": len(symbol_frames),
+        "instruments": sorted(symbol_frames),
+        "n_trades": len(trades_df),
+        "n_folds": len(fold_ranges),
+        "oos": oos_report,
+        "fold_diagnostics": fold_diagnostics,
+        "cross_fold_consistency": cross_fold_consistency,
+        "benchmark": {k: v for k, v in benchmark.items() if k not in ("period_returns", "period_dates")},
+        "comparison": comparison,
+    }
+
+
+def run_fii_dii_flow_pooled_classical_ml_backtest(
+    price_dfs: Dict[str, pd.DataFrame],
+    net_positioning_wide: pd.DataFrame,
+    cost_calc: CostCalculator,
+    initial_capital: float,
+    hold_days: int = 5,
+    max_concurrent_positions: int = 5,
+    quantile_threshold: float = 0.8,
+    n_folds: int = 3,
+    lookbacks: Sequence[int] = DEFAULT_LOOKBACKS,
+    evolver_generations: int = 15,
+    evolver_population: int = 30,
+    evolver_top_k: int = 5,
+    random_state: int = 42,
+) -> Dict[str, Any]:
+    """Same pooled, cross-sectional, nested-validation machinery as
+    run_fii_dii_flow_pooled_ml_backtest, with L1-regularized logistic
+    regression - classical only, matching this module's established
+    classical-first rollout discipline (no quantum/GPU spend on pooling
+    until a classical result actually beats the benchmark)."""
+    return run_fii_dii_flow_pooled_ml_backtest(
+        price_dfs, net_positioning_wide, cost_calc, initial_capital,
+        classifier_factory=lambda: LogisticRegression(
+            l1_ratio=1, solver="liblinear", C=0.1, class_weight="balanced", random_state=random_state,
+        ),
+        model_label="pooled_logistic_regression_l1",
+        hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
+        quantile_threshold=quantile_threshold, n_folds=n_folds, lookbacks=lookbacks,
+        evolver_generations=evolver_generations, evolver_population=evolver_population,
+        evolver_top_k=evolver_top_k, random_state=random_state,
+    )
