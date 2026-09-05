@@ -93,17 +93,38 @@ jobs:
             > >(tee /tmp/launch_swing_test_pod.log) 2>&1
 
       - name: Summarize swing-test run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+            /tmp/launch_swing_test_pod.log || echo "(no matching status lines captured)")
           {
             echo "### Swing edge diagnostic run"
             echo
             echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
             echo
             echo '```'
-            grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
-              /tmp/launch_swing_test_pod.log || echo "(no matching status lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
             echo
             echo "Full results: \`astra-trade-qml/logs/swing-test_training_full.log\` on the \`model-artifacts\` branch."
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Swing Edge Diagnostic - ${{ job.status }}
+            GPU candidates: ${{ steps.gpu.outputs.gpu_ids }}
+            ${{ steps.summarize.outputs.result_lines }}
+            Full results: astra-trade-qml/logs/swing-test_training_full.log on model-artifacts
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

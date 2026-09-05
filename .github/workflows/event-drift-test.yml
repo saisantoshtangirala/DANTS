@@ -59,13 +59,31 @@ jobs:
           python3 -u -m src.main --mode event-drift-test | tee /tmp/event_drift_test.log
 
       - name: Summarize event-drift run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "event_drift_test_started|event_drift_test_event_counts|event_drift_backtest_result|event_drift_test_complete" /tmp/event_drift_test.log || echo "(no matching result lines captured)")
           {
             echo "### Event drift diagnostic run"
             echo
             echo '```'
-            grep -E "event_drift_test_started|event_drift_test_event_counts|event_drift_backtest_result|event_drift_test_complete" /tmp/event_drift_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Event Drift Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

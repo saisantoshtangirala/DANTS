@@ -55,13 +55,31 @@ jobs:
           python3 -u -m src.main --mode portfolio-optimizer-backtest | tee /tmp/portfolio_optimizer_backtest.log
 
       - name: Summarize portfolio optimizer backtest run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "portfolio_optimizer_backtest_started|portfolio_optimizer_backtest_result|portfolio_optimizer_backtest_complete" /tmp/portfolio_optimizer_backtest.log || echo "(no matching result lines captured)")
           {
             echo "### Portfolio optimizer backtest diagnostic run"
             echo
             echo '```'
-            grep -E "portfolio_optimizer_backtest_started|portfolio_optimizer_backtest_result|portfolio_optimizer_backtest_complete" /tmp/portfolio_optimizer_backtest.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Portfolio Optimizer Backtest - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

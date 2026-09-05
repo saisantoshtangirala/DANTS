@@ -64,13 +64,31 @@ jobs:
           python3 -u -m src.main --mode factor-stress-test | tee /tmp/factor_stress_test.log
 
       - name: Summarize factor stress test run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "factor_stress_test_started|factor_stress_test_primary_result|factor_stress_test_significance|factor_stress_test_bootstrap_sharpe|factor_stress_test_subperiod|factor_stress_test_grid_point|factor_stress_test_complete" /tmp/factor_stress_test.log || echo "(no matching result lines captured)")
           {
             echo "### Factor momentum stress test run"
             echo
             echo '```'
-            grep -E "factor_stress_test_started|factor_stress_test_primary_result|factor_stress_test_significance|factor_stress_test_bootstrap_sharpe|factor_stress_test_subperiod|factor_stress_test_grid_point|factor_stress_test_complete" /tmp/factor_stress_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Factor Momentum Stress Test - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

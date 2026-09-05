@@ -67,16 +67,28 @@ jobs:
           python3 -u -m src.main --mode fii-dii-flow-paper | tee /tmp/fii_dii_flow_paper.log
 
       - name: Summarize paper-trading step
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "fii_dii_flow_paper_step_started|fii_dii_flow_paper_step_state|fii_dii_flow_paper_step_event|fii_dii_flow_paper_step_no_action|fii_dii_flow_paper_step_complete" /tmp/fii_dii_flow_paper.log || echo "(no matching result lines captured)")
           {
             echo "### FII/DII flow paper-trading step"
             echo
             echo '```'
-            grep -E "fii_dii_flow_paper_step_started|fii_dii_flow_paper_step_state|fii_dii_flow_paper_step_event|fii_dii_flow_paper_step_no_action|fii_dii_flow_paper_step_complete" /tmp/fii_dii_flow_paper.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          if echo "$RESULT_LINES" | grep -q "fii_dii_flow_paper_step_event"; then
+            HEADER="FII/DII Paper Trading - position opened/closed today"
+          else
+            HEADER="FII/DII Paper Trading - no action today"
+          fi
+          echo "header=$HEADER" >> "$GITHUB_OUTPUT"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Commit updated paper-trading state
         working-directory: astra-trade-qml
@@ -90,3 +102,15 @@ jobs:
           git add paper_trading/fii_dii_flow_state.json
           git commit -m "fii-dii-flow paper trading: daily state update ($(date -u +%Y-%m-%d))"
           git push origin HEAD:claude/unzip-and-explain-agpb8s
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            ${{ steps.summarize.outputs.header }} (job ${{ job.status }})
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

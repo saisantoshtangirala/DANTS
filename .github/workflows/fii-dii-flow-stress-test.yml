@@ -59,13 +59,31 @@ jobs:
           python3 -u -m src.main --mode fii-dii-flow-stress-test | tee /tmp/fii_dii_flow_stress_test.log
 
       - name: Summarize fii-dii-flow stress test run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "fii_dii_flow_stress_test_started|fii_dii_flow_stress_test_sample_size|fii_dii_flow_stress_test_primary_result|fii_dii_flow_stress_test_significance|fii_dii_flow_stress_test_bootstrap_sharpe|fii_dii_flow_stress_test_subperiod|fii_dii_flow_stress_test_grid_point|fii_dii_flow_stress_test_complete" /tmp/fii_dii_flow_stress_test.log || echo "(no matching result lines captured)")
           {
             echo "### FII/DII institutional-flow stress test run"
             echo
             echo '```'
-            grep -E "fii_dii_flow_stress_test_started|fii_dii_flow_stress_test_sample_size|fii_dii_flow_stress_test_primary_result|fii_dii_flow_stress_test_significance|fii_dii_flow_stress_test_bootstrap_sharpe|fii_dii_flow_stress_test_subperiod|fii_dii_flow_stress_test_grid_point|fii_dii_flow_stress_test_complete" /tmp/fii_dii_flow_stress_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            FII/DII Institutional-Flow Stress Test - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

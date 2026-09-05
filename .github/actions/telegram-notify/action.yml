@@ -1,0 +1,51 @@
+name: "Telegram Notify"
+description: >
+  Sends a message to a Telegram chat via the Bot API. Shared by every
+  workflow in this repo so a run's outcome (CI result, a diagnostic's
+  key findings, a paper-trading step's action) reaches Telegram instead
+  of only GITHUB_STEP_SUMMARY. Values are passed through environment
+  variables, not interpolated directly into the shell script, so a
+  message containing quotes/backticks/newlines (log-derived text) can't
+  break or inject into the curl command. Sent as PLAIN text (no
+  parse_mode) deliberately - the message bodies are built from raw
+  grep'd log lines across 16 different workflows, and requiring every
+  caller to HTML-escape that content correctly (Telegram rejects the
+  whole message on a malformed tag) isn't worth it for these internal
+  status pings.
+
+inputs:
+  message:
+    description: "Plain-text message to send (no HTML/Markdown parsing - sent as-is)"
+    required: true
+  bot_token:
+    description: "Telegram bot token (pass secrets.TELEGRAM_BOT_TOKEN from the caller)"
+    required: true
+  chat_id:
+    description: "Telegram chat ID (pass secrets.TELEGRAM_CHAT_ID from the caller)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        TG_BOT_TOKEN: ${{ inputs.bot_token }}
+        TG_CHAT_ID: ${{ inputs.chat_id }}
+        TG_MESSAGE: ${{ inputs.message }}
+      run: |
+        if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_CHAT_ID" ]; then
+          echo "Telegram secrets not configured (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID) - skipping notification."
+          exit 0
+        fi
+        # Telegram caps a single message at 4096 UTF-8 characters.
+        TG_MESSAGE_TRUNCATED=$(printf '%s' "$TG_MESSAGE" | head -c 4000)
+        status=$(curl -sS -o /tmp/telegram_response.json -w "%{http_code}" \
+          -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+          --data-urlencode "chat_id=${TG_CHAT_ID}" \
+          --data-urlencode "text=${TG_MESSAGE_TRUNCATED}" \
+          --data-urlencode "disable_web_page_preview=true")
+        echo "telegram sendMessage HTTP status: $status"
+        cat /tmp/telegram_response.json
+        if [ "$status" != "200" ]; then
+          echo "::warning::Telegram notification failed (HTTP $status) - not failing the job over it."
+        fi

@@ -62,13 +62,31 @@ jobs:
           python3 -u -m src.main --mode passive-benchmarks-test | tee /tmp/passive_benchmarks_test.log
 
       - name: Summarize passive-benchmarks run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "passive_benchmarks_test_started|sip_benchmark_result|factor_investing_backtest_result|passive_benchmarks_test_complete" /tmp/passive_benchmarks_test.log || echo "(no matching result lines captured)")
           {
             echo "### Passive benchmarks diagnostic run"
             echo
             echo '```'
-            grep -E "passive_benchmarks_test_started|sip_benchmark_result|factor_investing_backtest_result|passive_benchmarks_test_complete" /tmp/passive_benchmarks_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Passive Benchmarks Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

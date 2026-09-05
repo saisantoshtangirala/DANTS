@@ -66,13 +66,31 @@ jobs:
           python3 -u -m src.main --mode orb-test | tee /tmp/orb_test.log
 
       - name: Summarize ORB run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "orb_test_started|orb_test_sample_size|orb_backtest_result|orb_test_complete" /tmp/orb_test.log || echo "(no matching result lines captured)")
           {
             echo "### Opening-range-breakout diagnostic run"
             echo
             echo '```'
-            grep -E "orb_test_started|orb_test_sample_size|orb_backtest_result|orb_test_complete" /tmp/orb_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Opening-Range-Breakout Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -65,13 +65,31 @@ jobs:
           python3 -u -m src.main --mode midcap-momentum-stress-test | tee /tmp/midcap_momentum_stress_test.log
 
       - name: Summarize midcap-momentum stress test run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "midcap_momentum_stress_test_started|midcap_momentum_stress_test_universe|midcap_momentum_stress_test_dropped_illiquid|midcap_momentum_stress_test_primary_result|midcap_momentum_stress_test_significance|midcap_momentum_stress_test_bootstrap_sharpe|midcap_momentum_stress_test_subperiod|midcap_momentum_stress_test_grid_point|midcap_momentum_stress_test_complete" /tmp/midcap_momentum_stress_test.log || echo "(no matching result lines captured)")
           {
             echo "### Mid/small-cap momentum stress test run"
             echo
             echo '```'
-            grep -E "midcap_momentum_stress_test_started|midcap_momentum_stress_test_universe|midcap_momentum_stress_test_dropped_illiquid|midcap_momentum_stress_test_primary_result|midcap_momentum_stress_test_significance|midcap_momentum_stress_test_bootstrap_sharpe|midcap_momentum_stress_test_subperiod|midcap_momentum_stress_test_grid_point|midcap_momentum_stress_test_complete" /tmp/midcap_momentum_stress_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Mid/Small-Cap Momentum Stress Test - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

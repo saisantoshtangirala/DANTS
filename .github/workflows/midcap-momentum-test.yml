@@ -63,13 +63,31 @@ jobs:
           python3 -u -m src.main --mode midcap-momentum-test | tee /tmp/midcap_momentum_test.log
 
       - name: Summarize midcap-momentum run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "midcap_momentum_test_started|midcap_momentum_test_universe|midcap_momentum_backtest_dropped_illiquid|midcap_momentum_test_result|midcap_momentum_test_complete" /tmp/midcap_momentum_test.log || echo "(no matching result lines captured)")
           {
             echo "### Mid/small-cap momentum factor diagnostic run"
             echo
             echo '```'
-            grep -E "midcap_momentum_test_started|midcap_momentum_test_universe|midcap_momentum_backtest_dropped_illiquid|midcap_momentum_test_result|midcap_momentum_test_complete" /tmp/midcap_momentum_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Mid/Small-Cap Momentum Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

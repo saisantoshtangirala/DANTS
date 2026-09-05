@@ -70,13 +70,31 @@ jobs:
           python3 -u -m src.main --mode pairs-trading-test | tee /tmp/pairs_trading_test.log
 
       - name: Summarize pairs-trading run
+        id: summarize
         if: always()
         run: |
+          RESULT_LINES=$(grep -E "pairs_trading_test_complete|pairs_trading_backtest_result" /tmp/pairs_trading_test.log || echo "(no matching result lines captured)")
           {
             echo "### Pairs trading diagnostic run"
             echo
             echo '```'
-            grep -E "pairs_trading_test_complete|pairs_trading_backtest_result" /tmp/pairs_trading_test.log \
-              || echo "(no matching result lines captured)"
+            echo "$RESULT_LINES"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            Pairs Trading Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
