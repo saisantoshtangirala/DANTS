@@ -47,6 +47,7 @@ from src.training.factor_stress_test import (
 from src.training.fii_dii_flow import run_fii_dii_flow_backtest
 from src.training.fii_dii_flow_quantum import (
     run_fii_dii_flow_classical_ml_backtest,
+    run_fii_dii_flow_pooled_classical_ml_backtest,
     run_fii_dii_flow_quantum_backtest,
 )
 from src.training.fii_dii_flow_stress_test import (
@@ -2112,6 +2113,69 @@ class TrainingPipeline:
 
         return run_fii_dii_flow_classical_ml_backtest(
             self.fii_dii_price_df, self.participant_oi_full_panel, cost_calc, initial_capital,
+            hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
+            quantile_threshold=quantile_threshold, n_folds=n_folds,
+        )
+
+    def fii_dii_flow_pooled_classical_ml_backtest(
+        self,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        quantile_threshold: float = 0.8,
+        n_folds: int = 3,
+        lookback_days: int = 1825,
+    ) -> Dict[str, Any]:
+        """
+        Cross-sectional generalization of fii_dii_flow_classical_ml_backtest():
+        pools every instrument in config.yaml's
+        data.symbols.sector_etf_universe against the SAME shared
+        institutional-flow feature panel (one nationwide F&O aggregate,
+        not per-symbol) instead of just NIFTYBEES - built to attack the
+        "not enough independent data" bottleneck the investigation found
+        in the single-instrument search (see fii_dii_flow_quantum.py's
+        module docstring), not to widen the search space further. See
+        run_fii_dii_flow_pooled_ml_backtest's docstring for the full
+        walk-forward/pooling mechanism.
+
+        Fetches each universe symbol's own price series directly via
+        EquityBhavcopyProvider (already symbol-agnostic - it filters
+        NSE's full-market daily file, cached per calendar day not per
+        symbol, so adding symbols over an already-cached date range
+        costs no extra network fetches), reusing fii_dii_data_ingestion's
+        already-fetched shared flow panel (self.participant_oi_full_panel).
+
+        Does NOT change what's live in paper trading either way - same
+        "comparison" verdict/recommendation contract as the other two
+        fii-dii-flow diagnostics.
+        """
+        if (
+            not hasattr(self, "participant_oi_full_panel")
+            or self.participant_oi_full_panel is None
+            or self.participant_oi_full_panel.empty
+        ):
+            self.fii_dii_data_ingestion(lookback_days=lookback_days)
+
+        from src.data.equity_bhavcopy import EquityBhavcopyProvider
+
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=lookback_days)
+        price_provider = EquityBhavcopyProvider()
+
+        universe = self.config["data"]["symbols"].get("sector_etf_universe", [])
+        price_dfs: Dict[str, Any] = {}
+        for symbol in universe:
+            p_df = price_provider.fetch_symbol_range(symbol, start_date, end_date)
+            if not p_df.empty:
+                price_dfs[symbol] = p_df[["date", "close"]].copy()
+
+        if not price_dfs:
+            raise RuntimeError("No usable price data for any symbol in data.symbols.sector_etf_universe.")
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        return run_fii_dii_flow_pooled_classical_ml_backtest(
+            price_dfs, self.participant_oi_full_panel, cost_calc, initial_capital,
             hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
             quantile_threshold=quantile_threshold, n_folds=n_folds,
         )

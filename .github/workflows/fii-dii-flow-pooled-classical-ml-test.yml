@@ -1,0 +1,91 @@
+name: FII/DII Institutional-Flow Pooled Classical ML Diagnostic (CI Runner)
+
+# Cross-sectional generalization of fii-dii-flow-classical-ml-test.yml:
+# does pooling multiple instruments (config.yaml's
+# data.symbols.sector_etf_universe) against the SAME shared
+# institutional-flow feature panel find real signal the single-
+# instrument search couldn't? The feature panel is one nationwide F&O
+# aggregate, identical across every instrument - only each instrument's
+# own forward-return label differs - so pooling multiplies usable
+# sample size without widening the search space, built to attack the
+# "not enough independent data" bottleneck a prior investigation found
+# (real-data ablations: a plain classifier already matches the hand-
+# tuned rule when given the one known-good feature alone - Sharpe 1.04
+# vs 1.12 - but the wider 48-feature single-instrument search finds
+# nothing but harm). See TrainingPipeline.fii_dii_flow_pooled_classical_ml_backtest()'s
+# docstring and src/training/fii_dii_flow_quantum.py's module docstring
+# for the full methodology.
+#
+# No Kite session needed (same data sources as fii-dii-flow-test.yml).
+# No quantum simulation, no GPU needed - logistic regression fits and
+# permutation tests are cheap - so like fii-dii-flow-classical-ml-test.yml
+# this runs directly on a plain ubuntu-latest runner, no RunPod pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: fii-dii-flow-pooled-classical-ml-test
+  cancel-in-progress: false
+
+jobs:
+  fii-dii-flow-pooled-classical-ml-test:
+    runs-on: ubuntu-latest
+    # Pooling ~5 instruments roughly multiplies the genetic-evolution
+    # search's per-fold row count (and so its cost) by the number of
+    # instruments pooled, on top of fii-dii-flow-classical-ml-test.yml's
+    # own ~20-minute single-instrument runtime - a generous timeout
+    # rather than a measured one, since this is this workflow's first run.
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-fii-dii-flow.txt
+
+      - name: Run fii-dii-flow pooled classical ML diagnostic
+        working-directory: astra-trade-qml
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode fii-dii-flow-pooled-classical-ml-test | tee /tmp/fii_dii_flow_pooled_classical_ml_test.log
+
+      - name: Summarize fii-dii-flow pooled classical ML run
+        id: summarize
+        if: always()
+        run: |
+          RESULT_LINES=$(grep -E "fii_dii_flow_pooled_classical_ml_test_started|fii_dii_flow_pooled_classical_ml_test_sample_size|fii_dii_flow_pooled_classical_ml_test_fold|fii_dii_flow_pooled_classical_ml_test_cross_fold_consistency|fii_dii_flow_pooled_classical_ml_test_oos_result|fii_dii_flow_pooled_classical_ml_test_comparison|fii_dii_flow_pooled_classical_ml_test_complete" /tmp/fii_dii_flow_pooled_classical_ml_test.log || echo "(no matching result lines captured)")
+          {
+            echo "### FII/DII institutional-flow pooled classical ML diagnostic run"
+            echo
+            echo '```'
+            echo "$RESULT_LINES"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            FII/DII Institutional-Flow Pooled Classical ML Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

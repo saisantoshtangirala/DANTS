@@ -22,6 +22,7 @@ Usage:
     python3 -m src.main --mode fii-dii-flow-paper    # one resumable daily paper-trading step (git-persisted state)
     python3 -m src.main --mode fii-dii-flow-quantum-test  # diagnostic: genetically-evolved features + quantum kernel classifier vs. the live rule-based signal
     python3 -m src.main --mode fii-dii-flow-classical-ml-test  # diagnostic: same search, L1 logistic regression instead of quantum - run this FIRST
+    python3 -m src.main --mode fii-dii-flow-pooled-classical-ml-test  # diagnostic: same classical search, pooled across config.yaml's sector_etf_universe instead of just NIFTYBEES
 """
 
 import argparse
@@ -1294,6 +1295,8 @@ def _log_fii_dii_flow_ml_result(logger, mode: str, result: dict) -> None:
         f"{mode}_sample_size",
         model_label=result.get("model_label"),
         n_days_with_data=result.get("n_days_with_data"),
+        n_instruments=result.get("n_instruments"),
+        instruments=result.get("instruments"),
         n_trades=result.get("n_trades"),
         n_folds=result.get("n_folds"),
     )
@@ -1310,6 +1313,7 @@ def _log_fii_dii_flow_ml_result(logger, mode: str, result: dict) -> None:
             train_days=fold.get("train_days"),
             inner_train_days=fold.get("inner_train_days"),
             inner_val_days=fold.get("inner_val_days"),
+            n_instruments_pooled=fold.get("n_instruments_pooled"),
             is_quantum=fold.get("is_quantum"),
             train_accuracy=fold.get("train_accuracy"),
             n_genes_evaluated=fold.get("n_genes_evaluated"),
@@ -1399,6 +1403,27 @@ def run_fii_dii_flow_classical_ml_test(config: dict, logger) -> None:
     logger.info("fii_dii_flow_classical_ml_test_complete")
 
 
+def run_fii_dii_flow_pooled_classical_ml_test(config: dict, logger) -> None:
+    """Cross-sectional generalization of fii_dii_flow_classical_ml_test:
+    pools every instrument in config.yaml's data.symbols.sector_etf_universe
+    against the SAME shared institutional-flow feature panel instead of
+    just NIFTYBEES, multiplying usable sample size for the search without
+    widening the feature space - built to attack the "not enough
+    independent data" bottleneck found in the single-instrument search
+    (see src/training/fii_dii_flow_quantum.py's module docstring). See
+    TrainingPipeline.fii_dii_flow_pooled_classical_ml_backtest()'s
+    docstring for the full pooling mechanism. No Kite session needed
+    (same data sources as fii_dii_flow_test)."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_pooled_classical_ml_test_started")
+    result = pipeline.fii_dii_flow_pooled_classical_ml_backtest()
+    _log_fii_dii_flow_ml_result(logger, "fii_dii_flow_pooled_classical_ml_test", result)
+    logger.info("fii_dii_flow_pooled_classical_ml_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -1419,7 +1444,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test", "fii-dii-flow-classical-ml-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test", "fii-dii-flow-classical-ml-test", "fii-dii-flow-pooled-classical-ml-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1472,6 +1497,8 @@ def main() -> None:
         run_fii_dii_flow_quantum_test(config, logger)
     elif args.mode == "fii-dii-flow-classical-ml-test":
         run_fii_dii_flow_classical_ml_test(config, logger)
+    elif args.mode == "fii-dii-flow-pooled-classical-ml-test":
+        run_fii_dii_flow_pooled_classical_ml_test(config, logger)
 
 
 if __name__ == "__main__":
