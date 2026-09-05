@@ -1,0 +1,88 @@
+name: FII/DII Institutional-Flow Classical ML Diagnostic (CI Runner)
+
+# Same question as fii-dii-flow-quantum-test.yml - does a genetically-
+# evolved feature set over the wider institutional-flow raw feature
+# space beat fii-dii-flow-test.yml's frozen single-feature rule - but
+# with an L1-regularized logistic regression instead of
+# QuantumKernelClassifier. Meant to run BEFORE the quantum version: L1
+# does implicit feature selection and is far more sample-efficient than
+# a quantum kernel fit capped at 150 rows, so this is the real, cheap
+# test of "is there any generalizing signal in the wider feature space
+# at all" before spending RunPod GPU budget re-testing the quantum
+# version. See TrainingPipeline.fii_dii_flow_classical_ml_backtest()'s
+# docstring and src/training/fii_dii_flow_quantum.py's module docstring
+# for the full methodology - including the nested train/validation
+# split and permutation test added after the quantum version's first
+# real run turned out to be a textbook overfitting result (85-89%
+# per-fold train accuracy, but OOS Sharpe 0.13 at p=0.80 - statistically
+# indistinguishable from noise - against the rule's Sharpe 1.19 at
+# p=0.02).
+#
+# No Kite session needed (same data sources as fii-dii-flow-test.yml).
+# No quantum simulation, no GPU needed - logistic regression fits and
+# permutation tests are cheap - so like fii-dii-flow-test.yml this runs
+# directly on a plain ubuntu-latest runner, no RunPod pod.
+#
+# workflow_dispatch only - a one-off (or occasional, re-run manually)
+# research question, not a recurring production job.
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: fii-dii-flow-classical-ml-test
+  cancel-in-progress: false
+
+jobs:
+  fii-dii-flow-classical-ml-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r astra-trade-qml/requirements/requirements-fii-dii-flow.txt
+
+      - name: Run fii-dii-flow classical ML diagnostic
+        working-directory: astra-trade-qml
+        # set -o pipefail: without it, `python3 ... | tee log` reports the
+        # PIPELINE's exit code as tee's (always 0), masking a crash behind
+        # a green step - the exact bug already found and fixed in
+        # pairs-trading-test.yml.
+        run: |
+          set -o pipefail
+          python3 -u -m src.main --mode fii-dii-flow-classical-ml-test | tee /tmp/fii_dii_flow_classical_ml_test.log
+
+      - name: Summarize fii-dii-flow classical ML run
+        id: summarize
+        if: always()
+        run: |
+          RESULT_LINES=$(grep -E "fii_dii_flow_classical_ml_test_started|fii_dii_flow_classical_ml_test_sample_size|fii_dii_flow_classical_ml_test_fold|fii_dii_flow_classical_ml_test_cross_fold_consistency|fii_dii_flow_classical_ml_test_oos_result|fii_dii_flow_classical_ml_test_comparison|fii_dii_flow_classical_ml_test_complete" /tmp/fii_dii_flow_classical_ml_test.log || echo "(no matching result lines captured)")
+          {
+            echo "### FII/DII institutional-flow classical ML diagnostic run"
+            echo
+            echo '```'
+            echo "$RESULT_LINES"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "result_lines<<TELEGRAM_EOF"
+            echo "$RESULT_LINES"
+            echo "TELEGRAM_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Telegram
+        if: always()
+        uses: ./.github/actions/telegram-notify
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: |
+            FII/DII Institutional-Flow Classical ML Diagnostic - ${{ job.status }}
+            ${{ steps.summarize.outputs.result_lines }}
+
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

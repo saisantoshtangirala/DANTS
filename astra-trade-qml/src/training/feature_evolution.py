@@ -191,3 +191,116 @@ class FeatureEvolver:
                 derived = pd.Series(0.0, index=df.index)
             result[gene.name()] = derived.replace([np.inf, -np.inf], np.nan).fillna(0.0)
         return result
+
+    def evolve_with_validation(
+        self,
+        df_train: pd.DataFrame,
+        df_val: pd.DataFrame,
+        feature_cols: List[str],
+        label_col: str = "future_return",
+        n_candidates: int = 20,
+        n_permutations: int = 1000,
+        alpha: float = 0.05,
+    ) -> List[Tuple[Gene, float, float]]:
+        """Fixes evolve()'s double-dip (fitness scored on train, then the
+        same train data used to fit a downstream model - nothing ever has
+        to prove itself on data the search hasn't seen).
+
+        Runs evolve() on df_train only, takes the top `n_candidates` (by
+        TRAIN fitness - a wider pool than final selection needs, so there's
+        something left to filter), then re-scores each candidate's fitness
+        on df_val (held out, never touched by the GA search) and keeps only
+        those whose validation IC clears a permutation-tested significance
+        bar, Bonferroni-corrected for the `n_candidates` actually tested at
+        this stage - the same idea as the Bonferroni correction the
+        original hand-found DII feature had to clear across 120 fixed
+        combinations, applied here because the search space (evolved
+        combinations) is a moving target instead of a fixed list.
+
+        n_permutations must be large enough that even a perfect signal
+        can clear the corrected bar: the smallest p-value
+        permutation_test_ic can ever report is 1/(n_permutations+1), so
+        this needs 1/(n_permutations+1) < alpha/n_candidates - e.g. the
+        defaults (1000, 0.05, 20) give a smallest-possible p-value of
+        ~0.001 against a corrected threshold of 0.0025, a real margin.
+        Too few permutations relative to n_candidates/alpha makes passing
+        mathematically impossible regardless of signal strength - caught
+        by this method's own test suite hitting exactly that wall.
+
+        Returns (gene, val_ic, perm_p_value) triples sorted by val_ic
+        descending, capped at self.top_k - often fewer than top_k, and
+        honestly empty when nothing survives. Callers should refit the
+        surviving genes' columns on the FULL train+val data before fitting
+        a real model - df_val's only job here is gating which features are
+        trusted, not shrinking the final training set.
+        """
+        if label_col not in df_train.columns or label_col not in df_val.columns or not feature_cols:
+            return []
+
+        # evolve() ranks by train fitness and returns only self.top_k - ask
+        # for a wider pool temporarily so there's something left after the
+        # validation filter below, then restore the configured value.
+        original_top_k = self.top_k
+        self.top_k = max(self.top_k, n_candidates)
+        try:
+            candidates = self.evolve(df_train, feature_cols, label_col=label_col)
+        finally:
+            self.top_k = original_top_k
+
+        candidates = candidates[:n_candidates]
+        if not candidates:
+            return []
+
+        label_val = df_val[label_col].to_numpy(dtype=float)
+        corrected_alpha = alpha / len(candidates)
+
+        survivors: List[Tuple[Gene, float, float]] = []
+        for gene, _train_fitness in candidates:
+            derived_val = gene.evaluate(df_val)
+            if derived_val is None:
+                continue
+            val_fitness = self._fitness(derived_val, label_val)
+            if val_fitness <= 0:
+                continue
+            p_value = permutation_test_ic(
+                derived_val, label_val, n_permutations=n_permutations,
+                random_state=int(self.rng.integers(0, 2**31 - 1)),
+            )
+            if p_value <= corrected_alpha:
+                survivors.append((gene, val_fitness, p_value))
+
+        survivors.sort(key=lambda gvp: gvp[1], reverse=True)
+        return survivors[:original_top_k]
+
+
+def permutation_test_ic(
+    derived: pd.Series, label: np.ndarray, n_permutations: int = 500, random_state: int = 42,
+) -> float:
+    """Empirical p-value for a derived feature's |Spearman IC| against
+    label: shuffles label n_permutations times, recomputes the same |IC|
+    each time, and returns the fraction of shuffles scoring >= the
+    observed value (with add-one smoothing, so a p-value of exactly 0 is
+    never reported from a finite number of permutations). A gene that
+    only fits noise will score well against roughly as many shuffled
+    labels as the real one - a real signal will beat almost all of them."""
+    observed = FeatureEvolver._fitness(derived, label)
+    if observed <= 0:
+        return 1.0
+
+    values = derived.to_numpy()
+    finite = np.isfinite(values)
+    if finite.sum() < 10:
+        return 1.0
+
+    values_finite = values[finite]
+    label_finite = label[finite]
+    rng = np.random.default_rng(random_state)
+
+    count_ge = 0
+    for _ in range(n_permutations):
+        shuffled_label = rng.permutation(label_finite)
+        ic, _ = spearmanr(values_finite, shuffled_label)
+        if ic is not None and np.isfinite(ic) and abs(float(ic)) >= observed:
+            count_ge += 1
+
+    return (count_ge + 1) / (n_permutations + 1)

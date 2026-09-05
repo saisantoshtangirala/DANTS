@@ -67,7 +67,7 @@ class TestCompareToRuleBasedBenchmark:
         result = compare_to_rule_based_benchmark(quantum_oos, benchmark)
         assert result["beats_sharpe"] is True
         # benchmark's returns are far more consistent -> far smaller p-value than quantum's noisier series
-        assert result["quantum_oos_p_value"] > result["benchmark_oos_p_value"]
+        assert result["model_oos_p_value"] > result["benchmark_oos_p_value"]
         assert result["beats_significance"] is False
         assert result["verdict"] == "does_not_beat_benchmark"
 
@@ -137,10 +137,21 @@ class TestRunFiiDiiFlowQuantumBacktestPlumbing:
 
         assert result["n_days_with_data"] == n
         assert result["n_folds"] == 2
+        assert result["model_label"] == "quantum_kernel"
         assert len(result["fold_diagnostics"]) == 2
         for fold in result["fold_diagnostics"]:
-            assert fold["n_evolved_genes"] <= 2
+            if fold.get("skipped_reason"):
+                continue
+            # top_k=2 caps how many genes can survive validation, on top of
+            # the (near-certain, since this data is pure noise) validation
+            # filter itself rejecting most or all candidates.
+            assert fold["n_genes_passed_validation"] <= 2
             assert 0.0 <= fold["decision_threshold"] <= 1.0
+            assert "permutation_p_values" in fold
+            assert "inner_train_days" in fold and "inner_val_days" in fold
+
+        assert "cross_fold_consistency" in result
+        assert "recurring_raw_features" in result["cross_fold_consistency"]
 
         # A comparison should always be present once there are trades,
         # and its verdict must be one of the two defined outcomes.

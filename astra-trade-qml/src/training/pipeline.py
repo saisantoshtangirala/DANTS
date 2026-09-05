@@ -45,7 +45,10 @@ from src.training.factor_stress_test import (
     subperiod_breakdown,
 )
 from src.training.fii_dii_flow import run_fii_dii_flow_backtest
-from src.training.fii_dii_flow_quantum import run_fii_dii_flow_quantum_backtest
+from src.training.fii_dii_flow_quantum import (
+    run_fii_dii_flow_classical_ml_backtest,
+    run_fii_dii_flow_quantum_backtest,
+)
 from src.training.fii_dii_flow_stress_test import (
     fii_dii_flow_parameter_grid_search,
     one_sample_significance_test,
@@ -2073,6 +2076,44 @@ class TrainingPipeline:
             hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
             quantile_threshold=quantile_threshold, n_folds=n_folds, n_qubits=n_qubits,
             use_gpu=use_gpu,
+        )
+
+    def fii_dii_flow_classical_ml_backtest(
+        self,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        quantile_threshold: float = 0.8,
+        n_folds: int = 3,
+        lookback_days: int = 1825,
+    ) -> Dict[str, Any]:
+        """
+        Same question as fii_dii_flow_quantum_backtest() - does a
+        genetically-evolved feature set beat the frozen rule-based
+        signal - but with an L1-regularized logistic regression instead
+        of QuantumKernelClassifier. Meant to run FIRST: far cheaper and
+        more sample-efficient than a quantum-kernel fit, so this is the
+        real test of "is there any generalizing signal in the wider
+        institutional-flow feature space at all" before spending RunPod
+        GPU budget on the quantum version. See
+        src/training/fii_dii_flow_quantum.py's module docstring for the
+        full methodology (the nested train/validation split and
+        permutation test that fixed a real overfitting bug found when
+        this was first run for real) and intended rollout order.
+
+        Does NOT change what's live in paper trading either way - same
+        "comparison" verdict/recommendation contract as the quantum
+        version.
+        """
+        if not hasattr(self, "fii_dii_price_df") or self.fii_dii_price_df is None or self.fii_dii_price_df.empty:
+            self.fii_dii_data_ingestion(lookback_days=lookback_days)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        return run_fii_dii_flow_classical_ml_backtest(
+            self.fii_dii_price_df, self.participant_oi_full_panel, cost_calc, initial_capital,
+            hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
+            quantile_threshold=quantile_threshold, n_folds=n_folds,
         )
 
     def orb_backtest(

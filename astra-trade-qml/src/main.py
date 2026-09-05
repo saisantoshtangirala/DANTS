@@ -21,6 +21,7 @@ Usage:
     python3 -m src.main --mode fii-dii-flow-stress-test  # stress-test: fii-dii-flow-test result significance/sensitivity
     python3 -m src.main --mode fii-dii-flow-paper    # one resumable daily paper-trading step (git-persisted state)
     python3 -m src.main --mode fii-dii-flow-quantum-test  # diagnostic: genetically-evolved features + quantum kernel classifier vs. the live rule-based signal
+    python3 -m src.main --mode fii-dii-flow-classical-ml-test  # diagnostic: same search, L1 logistic regression instead of quantum - run this FIRST
 """
 
 import argparse
@@ -1284,48 +1285,52 @@ def run_fii_dii_flow_paper(config: dict, logger) -> None:
     logger.info("fii_dii_flow_paper_step_complete")
 
 
-def run_fii_dii_flow_quantum_test(config: dict, logger) -> None:
-    """Does a genetically-evolved feature set + this codebase's
-    existing quantum kernel classifier beat fii_dii_flow_test's frozen
-    single-feature rule (the one currently live in paper trading),
-    walk-forward validated on the same NSE institutional-flow data?
-    See TrainingPipeline.fii_dii_flow_quantum_backtest()'s docstring
-    and src/training/fii_dii_flow_quantum.py for the full methodology
-    and the explicit adoption gate - this diagnostic does NOT change
-    what's live in paper trading either way. No Kite session needed
-    (same data sources as fii_dii_flow_test)."""
-    from src.training.pipeline import TrainingPipeline
-
-    pipeline = TrainingPipeline(config, kite_provider=None)
-
-    logger.info("fii_dii_flow_quantum_test_started")
-    result = pipeline.fii_dii_flow_quantum_backtest()
+def _log_fii_dii_flow_ml_result(logger, mode: str, result: dict) -> None:
+    """Shared structured-logging for every run_fii_dii_flow_ml_backtest-
+    based diagnostic (fii_dii_flow_quantum_test, fii_dii_flow_classical_ml_test) -
+    same result shape, different classifier under the hood. `mode` names
+    the event prefix (e.g. "fii_dii_flow_quantum_test")."""
     logger.info(
-        "fii_dii_flow_quantum_test_sample_size",
+        f"{mode}_sample_size",
+        model_label=result.get("model_label"),
         n_days_with_data=result.get("n_days_with_data"),
         n_trades=result.get("n_trades"),
         n_folds=result.get("n_folds"),
     )
 
     for fold in result.get("fold_diagnostics", []):
+        if fold.get("skipped_reason"):
+            logger.info(f"{mode}_fold_skipped", fold=fold.get("fold"), reason=fold.get("skipped_reason"))
+            continue
         logger.info(
-            "fii_dii_flow_quantum_test_fold",
+            f"{mode}_fold",
             fold=fold.get("fold"),
             fold_start_date=fold.get("fold_start_date"),
             fold_end_date=fold.get("fold_end_date"),
             train_days=fold.get("train_days"),
+            inner_train_days=fold.get("inner_train_days"),
+            inner_val_days=fold.get("inner_val_days"),
             is_quantum=fold.get("is_quantum"),
             train_accuracy=fold.get("train_accuracy"),
-            n_evolved_genes=fold.get("n_evolved_genes"),
+            n_genes_evaluated=fold.get("n_genes_evaluated"),
+            n_genes_passed_validation=fold.get("n_genes_passed_validation"),
             evolved_gene_names=fold.get("evolved_gene_names"),
+            permutation_p_values=fold.get("permutation_p_values"),
             decision_threshold=fold.get("decision_threshold"),
             n_signals_in_fold=fold.get("n_signals_in_fold"),
+        )
+
+    cross_fold = result.get("cross_fold_consistency")
+    if cross_fold:
+        logger.info(
+            f"{mode}_cross_fold_consistency",
+            recurring_raw_features=cross_fold.get("recurring_raw_features"),
         )
 
     oos = result.get("oos") or {}
     if oos:
         logger.info(
-            "fii_dii_flow_quantum_test_oos_result",
+            f"{mode}_oos_result",
             total_trades=oos.get("total_trades"),
             win_rate=oos.get("win_rate"),
             avg_trade_return_pct=oos.get("avg_trade_return_pct"),
@@ -1337,10 +1342,10 @@ def run_fii_dii_flow_quantum_test(config: dict, logger) -> None:
     comparison = result.get("comparison")
     if comparison:
         logger.info(
-            "fii_dii_flow_quantum_test_comparison",
-            quantum_oos_sharpe=comparison.get("quantum_oos_sharpe"),
-            quantum_oos_p_value=comparison.get("quantum_oos_p_value"),
-            quantum_oos_n_trades=comparison.get("quantum_oos_n_trades"),
+            f"{mode}_comparison",
+            model_oos_sharpe=comparison.get("model_oos_sharpe"),
+            model_oos_p_value=comparison.get("model_oos_p_value"),
+            model_oos_n_trades=comparison.get("model_oos_n_trades"),
             benchmark_oos_sharpe=comparison.get("benchmark_oos_sharpe"),
             benchmark_oos_p_value=comparison.get("benchmark_oos_p_value"),
             benchmark_oos_n_trades=comparison.get("benchmark_oos_n_trades"),
@@ -1348,7 +1353,50 @@ def run_fii_dii_flow_quantum_test(config: dict, logger) -> None:
             recommendation=comparison.get("recommendation"),
         )
 
+
+def run_fii_dii_flow_quantum_test(config: dict, logger) -> None:
+    """Does a genetically-evolved feature set + this codebase's
+    existing quantum kernel classifier beat fii_dii_flow_test's frozen
+    single-feature rule (the one currently live in paper trading),
+    walk-forward validated on the same NSE institutional-flow data?
+    See TrainingPipeline.fii_dii_flow_quantum_backtest()'s docstring
+    and src/training/fii_dii_flow_quantum.py for the full methodology
+    (including the nested train/validation split and permutation test
+    that fixed a real overfitting bug found the first time this ran for
+    real) and the explicit adoption gate - this diagnostic does NOT
+    change what's live in paper trading either way. No Kite session
+    needed (same data sources as fii_dii_flow_test). Per this module's
+    docstring, run_fii_dii_flow_classical_ml_test is meant to run FIRST -
+    only re-run this one if that cheaper test beats the benchmark."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_quantum_test_started")
+    result = pipeline.fii_dii_flow_quantum_backtest()
+    _log_fii_dii_flow_ml_result(logger, "fii_dii_flow_quantum_test", result)
     logger.info("fii_dii_flow_quantum_test_complete")
+
+
+def run_fii_dii_flow_classical_ml_test(config: dict, logger) -> None:
+    """Same question as fii_dii_flow_quantum_test - does a genetically-
+    evolved feature set beat the frozen rule-based signal - but with an
+    L1-regularized logistic regression instead of QuantumKernelClassifier.
+    Meant to run FIRST: far cheaper and more sample-efficient than a
+    quantum-kernel fit, so this is the real test of "is there any
+    generalizing signal in the wider institutional-flow feature space at
+    all" before spending RunPod GPU budget on the quantum version. See
+    TrainingPipeline.fii_dii_flow_classical_ml_backtest()'s docstring and
+    src/training/fii_dii_flow_quantum.py for the full methodology. No
+    Kite session needed (same data sources as fii_dii_flow_test)."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_classical_ml_test_started")
+    result = pipeline.fii_dii_flow_classical_ml_backtest()
+    _log_fii_dii_flow_ml_result(logger, "fii_dii_flow_classical_ml_test", result)
+    logger.info("fii_dii_flow_classical_ml_test_complete")
 
 
 def run_dashboard(config: dict, logger) -> None:
@@ -1371,7 +1419,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test", "fii-dii-flow-classical-ml-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1422,6 +1470,8 @@ def main() -> None:
         run_fii_dii_flow_paper(config, logger)
     elif args.mode == "fii-dii-flow-quantum-test":
         run_fii_dii_flow_quantum_test(config, logger)
+    elif args.mode == "fii-dii-flow-classical-ml-test":
+        run_fii_dii_flow_classical_ml_test(config, logger)
 
 
 if __name__ == "__main__":

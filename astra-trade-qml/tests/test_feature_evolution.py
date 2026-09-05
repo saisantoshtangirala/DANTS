@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.training.feature_evolution import ALL_OPS, UNARY_OPS, FeatureEvolver, Gene
+from src.training.feature_evolution import ALL_OPS, UNARY_OPS, FeatureEvolver, Gene, permutation_test_ic
 
 
 @pytest.fixture
@@ -100,3 +100,79 @@ def test_evolve_returns_empty_when_no_feature_cols(synthetic_df):
 
 def test_all_ops_contains_unary_ops():
     assert set(UNARY_OPS).issubset(set(ALL_OPS))
+
+
+class TestPermutationTestIc:
+    def test_pure_noise_gives_high_p_value(self):
+        rng = np.random.default_rng(3)
+        n = 300
+        derived = pd.Series(rng.normal(size=n))
+        label = rng.normal(size=n)  # unrelated to derived
+        p = permutation_test_ic(derived, label, n_permutations=200, random_state=1)
+        assert p > 0.05
+
+    def test_strong_real_signal_gives_low_p_value(self):
+        rng = np.random.default_rng(4)
+        n = 300
+        derived = pd.Series(rng.normal(size=n))
+        label = derived.to_numpy() * 3.0 + rng.normal(scale=0.05, size=n)  # strongly driven by derived
+        p = permutation_test_ic(derived, label, n_permutations=200, random_state=1)
+        assert p < 0.01
+
+    def test_zero_fitness_short_circuits_to_p_one(self):
+        derived = pd.Series([1.0] * 20)  # constant -> zero IC
+        label = np.arange(20, dtype=float)
+        assert permutation_test_ic(derived, label) == 1.0
+
+
+class TestEvolveWithValidation:
+    def test_rejects_gene_that_only_fits_training_noise(self):
+        """A gene search over PURE NOISE features/label should find
+        nothing that survives validation - if it does, the double-dip
+        this method exists to fix is still present."""
+        rng = np.random.default_rng(5)
+        n = 150
+        train_df = pd.DataFrame({
+            "feature_a": rng.normal(size=n),
+            "feature_b": rng.normal(size=n),
+            "future_return": rng.normal(size=n),  # unrelated to features
+        })
+        val_df = pd.DataFrame({
+            "feature_a": rng.normal(size=n),
+            "feature_b": rng.normal(size=n),
+            "future_return": rng.normal(size=n),
+        })
+        evolver = FeatureEvolver(population_size=30, n_generations=10, top_k=5, random_state=2)
+        survivors = evolver.evolve_with_validation(
+            train_df, val_df, ["feature_a", "feature_b"], n_candidates=15, n_permutations=100,
+        )
+        assert survivors == []
+
+    def test_accepts_gene_that_is_genuinely_informative_in_both_slices(self):
+        rng = np.random.default_rng(6)
+        n = 200
+
+        def make_slice(seed):
+            r = np.random.default_rng(seed)
+            feature_a = r.normal(size=n)
+            noise_feature = r.normal(size=n)
+            future_return = feature_a * 2.5 + r.normal(scale=0.1, size=n)
+            return pd.DataFrame({"feature_a": feature_a, "noise_feature": noise_feature, "future_return": future_return})
+
+        train_df = make_slice(10)
+        val_df = make_slice(11)  # different draw, SAME underlying relationship
+
+        evolver = FeatureEvolver(population_size=30, n_generations=10, top_k=3, random_state=3)
+        survivors = evolver.evolve_with_validation(
+            train_df, val_df, ["feature_a", "noise_feature"], n_candidates=10, n_permutations=1000,
+        )
+        assert len(survivors) > 0
+        best_gene, val_ic, p_value = survivors[0]
+        assert best_gene.feature_a == "feature_a" or best_gene.feature_b == "feature_a"
+        assert val_ic > 0
+        assert p_value <= 0.05
+
+    def test_returns_empty_when_label_col_missing_from_either_slice(self):
+        df = pd.DataFrame({"feature_a": [1.0, 2.0, 3.0] * 10})
+        evolver = FeatureEvolver(population_size=5, n_generations=2)
+        assert evolver.evolve_with_validation(df, df, ["feature_a"], label_col="missing") == []
