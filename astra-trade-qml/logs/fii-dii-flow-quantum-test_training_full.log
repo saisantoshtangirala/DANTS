@@ -1,0 +1,79 @@
++ echo '=== GPU diagnostics (pre-install) ==='
+=== GPU diagnostics (pre-install) ===
++ nvidia-smi
+Sat Sep  5 05:48:08 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 550.127.05             Driver Version: 550.127.05     CUDA Version: 12.4     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A4500               On  |   00000000:C2:00.0 Off |                  Off |
+| 30%   33C    P8             23W /  200W |       2MiB /  20470MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
++ ldconfig
++ set +x
+Cloning into 'repo'...
+Updating files:  34% (51/147)Updating files:  35% (52/147)Updating files:  36% (53/147)Updating files:  37% (55/147)Updating files:  38% (56/147)Updating files:  39% (58/147)Updating files:  40% (59/147)Updating files:  41% (61/147)Updating files:  42% (62/147)Updating files:  43% (64/147)Updating files:  44% (65/147)Updating files:  45% (67/147)Updating files:  46% (68/147)Updating files:  47% (70/147)Updating files:  48% (71/147)Updating files:  49% (73/147)Updating files:  50% (74/147)Updating files:  51% (75/147)Updating files:  52% (77/147)Updating files:  53% (78/147)Updating files:  54% (80/147)Updating files:  55% (81/147)Updating files:  56% (83/147)Updating files:  57% (84/147)Updating files:  58% (86/147)Updating files:  59% (87/147)Updating files:  60% (89/147)Updating files:  61% (90/147)Updating files:  62% (92/147)Updating files:  63% (93/147)Updating files:  64% (95/147)Updating files:  65% (96/147)Updating files:  66% (98/147)Updating files:  67% (99/147)Updating files:  68% (100/147)Updating files:  69% (102/147)Updating files:  70% (103/147)Updating files:  70% (104/147)Updating files:  71% (105/147)Updating files:  72% (106/147)Updating files:  73% (108/147)Updating files:  74% (109/147)Updating files:  75% (111/147)Updating files:  76% (112/147)Updating files:  77% (114/147)Updating files:  78% (115/147)Updating files:  79% (117/147)Updating files:  80% (118/147)Updating files:  81% (120/147)Updating files:  82% (121/147)Updating files:  83% (123/147)Updating files:  84% (124/147)Updating files:  85% (125/147)Updating files:  86% (127/147)Updating files:  87% (128/147)Updating files:  88% (130/147)Updating files:  89% (131/147)Updating files:  90% (133/147)Updating files:  91% (134/147)Updating files:  92% (136/147)Updating files:  93% (137/147)Updating files:  94% (139/147)Updating files:  95% (140/147)Updating files:  96% (142/147)Updating files:  97% (143/147)Updating files:  98% (145/147)Updating files:  99% (146/147)Updating files: 100% (147/147)Updating files: 100% (147/147), done.
++ cd repo/astra-trade-qml
++ pip install --no-cache-dir -q -r requirements/requirements-runpod-image.txt
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable.It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 24.2 -> 26.2.1
+[notice] To update, run: python -m pip install --upgrade pip
++ echo '=== GPU diagnostics (post-install) ==='
+=== GPU diagnostics (post-install) ===
++ python3 -c '
+import torch
+torch.cuda.init()
+print(f'\''PyTorch {torch.__version__}, CUDA available: {torch.cuda.is_available()}'\'')
+if torch.cuda.is_available():
+    print(f'\''GPU: {torch.cuda.get_device_name(0)}, VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB'\'')
+else:
+    print('\''WARNING: CUDA not available - all training will run on CPU'\'')
+try:
+    import xgboost as xgb
+    print(f'\''XGBoost {xgb.__version__}'\'')
+except: pass
+'
+PyTorch 2.4.1+cu124, CUDA available: True
+GPU: NVIDIA RTX A4500, VRAM: 21.2 GB
+XGBoost 3.2.0
++ git config user.email runpod-bot@astra-trade-qml.local
++ git config user.name 'RunPod Training Bot'
++ set +x
++ echo '=== Starting training ==='
+=== Starting training ===
++ PYTHONUNBUFFERED=1
++ timeout 10800 python3 -u -m src.main --mode fii-dii-flow-quantum-test
+CUDA initialized: NVIDIA RTX A4500, VRAM: 21.2 GB
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/workspace/repo/astra-trade-qml/src/main.py", line 1428, in <module>
+    main()
+  File "/workspace/repo/astra-trade-qml/src/main.py", line 1424, in main
+    run_fii_dii_flow_quantum_test(config, logger)
+  File "/workspace/repo/astra-trade-qml/src/main.py", line 1297, in run_fii_dii_flow_quantum_test
+    from src.training.pipeline import TrainingPipeline
+  File "/workspace/repo/astra-trade-qml/src/training/pipeline.py", line 54, in <module>
+    from src.training.pairs_trading import backtest_pair, find_cointegrated_pairs
+  File "/workspace/repo/astra-trade-qml/src/training/pairs_trading.py", line 35, in <module>
+    from statsmodels.tsa.stattools import coint
+ModuleNotFoundError: No module named 'statsmodels'
++ TRAIN_EXIT=1
++ mkdir -p models/latest logs
++ echo exit=1
+++ date -u +%Y-%m-%dT%H:%M:%SZ
++ echo finished_at=2026-09-05T05:49:20Z
++ cp /workspace/training.log logs/fii-dii-flow-quantum-test_training_full.log
