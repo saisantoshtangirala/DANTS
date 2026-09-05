@@ -102,6 +102,63 @@ def compute_rolling_quantile_rank(feat: pd.Series, trailing_window: int) -> pd.S
     )
 
 
+def simulate_concurrent_tranche_trades(
+    dates: List[Any],
+    closes: List[float],
+    entry_ok: pd.Series,
+    hold_days: int,
+    max_concurrent_positions: int,
+    cost_calc: CostCalculator,
+    position_notional: float,
+) -> List[Dict[str, Any]]:
+    """Shared concurrent-tranche trade simulator, extracted so a
+    different entry rule (e.g. fii_dii_flow_quantum.py's evolved-
+    feature quantum classifier) can be backtested with EXACTLY the
+    same execution mechanics this validated rule uses - same
+    one-day publication-to-execution lag, same hold_days exit, same
+    CostCalculator - making the two approaches' OOS trade sets
+    directly comparable. They differ only in `entry_ok`, a positional
+    (0-indexed, aligned to `dates`/`closes`) boolean series saying
+    whether day i's signal fired.
+    """
+    n = len(dates)
+    trades: List[Dict[str, Any]] = []
+    open_positions: List[Tuple[int, float]] = []
+
+    for i in range(n):
+        d = dates[i]
+
+        still_open: List[Tuple[int, float]] = []
+        for entry_idx, entry_price in open_positions:
+            if i - entry_idx >= hold_days:
+                exit_price = closes[i]
+                quantity = position_notional / entry_price if entry_price > 0 else 0.0
+                net_pnl = cost_calc.net_pnl(entry_price, exit_price, quantity, side="BUY", delivery=True)
+                notional = entry_price * quantity
+                pnl_pct = net_pnl / notional if notional > 0 else 0.0
+                trades.append({
+                    "entry_date": dates[entry_idx], "exit_date": d,
+                    "entry_price": entry_price, "exit_price": exit_price,
+                    "pnl": net_pnl, "pnl_pct": pnl_pct, "confidence": 1.0,
+                })
+            else:
+                still_open.append((entry_idx, entry_price))
+        open_positions = still_open
+
+        if not bool(entry_ok.iloc[i]):
+            continue
+        if len(open_positions) >= max_concurrent_positions:
+            continue  # at capacity - a real, honestly-reported missed signal, not silently expanded risk
+        # Signal known only after day i's close - earliest real entry is
+        # the FOLLOWING trading day's close, not day i's own close.
+        entry_idx = i + 1
+        if entry_idx >= n:
+            continue
+        open_positions.append((entry_idx, closes[entry_idx]))
+
+    return trades
+
+
 def run_fii_dii_flow_backtest(
     price_df: pd.DataFrame,
     net_positioning: pd.Series,
@@ -144,43 +201,21 @@ def run_fii_dii_flow_backtest(
     feat = net_positioning.diff(flow_lookback_days)
     quantile_rank = compute_rolling_quantile_rank(feat, trailing_window)
 
-    position_notional = initial_capital / max_concurrent_positions
-
-    trades: List[Dict[str, Any]] = []
-    open_positions: List[Tuple[int, float]] = []  # (entry_idx, entry_price)
-
-    for i in range(n):
-        d = dates[i]
-
-        still_open: List[Tuple[int, float]] = []
-        for entry_idx, entry_price in open_positions:
-            if i - entry_idx >= hold_days:
-                exit_price = closes[i]
-                quantity = position_notional / entry_price if entry_price > 0 else 0.0
-                net_pnl = cost_calc.net_pnl(entry_price, exit_price, quantity, side="BUY", delivery=True)
-                notional = entry_price * quantity
-                pnl_pct = net_pnl / notional if notional > 0 else 0.0
-                trades.append({
-                    "entry_date": dates[entry_idx], "exit_date": d,
-                    "entry_price": entry_price, "exit_price": exit_price,
-                    "pnl": net_pnl, "pnl_pct": pnl_pct, "confidence": 1.0,
-                })
-            else:
-                still_open.append((entry_idx, entry_price))
-        open_positions = still_open
-
+    # Positional (0-indexed) admissibility series, aligned to dates/closes -
+    # the shared simulator's contract (see simulate_concurrent_tranche_trades),
+    # letting a different entry rule (e.g. fii_dii_flow_quantum.py's
+    # evolved-feature quantum classifier) reuse the exact same execution
+    # mechanics for a directly comparable OOS trade set.
+    entry_ok = pd.Series(False, index=range(n))
+    for i, d in enumerate(dates):
         qr = quantile_rank.get(d)
-        if qr is None or pd.isna(qr) or qr < quantile_threshold:
-            continue
-        if len(open_positions) >= max_concurrent_positions:
-            continue  # at capacity - a real, honestly-reported missed signal, not silently expanded risk
-        # Signal known only after day d's close (NSE publishes that
-        # evening) - earliest real entry is the FOLLOWING trading day's
-        # close, not day d's own close.
-        entry_idx = i + 1
-        if entry_idx >= n:
-            continue
-        open_positions.append((entry_idx, closes[entry_idx]))
+        if qr is not None and not pd.isna(qr) and qr >= quantile_threshold:
+            entry_ok.iloc[i] = True
+
+    position_notional = initial_capital / max_concurrent_positions
+    trades = simulate_concurrent_tranche_trades(
+        dates, closes, entry_ok, hold_days, max_concurrent_positions, cost_calc, position_notional,
+    )
 
     if not trades:
         return {"n_days_with_data": n, "n_trades": 0, "train": {}, "oos": {}}

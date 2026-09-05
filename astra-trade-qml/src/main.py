@@ -20,6 +20,7 @@ Usage:
     python3 -m src.main --mode fii-dii-flow-test     # diagnostic: NSE FII/DII institutional-flow signal, no ML model
     python3 -m src.main --mode fii-dii-flow-stress-test  # stress-test: fii-dii-flow-test result significance/sensitivity
     python3 -m src.main --mode fii-dii-flow-paper    # one resumable daily paper-trading step (git-persisted state)
+    python3 -m src.main --mode fii-dii-flow-quantum-test  # diagnostic: genetically-evolved features + quantum kernel classifier vs. the live rule-based signal
 """
 
 import argparse
@@ -1283,6 +1284,73 @@ def run_fii_dii_flow_paper(config: dict, logger) -> None:
     logger.info("fii_dii_flow_paper_step_complete")
 
 
+def run_fii_dii_flow_quantum_test(config: dict, logger) -> None:
+    """Does a genetically-evolved feature set + this codebase's
+    existing quantum kernel classifier beat fii_dii_flow_test's frozen
+    single-feature rule (the one currently live in paper trading),
+    walk-forward validated on the same NSE institutional-flow data?
+    See TrainingPipeline.fii_dii_flow_quantum_backtest()'s docstring
+    and src/training/fii_dii_flow_quantum.py for the full methodology
+    and the explicit adoption gate - this diagnostic does NOT change
+    what's live in paper trading either way. No Kite session needed
+    (same data sources as fii_dii_flow_test)."""
+    from src.training.pipeline import TrainingPipeline
+
+    pipeline = TrainingPipeline(config, kite_provider=None)
+
+    logger.info("fii_dii_flow_quantum_test_started")
+    result = pipeline.fii_dii_flow_quantum_backtest()
+    logger.info(
+        "fii_dii_flow_quantum_test_sample_size",
+        n_days_with_data=result.get("n_days_with_data"),
+        n_trades=result.get("n_trades"),
+        n_folds=result.get("n_folds"),
+    )
+
+    for fold in result.get("fold_diagnostics", []):
+        logger.info(
+            "fii_dii_flow_quantum_test_fold",
+            fold=fold.get("fold"),
+            fold_start_date=fold.get("fold_start_date"),
+            fold_end_date=fold.get("fold_end_date"),
+            train_days=fold.get("train_days"),
+            is_quantum=fold.get("is_quantum"),
+            train_accuracy=fold.get("train_accuracy"),
+            n_evolved_genes=fold.get("n_evolved_genes"),
+            evolved_gene_names=fold.get("evolved_gene_names"),
+            decision_threshold=fold.get("decision_threshold"),
+            n_signals_in_fold=fold.get("n_signals_in_fold"),
+        )
+
+    oos = result.get("oos") or {}
+    if oos:
+        logger.info(
+            "fii_dii_flow_quantum_test_oos_result",
+            total_trades=oos.get("total_trades"),
+            win_rate=oos.get("win_rate"),
+            avg_trade_return_pct=oos.get("avg_trade_return_pct"),
+            sharpe_ratio=oos.get("sharpe_ratio"),
+            trades_per_year=oos.get("trades_per_year"),
+            max_drawdown_pct=oos.get("max_drawdown_pct"),
+        )
+
+    comparison = result.get("comparison")
+    if comparison:
+        logger.info(
+            "fii_dii_flow_quantum_test_comparison",
+            quantum_oos_sharpe=comparison.get("quantum_oos_sharpe"),
+            quantum_oos_p_value=comparison.get("quantum_oos_p_value"),
+            quantum_oos_n_trades=comparison.get("quantum_oos_n_trades"),
+            benchmark_oos_sharpe=comparison.get("benchmark_oos_sharpe"),
+            benchmark_oos_p_value=comparison.get("benchmark_oos_p_value"),
+            benchmark_oos_n_trades=comparison.get("benchmark_oos_n_trades"),
+            verdict=comparison.get("verdict"),
+            recommendation=comparison.get("recommendation"),
+        )
+
+    logger.info("fii_dii_flow_quantum_test_complete")
+
+
 def run_dashboard(config: dict, logger) -> None:
     import subprocess
 
@@ -1303,7 +1371,7 @@ def run_dashboard(config: dict, logger) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Astra-Trade QML")
-    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper"], required=True)
+    parser.add_argument("--mode", choices=["train", "paper", "dashboard", "stress-test", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "pairs-trading-test", "event-drift-test", "passive-benchmarks-test", "orb-test", "factor-stress-test", "midcap-momentum-test", "midcap-momentum-stress-test", "fii-dii-flow-test", "fii-dii-flow-stress-test", "fii-dii-flow-paper", "fii-dii-flow-quantum-test"], required=True)
     parser.add_argument("--config", default=None, help="Path to config.yaml (default: config/config.yaml)")
     args = parser.parse_args()
 
@@ -1352,6 +1420,8 @@ def main() -> None:
         run_fii_dii_flow_stress_test(config, logger)
     elif args.mode == "fii-dii-flow-paper":
         run_fii_dii_flow_paper(config, logger)
+    elif args.mode == "fii-dii-flow-quantum-test":
+        run_fii_dii_flow_quantum_test(config, logger)
 
 
 if __name__ == "__main__":

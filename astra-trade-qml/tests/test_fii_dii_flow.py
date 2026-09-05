@@ -3,7 +3,11 @@ import pandas as pd
 import pytest
 
 from src.trading.costs import CostCalculator
-from src.training.fii_dii_flow import compute_rolling_quantile_rank, run_fii_dii_flow_backtest
+from src.training.fii_dii_flow import (
+    compute_rolling_quantile_rank,
+    run_fii_dii_flow_backtest,
+    simulate_concurrent_tranche_trades,
+)
 
 
 @pytest.fixture
@@ -187,3 +191,38 @@ class TestRunFiiDiiFlowBacktest:
         # larger given trades_per_year is far below 252 here
         naive_252_sharpe = pnl_pct.mean() / pnl_pct.std(ddof=1) * np.sqrt(252)
         assert abs(naive_252_sharpe) > abs(train["sharpe_ratio"])
+
+
+class TestSimulateConcurrentTrancheTrades:
+    """Direct coverage of the shared execution engine extracted so
+    fii_dii_flow_quantum.py can reuse the exact same mechanics with a
+    different entry rule - see that module's docstring."""
+
+    def test_no_entries_produces_no_trades(self, cost_calc):
+        dates = list(pd.bdate_range("2023-01-02", periods=20))
+        closes = [100.0] * 20
+        entry_ok = pd.Series(False, index=range(20))
+        trades = simulate_concurrent_tranche_trades(dates, closes, entry_ok, hold_days=5, max_concurrent_positions=3, cost_calc=cost_calc, position_notional=1000.0)
+        assert trades == []
+
+    def test_single_entry_exits_after_hold_days(self, cost_calc):
+        dates = list(pd.bdate_range("2023-01-02", periods=20))
+        closes = [100.0 + i for i in range(20)]
+        entry_ok = pd.Series(False, index=range(20))
+        entry_ok.iloc[2] = True  # signal fires on day 2 -> entry at day 3's close
+        trades = simulate_concurrent_tranche_trades(dates, closes, entry_ok, hold_days=5, max_concurrent_positions=3, cost_calc=cost_calc, position_notional=1000.0)
+        assert len(trades) == 1
+        assert trades[0]["entry_date"] == dates[3]
+        assert trades[0]["exit_date"] == dates[3 + 5]
+        assert trades[0]["entry_price"] == closes[3]
+        assert trades[0]["exit_price"] == closes[3 + 5]
+
+    def test_capacity_blocks_extra_entries(self, cost_calc):
+        dates = list(pd.bdate_range("2023-01-02", periods=20))
+        closes = [100.0] * 20
+        entry_ok = pd.Series(False, index=range(20))
+        for i in range(5):  # signal fires every day for the first 5 days
+            entry_ok.iloc[i] = True
+        trades = simulate_concurrent_tranche_trades(dates, closes, entry_ok, hold_days=10, max_concurrent_positions=2, cost_calc=cost_calc, position_notional=1000.0)
+        # only 2 concurrent tranches allowed - extra signals while at capacity are dropped
+        assert len(trades) == 2

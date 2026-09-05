@@ -45,6 +45,7 @@ from src.training.factor_stress_test import (
     subperiod_breakdown,
 )
 from src.training.fii_dii_flow import run_fii_dii_flow_backtest
+from src.training.fii_dii_flow_quantum import run_fii_dii_flow_quantum_backtest
 from src.training.fii_dii_flow_stress_test import (
     fii_dii_flow_parameter_grid_search,
     one_sample_significance_test,
@@ -1841,6 +1842,10 @@ class TrainingPipeline:
         panel = oi_provider.fetch_range(start_date, end_date)
         net_positioning = compute_net_positioning(panel)
         self.participant_oi_net_positioning = net_positioning["dii_net_index_future"] if not net_positioning.empty else net_positioning
+        # Full wide panel (every client_type x instrument column, not
+        # just the single validated DII feature above) - used by
+        # fii_dii_flow_quantum_backtest()'s wider raw feature search.
+        self.participant_oi_full_panel = net_positioning
 
         price_provider = EquityBhavcopyProvider()
         price_df = price_provider.fetch_symbol_range(symbol, start_date, end_date)
@@ -2016,6 +2021,49 @@ class TrainingPipeline:
         state_file.write_text(json.dumps(new_state, indent=2, default=str))
 
         return new_state
+
+    def fii_dii_flow_quantum_backtest(
+        self,
+        hold_days: int = 5,
+        max_concurrent_positions: int = 5,
+        quantile_threshold: float = 0.8,
+        n_folds: int = 3,
+        n_qubits: int = 4,
+        lookback_days: int = 1825,
+    ) -> Dict[str, Any]:
+        """
+        Does a genetically-evolved feature set + this codebase's
+        existing quantum kernel classifier beat fii_dii_flow_backtest()'s
+        frozen single-feature rule (the one currently live in paper
+        trading), walk-forward validated on the same NSE institutional-
+        flow data? See src/training/fii_dii_flow_quantum.py's module
+        docstring for the full methodology - genetic feature evolution
+        (src/training/feature_evolution.py) over a much wider raw
+        feature space than the one hand-picked DII feature
+        (src/training/fii_dii_flow_features.py), classified per
+        expanding-window fold by QuantumKernelClassifier
+        (src/models/quantum/quantum_kernel.py, the same quantum-kernel
+        SVM already used in the production ensemble), executed through
+        the identical concurrent-tranche trade engine the rule-based
+        backtest uses so the two are directly comparable.
+
+        Does NOT change what's live in paper trading either way - see
+        the returned "comparison" dict's verdict/recommendation for
+        whether this result clears the bar to be considered for that,
+        and src/trading/fii_dii_flow_paper.py's own docstring for what
+        it actually runs today.
+        """
+        if not hasattr(self, "fii_dii_price_df") or self.fii_dii_price_df is None or self.fii_dii_price_df.empty:
+            self.fii_dii_data_ingestion(lookback_days=lookback_days)
+
+        cost_calc = CostCalculator(self.config["trading"]["costs"])
+        initial_capital = self.config["trading"]["capital"]["initial"]
+
+        return run_fii_dii_flow_quantum_backtest(
+            self.fii_dii_price_df, self.participant_oi_full_panel, cost_calc, initial_capital,
+            hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
+            quantile_threshold=quantile_threshold, n_folds=n_folds, n_qubits=n_qubits,
+        )
 
     def orb_backtest(
         self,
