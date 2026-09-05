@@ -37,8 +37,25 @@ runs:
           echo "Telegram secrets not configured (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID) - skipping notification."
           exit 0
         fi
+        # The message bodies are grep'd from this codebase's structlog
+        # console output, which is colorized for a terminal: raw ANSI
+        # escape codes (ESC[32m, ESC[1m, ...) and structlog's own
+        # timestamp/level/logger-name boilerplate. Telegram has no ANSI
+        # renderer, so left as-is those escapes show up as literal
+        # garbled "[32m"/"[1m" text in the chat. Strip the escapes, drop
+        # the redundant "<date> <time> | INFO | <iso-timestamp> [info  ] "
+        # prefix and the trailing "[astra_trade]" logger tag each line
+        # carries, and collapse the resulting run of spaces - so what
+        # arrives in Telegram is just "<event_name> key=value ..." per
+        # line, not a scrollback dump.
+        TG_MESSAGE_CLEAN=$(printf '%s' "$TG_MESSAGE" \
+          | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' \
+          | sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:,]+ \| [A-Z]+ \| [0-9TZ:.+-]+ \[[a-z ]+\] //' \
+          | sed -E 's/\[astra_trade\] ?//g' \
+          | sed -E 's/[ \t]+/ /g' \
+          | sed -E 's/[ \t]+$//')
         # Telegram caps a single message at 4096 UTF-8 characters.
-        TG_MESSAGE_TRUNCATED=$(printf '%s' "$TG_MESSAGE" | head -c 4000)
+        TG_MESSAGE_TRUNCATED=$(printf '%s' "$TG_MESSAGE_CLEAN" | head -c 4000)
         status=$(curl -sS -o /tmp/telegram_response.json -w "%{http_code}" \
           -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
           --data-urlencode "chat_id=${TG_CHAT_ID}" \
