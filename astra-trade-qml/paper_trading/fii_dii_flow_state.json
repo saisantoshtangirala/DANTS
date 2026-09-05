@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "open_tranches": [],
+  "closed_trades": [],
+  "last_processed_signal_date": "2026-09-04",
+  "cumulative_pnl": 0,
+  "n_closed_trades": 0,
+  "n_open_tranches": 0,
+  "events": []
+}
