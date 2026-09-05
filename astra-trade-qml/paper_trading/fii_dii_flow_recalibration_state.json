@@ -1,16 +1,16 @@
 {
-  "last_run": "2026-09-05T09:42:39.380269",
+  "last_run": "2026-09-05T13:46:40.416177",
   "verdict": {
     "current_candidate": "dii_net_index_future_diff5",
     "current_feature_still_valid": false,
     "current_candidate_stats": {
       "feature": "dii_net_index_future_diff5",
-      "ic_full": 0.12576042628706238,
-      "p_full": 0.004995004995004995,
-      "ic_first_half": 0.08149106370585418,
-      "p_first_half": 0.21678321678321677,
-      "ic_second_half": 0.1644311715709464,
-      "p_second_half": 0.012987012987012988,
+      "ic_full": 0.12877148149688472,
+      "p_full": 0.005994005994005994,
+      "ic_first_half": 0.0818561570072914,
+      "p_first_half": 0.22677322677322678,
+      "ic_second_half": 0.17061864328830745,
+      "p_second_half": 0.008991008991008992,
       "passes_bonferroni_both_halves": false
     },
     "best_candidate": null,
