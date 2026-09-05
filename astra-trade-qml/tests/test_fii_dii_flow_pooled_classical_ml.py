@@ -113,6 +113,16 @@ class TestPooledClassicalMlBacktestGroundTruth:
         oos = result["oos"]
         assert oos.get("sharpe_ratio", 0.0) > 0
 
+        # Regression check: the per-instrument rule-based benchmark must
+        # actually be pooled and non-empty - the benchmark fires on its
+        # own top-quantile threshold regardless of the ML search, so a
+        # zero-trade benchmark here means the pooled benchmark
+        # aggregation itself is broken (caught for real once: a wrong
+        # dict key silently dropped every instrument's benchmark report).
+        comparison = result["comparison"]
+        assert comparison["benchmark_oos_n_trades"] > 0
+        assert comparison["benchmark_oos_sharpe"] != 0.0
+
     def test_rejects_pure_noise(self, cost_calc):
         dates = pd.bdate_range("2019-01-01", periods=700)
         wide = _shared_wide_panel(dates, seed=101)

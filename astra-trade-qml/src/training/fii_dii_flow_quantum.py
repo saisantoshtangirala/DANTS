@@ -613,14 +613,22 @@ def _first_index_on_or_after(dates: List[Any], target: Any) -> int:
     return len(dates)
 
 
-def _combine_period_reports(reports: List[Dict[str, Any]], initial_capital: float) -> Dict[str, Any]:
+def _combine_period_reports(reports: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Pools several already-computed reports' period_returns/
     period_dates (each produced by _report_from_trades) into one
-    aggregate report, using _report_from_trades itself on a
-    reconstructed pnl_pct/exit_date frame - used to combine multiple
-    instruments' individually-computed rule-based benchmark reports
-    into one pooled Sharpe/significance figure, the same way pooled
-    model trades are combined from a single concatenated trades_df."""
+    aggregate Sharpe/trade-count figure - used to combine multiple
+    instruments' individually-computed rule-based benchmark reports into
+    one pooled figure, the same way pooled model trades are combined
+    from a single concatenated trades_df.
+
+    Deliberately does NOT route through _report_from_trades/
+    generate_performance_report: those need per-trade columns
+    (pnl, confidence, ...) this function doesn't have - only the
+    period_returns/period_dates each input report already carries.
+    Recomputes just the two fields compare_to_rule_based_benchmark and
+    this module's callers actually need (sharpe_ratio, period_returns),
+    with the identical trade-level (not daily-bar) Sharpe annualization
+    _report_from_trades itself uses."""
     returns: List[float] = []
     dates: List[Any] = []
     for r in reports:
@@ -628,9 +636,24 @@ def _combine_period_reports(reports: List[Dict[str, Any]], initial_capital: floa
         dates.extend(r.get("period_dates", []))
     if not returns:
         return {"n_trades": 0}
+
     order = np.argsort(pd.to_datetime(pd.Series(dates)).to_numpy())
-    pooled = pd.DataFrame({"pnl_pct": np.array(returns)[order], "exit_date": np.array(dates, dtype=object)[order]})
-    return _report_from_trades(pooled, initial_capital)
+    pnl_pct = np.array(returns)[order]
+    exit_dates = pd.to_datetime(pd.Series(dates)).to_numpy()[order]
+
+    span_days = (pd.Timestamp(exit_dates[-1]) - pd.Timestamp(exit_dates[0])).days
+    trades_per_year = len(pnl_pct) / (span_days / 365.25) if span_days > 0 else float(len(pnl_pct))
+    std = pnl_pct.std(ddof=1) if len(pnl_pct) > 1 else 0.0
+    sharpe_ratio = float(pnl_pct.mean() / std * np.sqrt(trades_per_year)) if std > 1e-12 else 0.0
+
+    return {
+        "sharpe_ratio": sharpe_ratio,
+        "trades_per_year": float(trades_per_year),
+        "total_trades": len(pnl_pct),
+        "avg_trade_return_pct": float(pnl_pct.mean()),
+        "period_returns": list(pnl_pct),
+        "period_dates": list(exit_dates),
+    }
 
 
 def run_fii_dii_flow_pooled_ml_backtest(
@@ -886,7 +909,13 @@ def run_fii_dii_flow_pooled_ml_backtest(
             flow_lookback_days=5, trailing_window=252, quantile_threshold=quantile_threshold,
             hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
         )
-        if bench.get("n_trades", 0) > 0:
+        # _rule_based_benchmark_same_window returns {"n_trades": 0} in the
+        # no-trades case but the full _report_from_trades shape (whose
+        # trade-count field is "total_trades", not "n_trades") otherwise -
+        # check period_returns directly instead of a key name that
+        # differs between those two shapes, and that _combine_period_reports
+        # actually needs anyway.
+        if bench.get("period_returns"):
             benchmark_reports.append(bench)
 
     if not all_trades:
@@ -900,7 +929,7 @@ def run_fii_dii_flow_pooled_ml_backtest(
 
     trades_df = pd.DataFrame(all_trades).sort_values("exit_date").reset_index(drop=True)
     oos_report = _report_from_trades(trades_df, initial_capital)
-    benchmark = _combine_period_reports(benchmark_reports, initial_capital)
+    benchmark = _combine_period_reports(benchmark_reports)
     comparison = compare_to_rule_based_benchmark(oos_report, benchmark)
 
     return {
