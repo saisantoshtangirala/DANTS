@@ -859,7 +859,7 @@ def main() -> None:
     parser.add_argument("--boot-timeout-seconds", type=int, default=1800, help="Max time to wait for the container to start (30m default - the ~15GB PyTorch image can take 15-25min to pull on cold hosts)")
     parser.add_argument("--max-launch-attempts", type=int, default=3, help="Retries if the pod fails to boot (host-side failures like image-layer corruption)")
     parser.add_argument("--train-timeout-seconds", type=int, default=10800, help="Hard cap inside the pod (3h default)")
-    parser.add_argument("--script-mode", default="train", choices=["train", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test"], help="src.main --mode to run inside the pod (default: train)")
+    parser.add_argument("--script-mode", default="train", choices=["train", "swing-test", "swing-walk-forward", "xgboost-baseline", "regime-gated-test", "fii-dii-flow-quantum-test"], help="src.main --mode to run inside the pod (default: train)")
     parser.add_argument("--pod-name", default="", help="RunPod pod name (default: astra-trade-qml-training for train mode, astra-trade-qml-{script-mode} otherwise, so a non-train run never collides with a concurrent production training pod)")
     parser.add_argument("--poll-timeout-seconds", type=int, default=11400, help="Outer safety-net cap once booted (3h10m default)")
     parser.add_argument("--ssh-key-file", default="", help="Path to SSH private key for log streaming (overrides RUNPOD_SSH_KEY env var)")

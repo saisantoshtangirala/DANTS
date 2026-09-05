@@ -63,6 +63,7 @@ class QuantumKernelClassifier:
         pca_components: int = 4,
         fallback_to_classical: bool = True,
         quantum_depth_adaptation: bool = False,
+        use_gpu: bool = False,
     ):
         """
         Initialize Quantum Kernel classifier.
@@ -79,6 +80,16 @@ class QuantumKernelClassifier:
             quantum_depth_adaptation: After the initial fit, sweep
                 feature_map_reps over {1, 2, 3} and keep whichever gives
                 the best validation accuracy (requires X_val/y_val)
+            use_gpu: Try qiskit-aer's GPU-accelerated AerSimulator for
+                the kernel-fidelity sampler (requires qiskit-aer-gpu and
+                an actual CUDA GPU - installed on this project's RunPod
+                training pods, requirements/requirements-runpod-image.txt).
+                Falls back to the CPU-only exact StatevectorSampler on
+                ANY failure (no GPU, package not installed, wrong
+                build) - always safe to leave on, never breaks a
+                GPU-less environment, just doesn't speed it up. Off by
+                default so every already-validated call site's behavior
+                is unchanged unless it opts in.
         """
         self.n_qubits = n_qubits
         self.feature_map_type = feature_map_type
@@ -89,6 +100,7 @@ class QuantumKernelClassifier:
         self.pca_components = min(pca_components, n_qubits)
         self.fallback_to_classical = fallback_to_classical
         self.quantum_depth_adaptation = quantum_depth_adaptation
+        self.use_gpu = use_gpu
 
         self.feature_map = None
         self.quantum_kernel = None
@@ -237,15 +249,39 @@ class QuantumKernelClassifier:
         self.training_metrics["adapted_reps"] = best_reps
         print(f"  Quantum depth adaptation: chose reps={best_reps} (val_acc={best_val_acc:.4f})", flush=True)
 
-    @staticmethod
-    def _make_sampler():
-        """Create a V2 StatevectorSampler for quantum kernel fidelity computation.
+    def _make_sampler(self):
+        """Create a BaseSamplerV2-compatible sampler for quantum kernel
+        fidelity computation.
 
         ComputeUncompute (qiskit-algorithms 0.3.x) requires BaseSamplerV2.
-        StatevectorSampler is the V2 primitive that provides exact statevector
-        simulation and satisfies the BaseSamplerV2 interface.
+        When self.use_gpu is set, tries qiskit-aer's GPU-accelerated
+        AerSimulator first (qiskit_aer.primitives.SamplerV2 also
+        satisfies BaseSamplerV2) - real speedup for the O(n^2) circuit
+        evaluations a kernel matrix fit/predict costs, on hardware that
+        actually has a CUDA GPU and qiskit-aer-gpu installed. A 1-qubit
+        smoke circuit is run immediately so a GPU-less or misconfigured
+        environment fails fast HERE, not partway through a multi-minute
+        real fit - on any failure, falls back to the CPU-only exact
+        StatevectorSampler, the same primitive this class always used
+        before use_gpu existed.
         """
-        print("Quantum Kernel: using StatevectorSampler (V2, exact simulation)", flush=True)
+        if self.use_gpu:
+            try:
+                from qiskit_aer.primitives import SamplerV2 as AerGpuSamplerV2
+
+                gpu_sampler = AerGpuSamplerV2(
+                    options={"backend_options": {"device": "GPU", "method": "statevector"}}
+                )
+                probe = QuantumCircuit(1, 1)
+                probe.h(0)
+                probe.measure(0, 0)
+                gpu_sampler.run([probe], shots=1).result()
+                print("Quantum Kernel: using qiskit-aer GPU-accelerated AerSimulator (SamplerV2)", flush=True)
+                return gpu_sampler
+            except Exception as e:
+                print(f"Quantum Kernel: GPU sampler unavailable ({e}) - falling back to CPU StatevectorSampler.", flush=True)
+
+        print("Quantum Kernel: using StatevectorSampler (V2, exact simulation, CPU)", flush=True)
         return StatevectorSampler()
 
     def _fit_quantum(

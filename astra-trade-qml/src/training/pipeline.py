@@ -2030,6 +2030,7 @@ class TrainingPipeline:
         n_folds: int = 3,
         n_qubits: int = 4,
         lookback_days: int = 1825,
+        use_gpu: bool = True,
     ) -> Dict[str, Any]:
         """
         Does a genetically-evolved feature set + this codebase's
@@ -2047,6 +2048,14 @@ class TrainingPipeline:
         the identical concurrent-tranche trade engine the rule-based
         backtest uses so the two are directly comparable.
 
+        use_gpu=True by default: tries qiskit-aer's GPU-accelerated
+        AerSimulator for each fold's quantum-kernel fit (real speedup on
+        a RunPod pod with qiskit-aer-gpu and an actual CUDA GPU - see
+        .github/workflows/fii-dii-flow-quantum-test.yml), falling back
+        to the CPU-only exact simulator on any failure - safe to leave
+        on even where no GPU exists (e.g. local dev), just doesn't speed
+        anything up there.
+
         Does NOT change what's live in paper trading either way - see
         the returned "comparison" dict's verdict/recommendation for
         whether this result clears the bar to be considered for that,
@@ -2063,6 +2072,7 @@ class TrainingPipeline:
             self.fii_dii_price_df, self.participant_oi_full_panel, cost_calc, initial_capital,
             hold_days=hold_days, max_concurrent_positions=max_concurrent_positions,
             quantile_threshold=quantile_threshold, n_folds=n_folds, n_qubits=n_qubits,
+            use_gpu=use_gpu,
         )
 
     def orb_backtest(

@@ -1,4 +1,4 @@
-name: FII/DII Institutional-Flow Quantum/ML Diagnostic (CI Runner)
+name: FII/DII Institutional-Flow Quantum/ML Diagnostic (RunPod)
 
 # Does a genetically-evolved feature set + this codebase's existing
 # quantum kernel classifier (src/models/quantum/quantum_kernel.py, the
@@ -13,33 +13,54 @@ name: FII/DII Institutional-Flow Quantum/ML Diagnostic (CI Runner)
 # (periodic walk-forward re-calibration of the existing rule) if it
 # doesn't beat the benchmark.
 #
-# Same NSE-archive data sources as fii-dii-flow-test.yml - no Kite
-# session needed. Unlike that workflow, this one does real quantum-
-# circuit simulation work (qiskit's exact statevector simulator, CPU-
-# only - no RunPod GPU pod, QuantumKernelClassifier's own simulation
-# doesn't use one) per walk-forward fold, which is genuinely slow: a
-# single fold's QSVC fit on a 150-sample kernel matrix alone measured
-# ~65s locally at just 2 qubits, before the fold-diagnostic prediction
-# pass; the default 4-qubit, 3-fold config used here is expected to
-# take considerably longer, hence the generous timeout below relative
-# to fii-dii-flow-test.yml's.
+# Runs on a rented RunPod GPU pod, unlike every other fii-dii-flow
+# workflow (which need no ML training at all): this one does real
+# quantum-circuit simulation per walk-forward fold, CPU-bound by
+# default (qiskit's exact StatevectorSampler never used a GPU at all -
+# confirmed by reading quantum_kernel.py, its backend_name="aer_simulator"
+# parameter was stored but never actually wired to a backend). Fixed
+# for real here: QuantumKernelClassifier now takes use_gpu=True
+# (defaulted on in fii_dii_flow_quantum.py), trying qiskit-aer's
+# GPU-accelerated AerSimulator (qiskit-aer-gpu, already in
+# requirements-runpod-image.txt - the same image every other RunPod
+# workflow in this repo uses) before falling back to the CPU simulator
+# on any failure. A single fold's QSVC fit on a 150-row kernel matrix
+# measured ~65s on PLAIN CPU at just 2 qubits locally - this run uses 4
+# qubits x 3 folds on 5 years of real data, so even with a real GPU
+# speedup the timeout below stays generous.
 #
-# No RunPod GPU pod needed (see above), so like the other fii-dii-flow
-# workflows this runs directly on a plain ubuntu-latest runner.
+# No Kite session needed - both data sources
+# (src/data/participant_oi.py, src/data/equity_bhavcopy.py) hit NSE's
+# public archives directly, so no KITE_* secrets are passed to the pod.
 #
 # workflow_dispatch only - a one-off (or occasional, re-run manually)
 # research question, not a recurring production job.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      min_vram_gb:
+        description: "Minimum GPU VRAM (GB) to select"
+        required: false
+        default: "12"
 
 concurrency:
   group: fii-dii-flow-quantum-test
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   fii-dii-flow-quantum-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    # Padded well above the pod's own poll-timeout-seconds cap (3 launch
+    # attempts x 30min boot check, worst case, + the poll timeout once
+    # booted) - see regime-gated-test.yml's own timeout comment for the
+    # same reasoning; this diagnostic's actual training-side cost is a
+    # real unknown (first real GPU-accelerated run of this quantum
+    # kernel code), so this errs generous rather than risk a false
+    # "failed" from a hard job-timeout mid-run.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
@@ -48,30 +69,55 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install -r astra-trade-qml/requirements/requirements-fii-dii-flow-quantum.txt
+      - name: Install script dependencies
+        run: pip install requests
 
-      - name: Run fii-dii-flow quantum/ML diagnostic
-        working-directory: astra-trade-qml
-        # set -o pipefail: without it, `python3 ... | tee log` reports the
-        # PIPELINE's exit code as tee's (always 0), masking a crash behind
-        # a green step - the exact bug already found and fixed in
-        # pairs-trading-test.yml.
+      - name: Select cheapest available GPU
+        id: gpu
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
         run: |
-          set -o pipefail
-          python3 -u -m src.main --mode fii-dii-flow-quantum-test | tee /tmp/fii_dii_flow_quantum_test.log
+          GPU_IDS=$(python3 astra-trade-qml/scripts/ci/select_gpu.py \
+            --min-vram-gb "${{ github.event.inputs.min_vram_gb || '12' }}")
+          echo "gpu_ids=$GPU_IDS" >> "$GITHUB_OUTPUT"
+          echo "Selected GPUs: $GPU_IDS"
 
-      - name: Summarize fii-dii-flow quantum/ML run
+      - name: Generate ephemeral SSH key for pod log streaming
+        run: |
+          ssh-keygen -t ed25519 -f /tmp/runpod_ssh_key -N "" -q
+          chmod 600 /tmp/runpod_ssh_key
+
+      - name: Launch fii-dii-flow-quantum-test pod and wait for completion
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -u astra-trade-qml/scripts/ci/launch_training_pod.py \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --gpu-ids-json '${{ steps.gpu.outputs.gpu_ids }}' \
+            --ssh-key-file /tmp/runpod_ssh_key \
+            --script-mode fii-dii-flow-quantum-test \
+            --train-timeout-seconds 10800 \
+            --poll-timeout-seconds 11400 \
+            > >(tee /tmp/launch_fii_dii_flow_quantum_test_pod.log) 2>&1
+
+      - name: Summarize fii-dii-flow-quantum-test run
         id: summarize
         if: always()
         run: |
-          RESULT_LINES=$(grep -E "fii_dii_flow_quantum_test_started|fii_dii_flow_quantum_test_sample_size|fii_dii_flow_quantum_test_fold|fii_dii_flow_quantum_test_oos_result|fii_dii_flow_quantum_test_comparison|fii_dii_flow_quantum_test_complete" /tmp/fii_dii_flow_quantum_test.log || echo "(no matching result lines captured)")
+          RESULT_LINES=$(grep -E "^(Launch attempt|Pod .* (booted|failed to boot|vanished|terminated|still running)|::error::|Training completed successfully)" \
+            /tmp/launch_fii_dii_flow_quantum_test_pod.log || echo "(no matching status lines captured)")
           {
             echo "### FII/DII institutional-flow quantum/ML diagnostic run"
+            echo
+            echo "GPU candidates: \`${{ steps.gpu.outputs.gpu_ids }}\`"
             echo
             echo '```'
             echo "$RESULT_LINES"
             echo '```'
+            echo
+            echo "Full results: \`astra-trade-qml/logs/fii-dii-flow-quantum-test_training_full.log\` on the \`model-artifacts\` branch."
           } >> "$GITHUB_STEP_SUMMARY"
           {
             echo "result_lines<<TELEGRAM_EOF"
@@ -87,6 +133,8 @@ jobs:
           chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
           message: |
             FII/DII Institutional-Flow Quantum/ML Diagnostic - ${{ job.status }}
+            GPU candidates: ${{ steps.gpu.outputs.gpu_ids }}
             ${{ steps.summarize.outputs.result_lines }}
+            Full results: astra-trade-qml/logs/fii-dii-flow-quantum-test_training_full.log on model-artifacts
 
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

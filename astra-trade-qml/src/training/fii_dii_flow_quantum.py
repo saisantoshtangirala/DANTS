@@ -224,6 +224,7 @@ def run_fii_dii_flow_quantum_backtest(
     evolver_population: int = 30,
     evolver_top_k: int = 5,
     random_state: int = 42,
+    use_gpu: bool = True,
 ) -> Dict[str, Any]:
     """
     price_df: 'date' + 'close' (see fii_dii_flow.py on instrument
@@ -300,7 +301,7 @@ def run_fii_dii_flow_quantum_backtest(
         if len(np.unique(y_train)) < 2:
             continue  # degenerate label (all-up or all-down in this train slice) - can't fit a 2-class model
 
-        clf = QuantumKernelClassifier(n_qubits=n_qubits, use_pca=True, pca_components=n_qubits)
+        clf = QuantumKernelClassifier(n_qubits=n_qubits, use_pca=True, pca_components=n_qubits, use_gpu=use_gpu)
         clf.fit(X_train, y_train)
 
         # Decision threshold from the TRAIN slice's OWN predicted

@@ -104,7 +104,7 @@ class TestRunFiiDiiFlowQuantumBacktestPlumbing:
         top-quantile threshold logic to produce a plausible number of
         entries without a real quantum fit."""
 
-        def __init__(self, n_qubits, use_pca, pca_components):
+        def __init__(self, n_qubits, use_pca, pca_components, use_gpu=False):
             self.is_quantum = False
             self.training_metrics = {"train_accuracy": 0.6}
 
